@@ -7,6 +7,7 @@ import { paintSky } from '../render/paint';
 import { makeLandscape } from '../render/terrain';
 import { useGame, type Settings } from '../game/store';
 import { dailySeed, randomSeed } from '../game/world';
+import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
 
@@ -28,6 +29,7 @@ export function Title() {
   }, []);
   const tRef = useRef(0);
   const canContinue = s.savedT > 0 && !s.outcome;
+  const inTutorial = s.tutorial.active;
 
   const start = (seed: number) => {
     useGame.getState().newGame(seed, settings);
@@ -53,9 +55,12 @@ export function Title() {
         <div className="menu">
           {canContinue && (
             <button className="btn primary big" onClick={() => useGame.setState({ phase: 'play' })}>
-              Continue
+              {inTutorial ? 'Continue Flight School' : 'Continue'}
             </button>
           )}
+          <button className={`btn big ${canContinue ? '' : 'amber'}`} onClick={startTutorial}>
+            🎓 Flight School <span style={{ fontWeight: 500, fontSize: 13, opacity: 0.8 }}>· start here</span>
+          </button>
           <button className={`btn big ${canContinue ? '' : 'primary'}`} onClick={() => setSetup(true)}>
             New expedition
           </button>

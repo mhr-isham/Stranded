@@ -27,6 +27,7 @@ import { lifeSupportEnd } from '../../game/survival';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { flag, jumpTo } from '../../game/tutorial';
 
 interface McResult {
   fuelLeft: number[];
@@ -129,6 +130,7 @@ export function Launch() {
 
   const nowDay = t / DAY;
   const ready = Math.abs(depDay - nowDay) < 1.5;
+  if (ready && dep !== 'now') setTimeout(() => flag('launch-ready'), 0);
   const leadNow = (((TAU_DEG * (t - model.tOpp)) / model.P2 - (TAU_DEG * (t - model.tOpp)) / model.P1) % 360 + 360) % 360;
   const margin = plan ? budget - plan.total : NaN;
 
@@ -141,6 +143,12 @@ export function Launch() {
   };
 
   const warpTo = () => {
+    if (s.tutorial.active) {
+      // Flight School: skip straight there.
+      jumpTo(depDay * DAY);
+      toast('ECHO skipped ahead to the launch window');
+      return;
+    }
     clock.stopAt = depDay * DAY;
     clock.pauseAtStop = true;
     clock.warpIndex = WARPS.length - 1;
@@ -151,18 +159,18 @@ export function Launch() {
 
   return (
     <div className="tool">
-      <div className="tool-stage">
+      <div className="tool-stage" data-tut="launch-stage">
         <Orrery model={model} plan={plan} mc={mc} t={t} depDay={depDay} />
       </div>
       <div className="tool-side">
         <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
-        <div className="panel panel-pad stack">
+        <div className="panel panel-pad stack" data-tut="launch-departure">
           <div className="row between">
             <b>Departure</b>
             <span className="mono">day {fmt(depDay, 1)}</span>
           </div>
           <input type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
-          <div className="row">
+          <div className="row" data-tut="launch-windows">
             {windows.slice(0, 3).map((w, i) => (
               <button key={w} className="btn small" onClick={() => setDep(w / DAY)}>
                 Window {i + 1}: day {fmt(w / DAY, 1)}
@@ -184,7 +192,7 @@ export function Launch() {
               <input type="range" min={Math.round((hoh.tof / DAY) * 0.5)} max={Math.round((hoh.tof / DAY) * 1.6)} value={tofDays} onChange={(e) => setTofDays(Number(e.target.value))} />
             </>
           )}
-          {pork && <Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} />}
+          {pork && <div data-tut="launch-porkchop"><Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} /></div>}
           <Formula>t = π√((a₁+a₂)³ / 8GM★),  φ = 180° − 360°·t/P₂</Formula>
           <dl className="kv">
             <dt>Hohmann flight time</dt>
@@ -197,7 +205,7 @@ export function Launch() {
         </div>
 
         {plan && (
-          <div className="panel panel-pad stack">
+          <div className="panel panel-pad stack" data-tut="launch-fuel">
             <b>Fuel (your estimate)</b>
             <dl className="kv">
               <dt>Escape from surface</dt>
@@ -222,6 +230,7 @@ export function Launch() {
                 bars make this forecast honest too.
               </div>
             </div>
+            <div data-tut="launch-go">
             {ready ? (
               confirm ? (
                 <div className="row">
@@ -244,6 +253,7 @@ export function Launch() {
             ) : (
               <div className="amber">That date has passed.</div>
             )}
+            </div>
           </div>
         )}
       </div>

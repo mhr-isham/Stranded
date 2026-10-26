@@ -9,9 +9,10 @@ import { useGame } from '../../game/store';
 import { paintSky } from '../../render/paint';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
-import { Formula, ReadingsTable, SendReadings, ToolHeader } from '../common/sheetBits';
+import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
 import { Modal } from '../common/widgets';
 import { sfx } from '../../game/audio';
+import { flag } from '../../game/tutorial';
 
 const BOB_R = 0.025; // m
 
@@ -20,6 +21,7 @@ export function Pendulum() {
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const g = surfaceGravity(sys);
   const addReading = useGame((s) => s.addReading);
+  const keptG = useGame((s) => s.readings).filter((r) => r.key === 'g' && r.kept).map((r) => r.value);
 
   const [nominal, setNominal] = useState(1.5); // m, the coarse knob setting
   // The true length differs from the knob by a hidden knot/attachment offset.
@@ -69,6 +71,7 @@ export function Pendulum() {
       setElapsed(time);
       setNInput(taps ? String(taps) : '');
       setAsk({ time });
+      flag('pend-timed');
       sfx('click');
     }
   };
@@ -96,6 +99,7 @@ export function Pendulum() {
     phys.current.om = 0;
     phys.current.swinging = true;
     phys.current.trail = [];
+    flag('pend-released');
   };
   const stopSwing = () => {
     phys.current.swinging = false;
@@ -138,6 +142,7 @@ export function Pendulum() {
               phys.current.om = 0;
               phys.current.swinging = true;
               phys.current.trail = [];
+              flag('pend-released');
             }
           }}
           draw={({ ctx, w, h, dpr, now, dt }) => {
@@ -250,7 +255,7 @@ export function Pendulum() {
             void now;
           }}
         />
-        <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }}>
+        <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="pend-watch">
           <div className="row" style={{ justifyContent: 'center', gap: 10, flexWrap: 'nowrap' }}>
             <div style={{ textAlign: 'center' }}>
               <div className="readout" style={{ minWidth: 120, fontSize: 24 }}>{fmtWatch(elapsed)}</div>
@@ -273,20 +278,22 @@ export function Pendulum() {
         <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. Clock runs in real time here." />
         <div className="panel panel-pad stack">
           <b>1 · Set the string length</b>
-          <input type="range" min={0.6} max={3} step={0.1} value={nominal} onChange={(e) => setNominal(Number(e.target.value))} disabled={running} />
+          <input data-tut="pend-length" type="range" min={0.6} max={3} step={0.1} value={nominal} onChange={(e) => setNominal(Number(e.target.value))} disabled={running} />
           <div className="muted" style={{ fontSize: 13 }}>Knob setting ≈ {fmt(nominal, 1)} m — the exact length depends on the knot. Measure it:</div>
           <b>2 · Measure it on the scale</b>
-          <Scale trueL={trueL} nominal={nominal} value={lRead} onChange={setLRead} />
+          <div data-tut="pend-scale">
+            <Scale trueL={trueL} nominal={nominal} value={lRead} onChange={(v) => (setLRead(v), flag('pend-measured'))} />
+          </div>
           <div className="row between">
             <span className="muted">Your reading (pivot → bob centre)</span>
             <span className="readout small">{lRead === null ? '—' : `${fmt(lRead, 4)} m`}</span>
           </div>
           <b>3 · Release and time it</b>
-          <div className="row">
+          <div className="row" data-tut="pend-release">
             <span className="muted" style={{ fontSize: 13 }}>Release angle {fmt(amp, 1)}°</span>
             <input type="range" min={1} max={30} step={0.5} value={amp} onChange={(e) => setAmp(Number(e.target.value))} style={{ flex: 1 }} />
           </div>
-          <div className="row">
+          <div className="row" data-tut="pend-release">
             <button className="btn primary" onClick={release}>
               Release
             </button>
@@ -302,7 +309,7 @@ export function Pendulum() {
         </div>
 
         {result && (
-          <div className="panel panel-pad stack">
+          <div className="panel panel-pad stack" data-tut="pend-result">
             <b>Result</b>
             <dl className="kv">
               <dt>Time for {result.N} swings</dt>
@@ -314,6 +321,14 @@ export function Pendulum() {
               <dt>Gravity g</dt>
               <dd className="blue">{fmt(result.g, 4)} m/s²</dd>
             </dl>
+            <SanityWarning
+              msgs={[
+                (result.g < 2 || result.g > 40) && 'That is not a plausible gravity for a planet you can stand on. Did you enter the right number of swings?',
+                result.N < 5 && 'Fewer than 5 swings: your reaction time dominates this reading. Time more swings for a better result.',
+                amp > 15 && `A ${fmt(amp, 0)}° release makes the swing slower than the formula assumes, so this g is too small.`,
+                outlierNote(result.g, keptG, 0.08),
+              ]}
+            />
             <div className="row">
               <button
                 className="btn primary"
@@ -332,15 +347,16 @@ export function Pendulum() {
           </div>
         )}
 
-        <div className="panel panel-pad">
+        <div className="panel panel-pad" data-tut="pend-log">
           <b>Gravity log</b>
           <ReadingsTable k="g" />
-          <SendReadings k="g" />
+          <SendReadings k="g" tut="pend-send" />
         </div>
       </div>
 
       {ask && (
         <Modal>
+          <div data-tut="pend-count" />
           <h2>How many full swings?</h2>
           <p className="muted">
             You timed {fmt(ask.time, 2)} s. A full swing is there and back. {taps ? `You tapped ${taps}.` : ''}
@@ -359,6 +375,7 @@ export function Pendulum() {
                 const T = ask.time / N;
                 setResult({ N, T, time: ask.time, g: (4 * Math.PI ** 2 * (lRead ?? 0)) / (T * T) });
                 setAsk(null);
+                flag('pend-result');
               }}
             >
               Calculate g

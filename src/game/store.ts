@@ -65,6 +65,17 @@ export interface Outcome {
   sheet: Partial<Record<PrimaryKey, Estimate>>;
 }
 
+export interface TutorialState {
+  active: boolean;
+  step: number;
+  /** Things the player has done that tutorial steps wait for (e.g. 'pend-released'). */
+  flags: string[];
+  /** Lessons the player has opened (for the lesson library). */
+  lessons: string[];
+  /** Extra text ECHO shows on the current step (e.g. the pre-flight report). */
+  note?: string[];
+}
+
 export interface GameState {
   phase: Phase;
   screen: Screen;
@@ -92,6 +103,7 @@ export interface GameState {
   survival: SurvivalState;
   outcome: Outcome | null;
   lastNightLog: number;
+  tutorial: TutorialState;
 
   set: (p: Partial<GameState>) => void;
   go: (screen: Screen) => void;
@@ -145,6 +157,7 @@ const initial = {
   survival: freshSurvival(600),
   outcome: null,
   lastNightLog: -1,
+  tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
 };
 
 let nextId = Date.now();
@@ -160,7 +173,15 @@ export const useGame = create<GameState>()(
         clock.paused = false;
         clock.warpIndex = 3;
         clock.stopAt = Infinity;
-        set({ ...initial, phase: 'intro', seed, settings, codex: get().codex, achievements: get().achievements });
+        set({
+          ...initial,
+          phase: 'intro',
+          seed,
+          settings,
+          codex: get().codex,
+          achievements: get().achievements,
+          tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
+        });
       },
       addReading: (r) =>
         set((s) => ({ readings: [...s.readings, { ...r, id: String(nextId++), kept: true, note: r.note ?? '' }] })),
@@ -180,6 +201,8 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'stranded-save-v1',
+      version: 2,
+      migrate: (old) => ({ ...(old as object), tutorial: { active: false, step: 0, flags: [], lessons: [] } }) as unknown as GameState,
       partialize: (s) => {
         const { set: _a, go: _b, newGame: _c, addReading: _d, toggleReading: _e, removeReading: _f, setSheet: _g, say: _h, dismissEcho: _i, unlock: _j, ...rest } = s;
         return { ...rest, savedT: clock.t };

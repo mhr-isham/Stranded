@@ -39,10 +39,7 @@ export function targetObservable(t: number, minAlt = 12 * DEG) {
 export function advance(dtReal: number) {
   const s = useGame.getState();
   if (s.phase !== 'play') return;
-  const { system: sys, solarDay } = currentWorld();
-  const t0 = clock.t;
-  const end = lifeSupportEnd(s, sys);
-  let t1 = Math.min(t0 + clock.rate * Math.min(dtReal, 0.1), clock.stopAt);
+  const t1 = Math.min(clock.t + clock.rate * Math.min(dtReal, 0.1), clock.stopAt);
   if (t1 >= clock.stopAt && clock.stopAt !== Infinity) {
     clock.stopAt = Infinity;
     clock.warpIndex = Math.min(clock.warpIndex, 3);
@@ -50,6 +47,28 @@ export function advance(dtReal: number) {
     clock.pauseAtStop = false;
     clock.emit();
   }
+  stepTo(t1, dtReal);
+}
+
+/**
+ * Jump game time forward to `target` at once, still processing everything
+ * that happens on the way (tracker logs, rover arrival, survival upkeep).
+ */
+export function fastForward(target: number) {
+  let guard = 0;
+  while (clock.t < target - 1 && useGame.getState().phase === 'play' && guard++ < 5000) {
+    stepTo(Math.min(target, clock.t + 2 * DAY), 0);
+  }
+  clock.emit();
+}
+
+function stepTo(t1Wanted: number, dtReal: number) {
+  const s = useGame.getState();
+  const { system: sys, solarDay } = currentWorld();
+  const t0 = clock.t;
+  let t1 = t1Wanted;
+  // The tutorial never runs out of air: it is about learning, not pressure.
+  const end = s.tutorial.active ? Infinity : lifeSupportEnd(s, sys);
   if (t1 >= end) {
     t1 = end;
     clock.t = t1;
@@ -110,7 +129,7 @@ export function advance(dtReal: number) {
   if (s.identified && Math.abs(t1 - nearestOpposition(t1)) < 25 * DAY) s.say(ECHO.parallax);
 
   missionTimer += dtReal;
-  if (missionTimer > 0.4) {
+  if (missionTimer > 0.4 && !s.tutorial.active) {
     missionTimer = 0;
     checkMissions();
   }

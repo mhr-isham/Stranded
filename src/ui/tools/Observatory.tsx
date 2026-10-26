@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
@@ -16,8 +16,9 @@ import { drawScope, SEEING } from '../../render/telescope';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Chart, unwrapDeg } from '../common/Chart';
-import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader } from '../common/sheetBits';
+import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierNote } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'catalog'; i: number };
 type Tab = 'sky' | 'year' | 'track' | 'micro' | 'moon';
@@ -47,6 +48,41 @@ export function Observatory() {
   const calip = useRef({ x1: -15 * ARCSEC, x2: 15 * ARCSEC, dragging: 0 as 0 | 1 | 2 | 3, start: { x: 0, a: 0, b: 0 } });
   const scopeK = useRef(1);
   const fov = Math.pow(10, fovLog) * DEG;
+
+  /** Point the telescope at an object (used by the "point at" buttons and Flight School). */
+  const pointAt = (kind: 'star' | 'target', fovDeg: number, tabId?: Tab) => {
+    setSel({ kind });
+    const off = Math.min(0.12, fovDeg / 12) * DEG;
+    aim.current = { a: (Math.random() - 0.5) * off, b: (Math.random() - 0.5) * off };
+    setMode('scope');
+    setFovLog(Math.log10(fovDeg));
+    if (tabId) setTab(tabId);
+    if (kind === 'target' && fovDeg < 0.1) calip.current = { ...calip.current, x1: -fovDeg * DEG * 0.22, x2: fovDeg * DEG * 0.22 };
+  };
+
+  useEffect(
+    () =>
+      onTutEvent((e) => {
+        if (e === 'select-target') {
+          setSel({ kind: 'target' });
+          aim.current = { a: 0, b: 0 };
+          flag('obs-sel-target');
+        } else if (e === 'scope-star') {
+          pointAt('star', 2, 'year');
+          flag('scope-star');
+        } else if (e === 'micro-ready') {
+          pointAt('target', 1 / 60, 'micro');
+          flag('micro-ready');
+        }
+      }),
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Tutorial signals.
+  useEffect(() => {
+    if (mode === 'scope' && sel) flag('scope-open');
+    if (mode === 'scope' && sel?.kind === 'target' && fov < 0.1 * DEG) flag('scope-zoomed');
+  }, [mode, sel, fov]);
 
   const objDir = (sl: Sel, tt: number): Vec3 => {
     if (sl.kind === 'star') return unit(topocentric(sys, 'star', tt, sys.site));
@@ -100,6 +136,7 @@ export function Observatory() {
     catalog.forEach((c, i) => c.mag < 2.6 && test({ kind: 'catalog', i }, c.dir));
     if (best) {
       setSel(best);
+      if ((best as Sel).kind === 'target') flag('obs-sel-target');
       aim.current = { a: (Math.random() - 0.5) * 0.4 * DEG, b: (Math.random() - 0.5) * 0.4 * DEG };
       sfx('click');
     }
@@ -121,7 +158,7 @@ export function Observatory() {
 
   return (
     <div className="tool">
-      <div className="tool-stage">
+      <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
             onPointerDown={(e) => {
@@ -156,9 +193,15 @@ export function Observatory() {
               gesture.current = null;
             }}
             onWheel={(e) => (cam.current.fov = Math.max(15 * DEG, Math.min(120 * DEG, cam.current.fov * (e.deltaY > 0 ? 1.1 : 0.9))))}
-            draw={({ ctx, w, h, dpr, now }) => {
+            draw={({ ctx, w, h, dpr, now, canvas }) => {
               const camera = { az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w, h };
               const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { showEcliptic: showEcl });
+              // Let Flight School point at the blue planet.
+              const tp = P.project(scene.target);
+              if (tp && scene.target[2] > 0 && tp.x > 0 && tp.y > 0 && tp.x < w && tp.y < h) {
+                const r = canvas.getBoundingClientRect();
+                setAnchor('planet', r.left + tp.x / dpr, r.top + tp.y / dpr);
+              }
               cam.current.scale = P.scale;
               // Selection ring and labels.
               const label = (d: [number, number, number], text: string, color: string) => {
@@ -302,6 +345,7 @@ export function Observatory() {
             Wide sky
           </button>
           <button
+            data-tut="obs-scope-btn"
             className={`btn ${mode === 'scope' ? 'primary' : ''}`}
             onClick={() => (sel ? setMode('scope') : toast('Tap a light in the sky first'))}
           >
@@ -309,7 +353,7 @@ export function Observatory() {
           </button>
         </div>
         {mode === 'scope' && (
-          <div className="panel panel-pad stage-bottom" style={{ width: 'min(440px, calc(100% - 16px))', padding: '8px 12px' }}>
+          <div className="panel panel-pad stage-bottom" data-tut="obs-fov" style={{ width: 'min(440px, calc(100% - 16px))', padding: '8px 12px' }}>
             <div className="row between">
               <span className="muted" style={{ fontSize: 13 }}>Field of view</span>
               <span className="mono">{fov > 0.1 * DEG ? `${fmt(fov / DEG, 2)}°` : `${fmt(fov / ARCSEC, 0)}″`}</span>
@@ -327,6 +371,7 @@ export function Observatory() {
             {TABS.map((tb) => (
               <button
                 key={tb.id}
+                data-tut={`obs-tab-${tb.id}`}
                 className={`btn small ${tab === tb.id ? 'primary' : 'ghost'}`}
                 onClick={() => {
                   setTab(tb.id);
@@ -354,7 +399,7 @@ export function Observatory() {
               </div>
             )}
             {mode === 'scope' && sel && sel.kind !== 'star' && !s.identified && (
-              <button className="btn primary" onClick={identify}>
+              <button className="btn primary" onClick={identify} data-tut="obs-identify">
                 This is the blue planet
               </button>
             )}
@@ -377,6 +422,7 @@ export function Observatory() {
 
         {tab === 'year' && (
           <YearPanel
+            onPoint={() => (pointAt('star', 2), flag('scope-star'))}
             canLog={mode === 'scope' && sel?.kind === 'star' && twilight}
             reason={sel?.kind !== 'star' ? 'Select the star and open the telescope (the solar filter fits automatically).' : mode !== 'scope' ? 'Open the telescope.' : !twilight ? 'Wait for sunrise or sunset: the tracker needs the star low in a twilight sky to see reference stars.' : ''}
             onLog={() => {
@@ -397,14 +443,19 @@ export function Observatory() {
             <div className="muted" style={{ fontSize: 13 }}>
               Point the telescope at the blue planet, zoom right in (under 2′), then drag the two green wires onto opposite edges of its disk.
             </div>
+            <button className="btn" data-tut="micro-point" onClick={() => (pointAt('target', 1 / 60), flag('micro-ready'))} disabled={!s.identified}>
+              Point at the blue planet (1′ field)
+            </button>
             <MicroReadout calip={calip} />
             <button
+              data-tut="micro-log"
               className="btn primary"
               disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified)}
               onClick={() => {
                 const a = Math.abs(calip.current.x2 - calip.current.x1);
                 s.addReading({ key: 'alpha2', value: a, at: clock.t, note: `day ${fmt(clock.t / DAY, 1)}` });
-                toast(`Diameter ${fmt(a / ARCSEC, 2)}″ logged`);
+                const warn = outlierNote(a, s.readings.filter((r) => r.key === 'alpha2' && r.kept).map((r) => r.value), 0.15);
+                toast(warn ? `Logged ${fmt(a / ARCSEC, 2)}″ — but it is far from your other readings. Check the wires.` : `Diameter ${fmt(a / ARCSEC, 2)}″ logged`);
                 sfx('log');
               }}
             >
@@ -413,7 +464,7 @@ export function Observatory() {
             <div className="hint">The disk looks biggest — and is easiest to measure — near opposition, when the blue planet is closest.</div>
             <Formula>R₂ = d · tan(α₂ / 2)</Formula>
             <ReadingsTable k="alpha2" render={(v) => `${fmt(v / ARCSEC, 2)}″`} />
-            <SendReadings k="alpha2" />
+            <SendReadings k="alpha2" tut="micro-send" />
           </div>
         )}
 
@@ -436,7 +487,7 @@ function MicroReadout({ calip }: { calip: React.MutableRefObject<{ x1: number; x
   return <div className="readout">{fmt(Math.abs(calip.current.x2 - calip.current.x1) / ARCSEC, 2)}″</div>;
 }
 
-function YearPanel({ canLog, reason, onLog }: { canLog: boolean; reason: string; onLog: () => void }) {
+function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void }) {
   const obs = useGame((s) => s.starObs);
   const [band, setBand] = useState<[number, number] | null>(null);
   const days = obs.map((o) => o.at / DAY);
@@ -453,10 +504,14 @@ function YearPanel({ canLog, reason, onLog }: { canLog: boolean; reason: string;
         At sunrise or sunset, centre the star in the telescope and log its position against the background stars. Come back days or weeks later.
         The star drifts east by 360° per year.
       </div>
-      <button className="btn primary" disabled={!canLog} onClick={onLog}>
+      <button className="btn" data-tut="year-point" onClick={onPoint}>
+        Point at the star (solar filter)
+      </button>
+      <button className="btn primary" disabled={!canLog} onClick={onLog} data-tut="year-log">
         Log star position
       </button>
       {!canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
+      <div data-tut="year-fit" className="stack">
       {pts.length > 0 && (
         <Chart
           series={[
@@ -483,6 +538,7 @@ function YearPanel({ canLog, reason, onLog }: { canLog: boolean; reason: string;
       )}
       <Formula>P₁ = 360° / (daily drift)</Formula>
       {P1 && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
+      </div>
     </div>
   );
 }
@@ -504,7 +560,7 @@ function TrackerPanel() {
         <div className="amber" style={{ fontSize: 13 }}>Identify the blue planet first (Sky tab).</div>
       ) : (
         <>
-          <button className={`btn ${s.trackOn ? '' : 'primary'}`} onClick={() => (s.set({ trackOn: !s.trackOn }), checkMissions())}>
+          <button data-tut="track-toggle" className={`btn ${s.trackOn ? '' : 'primary'}`} onClick={() => (s.set({ trackOn: !s.trackOn }), checkMissions())}>
             {s.trackOn ? 'Auto-log: ON (nightly)' : 'Turn on nightly auto-log'}
           </button>
           <div className="muted" style={{ fontSize: 13 }}>
@@ -513,6 +569,7 @@ function TrackerPanel() {
           </div>
         </>
       )}
+      <div data-tut="track-chart" className="stack">
       {pts.length > 1 && (
         <Chart
           series={[{ pts, color: '#6cc4ff', kind: 'dots' }]}
@@ -547,6 +604,7 @@ function TrackerPanel() {
           </button>
         </div>
       )}
+      </div>
       {picks.length > 0 && (
         <div className="stack">
           {picks.map((p, i) => (
@@ -560,12 +618,12 @@ function TrackerPanel() {
             </div>
           ))}
           <b style={{ marginTop: 6 }}>Date of opposition t₀ (latest)</b>
-          <SendToSheet k="tOpp" value={picks[picks.length - 1]} />
+          <SendToSheet k="tOpp" value={picks[picks.length - 1]} tut="track-send-t0" />
           {S && (
             <>
               <b style={{ marginTop: 6 }}>Synodic period S = {fmt(S / DAY, 2)} days</b>
               <Formula>1/P₂ = 1/P₁ − 1/S</Formula>
-              <SendToSheet k="S2" value={S} />
+              <SendToSheet k="S2" value={S} tut="track-send-S" />
             </>
           )}
         </div>
@@ -594,13 +652,14 @@ function MoonPanel() {
       {!s.identified ? (
         <div className="amber" style={{ fontSize: 13 }}>Identify the blue planet first.</div>
       ) : (
-        <button className={`btn ${s.moonTrackOn ? '' : 'primary'}`} onClick={() => (s.set({ moonTrackOn: !s.moonTrackOn }), s.say(ECHO.moon))}>
+        <button data-tut="moon-toggle" className={`btn ${s.moonTrackOn ? '' : 'primary'}`} onClick={() => (s.set({ moonTrackOn: !s.moonTrackOn }), s.say(ECHO.moon))}>
           {s.moonTrackOn ? 'Moon auto-log: ON' : 'Log the moon’s offset every few hours'}
         </button>
       )}
       <div className="muted" style={{ fontSize: 13 }}>
         The tracker measures how far the moon sits east (+) or west (−) of the planet. Its swing is the moon’s orbit seen edge-on.
       </div>
+      <div data-tut="moon-chart" className="stack">
       {pts.length > 1 && <Chart series={[{ pts, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) }, ...(curve.length ? [{ pts: curve, color: '#6cc4ff', kind: 'line' as const }] : [])]} xLabel="day" yLabel="moon offset (″)" band={band} onBand={setBand} brushMode="band" yFmt={(y) => y.toFixed(0)} />}
       {pts.length > 1 && <div className="faint" style={{ fontSize: 12 }}>Drag to choose the stretch of data to fit — near opposition is best, when the planet is closest.</div>}
       {tooLong && <div className="amber" style={{ fontSize: 13 }}>Choose a stretch of at most ~50 days (drag across the chart): the swing looks smaller when the planet is further away.</div>}
@@ -621,6 +680,7 @@ function MoonPanel() {
           <SendToSheet k="Pm" value={fit.period * DAY} spread={fit.sigmaPeriod * DAY} />
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -48,7 +48,7 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
  * Put a value on the progress sheet. The player always states the error bar
  * themselves; the spread of their own readings is offered as a guide.
  */
-export function SendToSheet({ k, value, at, spread, label = 'Send to progress sheet' }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; label?: string }) {
+export function SendToSheet({ k, value, at, spread, label = 'Send to progress sheet', tut }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; label?: string; tut?: string }) {
   const info = QUANTITY_INFO[k];
   const current = useGame((s) => s.sheet[k]);
   const setSheet = useGame((s) => s.setSheet);
@@ -57,7 +57,7 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
   const errNum = Number(err);
   const ok = err !== '' && errNum > 0;
   return (
-    <div className="stack" style={{ marginTop: 6 }}>
+    <div className="stack" style={{ marginTop: 6 }} data-tut={tut}>
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <div className="field" style={{ flex: 1.3 }}>
           <label>{info.symbol} value</label>
@@ -91,12 +91,12 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
 }
 
 /** Sheet sender for a quantity measured as a list of kept readings. */
-export function SendReadings({ k }: { k: PrimaryKey }) {
+export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
   const readings = useGame((s) => s.readings);
   const st = readingStats(readings, k);
   if (!st) return null;
   return (
-    <div>
+    <div data-tut={tut}>
       <div className="row between" style={{ marginTop: 8 }}>
         <span className="muted">Average of {st.n} kept</span>
         <span className="readout small">
@@ -126,4 +126,26 @@ export function ToolHeader({ title, sub }: { title: string; sub: string }) {
 export function Formula({ children }: { children: string }) {
   const on = useGame((s) => s.settings.formulas);
   return on ? <div className="formula">{children}</div> : null;
+}
+
+/** Compare a new reading with the kept ones; returns a warning when it looks off. */
+export function outlierNote(value: number, others: number[], tolerance: number) {
+  if (others.length < 1) return null;
+  const sorted = [...others].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  const off = Math.abs(value / med - 1);
+  return off > tolerance ? `This is ${Math.round(off * 100)}% away from your other readings (median ${sig(med, 4)}). Something may have gone wrong — consider discarding it.` : null;
+}
+
+export function SanityWarning({ msgs }: { msgs: (string | null | false | undefined)[] }) {
+  const list = msgs.filter(Boolean) as string[];
+  if (!list.length) return null;
+  return (
+    <div className="callout warn" style={{ margin: 0 }}>
+      <b>⚠ Suspicious reading</b>
+      {list.map((m) => (
+        <div key={m}>{m}</div>
+      ))}
+    </div>
+  );
 }

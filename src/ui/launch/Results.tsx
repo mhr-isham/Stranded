@@ -78,7 +78,7 @@ export function Results() {
   return (
     <div className="screen scroll" style={{ background: 'radial-gradient(ellipse at 50% 0%, #10204a 0%, #05070f 65%)' }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(24px + var(--safe-top)) 14px 40px' }} className="stack">
-        <div className="panel panel-pad" style={{ textAlign: 'center' }}>
+        <div className="panel panel-pad" style={{ textAlign: 'center' }} data-tut="results-grade">
           <div className="meter-label">Mission debrief · system #{s.seed}</div>
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}
@@ -118,7 +118,7 @@ export function Results() {
         </div>
 
         {budget.length > 0 && (
-          <div className="panel panel-pad stack">
+          <div className="panel panel-pad stack" data-tut="results-budget">
             <h2 style={{ fontSize: 18 }}>Where your fuel went</h2>
             <div className="muted" style={{ fontSize: 13 }}>Correction fuel saved if that one measurement had been perfect:</div>
             {budget.slice(0, 6).map((b) => (
@@ -133,7 +133,7 @@ export function Results() {
           </div>
         )}
 
-        <div className="panel panel-pad">
+        <div className="panel panel-pad" data-tut="results-table">
           <h2 style={{ fontSize: 18, marginBottom: 8 }}>Your numbers vs the truth</h2>
           <div className="scroll">
             <table className="log">

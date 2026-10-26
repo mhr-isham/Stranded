@@ -79,6 +79,7 @@ export function Hub() {
           key={st.kind}
           ref={(el) => void (tagRefs.current[i] = el)}
           className="hotspot"
+          data-tut={`hotspot-${st.screen === 'sheet' ? 'ship' : st.screen}`}
           style={{ transform: 'translate(-9999px,0)' }}
           onClick={() => go(st.screen)}
         >

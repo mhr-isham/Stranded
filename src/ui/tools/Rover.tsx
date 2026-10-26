@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { siteEastOf } from '../../engine/measure';
 import { localFrame, observerPos, toHorizontal, topocentric } from '../../engine/sky';
 import { norm, sub, unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
+import { flag } from '../../game/tutorial';
 import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
@@ -12,7 +13,7 @@ import { isCloudy } from '../../game/survival';
 import { hhmm, localSolarHours } from '../../game/time';
 import { drawScope } from '../../render/telescope';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
-import { Formula, ReadingsTable, SendReadings, ToolHeader } from '../common/sheetBits';
+import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 
 interface Capture {
@@ -69,14 +70,18 @@ export function Rover() {
       baseline: norm(sub(observerPos(sys, tt, sys.site), observerPos(sys, tt, roverSite))),
     });
     setMarks({ A: null, B: null });
+    flag('rover-captured');
     sfx('log');
   };
 
   const p = cap && marks.A && marks.B ? Math.hypot(marks.A.x - marks.B.x, marks.A.y - marks.B.y) : null;
+  useEffect(() => {
+    if (p) flag('rover-marked');
+  }, [p]);
 
   return (
     <div className="tool">
-      <div className="tool-stage">
+      <div className="tool-stage" data-tut="rover-stage">
         {cap ? (
           <CanvasView
             onPointerDown={(e) => {
@@ -149,7 +154,7 @@ export function Rover() {
 
       <div className="tool-side">
         <ToolHeader title="Rover & parallax" sub="Two sites, one instant: the blue planet shifts against the distant stars. The shift gives the distance." />
-        <div className="panel panel-pad stack">
+        <div className="panel panel-pad stack" data-tut="rover-drive">
           <b>1 · Position the rover</b>
           <div className="row between">
             <span className="muted">Rover is</span>
@@ -165,7 +170,7 @@ export function Rover() {
           <div className="hint">A longer baseline makes a bigger shift and a smaller relative error — but the drive takes days.</div>
         </div>
 
-        <div className="panel panel-pad stack">
+        <div className="panel panel-pad stack" data-tut="rover-image">
           <b>2 · Image both sites at once</b>
           <dl className="kv">
             <dt>Camp: blue planet altitude</dt>
@@ -190,7 +195,7 @@ export function Rover() {
         </div>
 
         {cap && (
-          <div className="panel panel-pad stack">
+          <div className="panel panel-pad stack" data-tut="rover-blink">
             <b>3 · Blink comparator</b>
             <div className="muted" style={{ fontSize: 13 }}>
               The two exposures alternate. Background stars stay put; the planet jumps. Mark the planet’s centre in each frame.
@@ -219,7 +224,15 @@ export function Rover() {
               <dd className="blue">{p ? `${fmt(cap.baseline / p / 1e9, 3)} million km` : '—'}</dd>
             </dl>
             <Formula>d = B / p   (p in radians)</Formula>
-            <div className="row">
+            {p && (
+              <SanityWarning
+                msgs={[
+                  p < 1 * ARCSEC && 'The two marks are almost on top of each other. Did you mark the planet in both frames (A and B)?',
+                  p > 60 * ARCSEC && 'That shift is far too large — one mark is probably on a star or empty sky.',
+                ]}
+              />
+            )}
+            <div className="row" data-tut="rover-keep">
               <button
                 className="btn primary"
                 disabled={!p}
@@ -242,7 +255,7 @@ export function Rover() {
         <div className="panel panel-pad">
           <b>Distance log</b>
           <ReadingsTable k="dPar" />
-          <SendReadings k="dPar" />
+          <SendReadings k="dPar" tut="rover-send" />
         </div>
       </div>
     </div>

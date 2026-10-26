@@ -8,8 +8,9 @@ import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { css, skyColors } from '../../render/color';
 import { sfx } from '../../game/audio';
+import { flag } from '../../game/tutorial';
 import { CanvasView } from '../common/CanvasView';
-import { Formula, ReadingsTable, SendReadings, ToolHeader } from '../common/sheetBits';
+import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
 import { toast } from '../common/widgets';
 
 const EYE = 1.7;
@@ -31,7 +32,8 @@ export function Hill() {
   const [at, setAt] = useState(0);
   const [moving, setMoving] = useState(false);
   const [zoom, setZoom] = useState(4);
-  const [result, setResult] = useState<null | { theta: number; R: number; h: number }>(null);
+  const [result, setResult] = useState<null | { theta: number; R: number; h: number; untouched: boolean }>(null);
+  const keptR = s.readings.filter((r) => r.key === 'R1' && r.kept).map((r) => r.value);
   const view = useRef({ pitch: -0.3, drag: null as null | { y: number; p: number }, brace: 0, sway: 0 });
   const h = stations[at].h + EYE;
   const dip = horizonDip(sys.home.radius, h) / DEG;
@@ -44,6 +46,7 @@ export function Hill() {
     spendTime(dur, () => {
       setAt(i);
       setMoving(false);
+      if (i === stations.length - 1) flag('hill-summit');
       view.current.pitch = -0.3;
       toast(`${stations[i].name}: ${stations[i].h} m above camp`);
     });
@@ -58,13 +61,14 @@ export function Hill() {
       return;
     }
     const R = (h * Math.cos(theta)) / (1 - Math.cos(theta));
-    setResult({ theta, R, h });
+    setResult({ theta, R, h, untouched: Math.abs(view.current.pitch + 0.3) < 1e-9 });
+    flag('hill-read');
     sfx('log');
   };
 
   return (
     <div className="tool">
-      <div className="tool-stage">
+      <div className="tool-stage" data-tut="hill-stage">
         <CanvasView
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture(e.pointerId);
@@ -146,7 +150,7 @@ export function Hill() {
             ctx.fillRect(0, 0, w, hp);
           }}
         />
-        <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }}>
+        <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="hill-controls">
           <div className="meter-label">Instrument pitch</div>
           <PitchReadout view={view} res={res} />
           <div className="row" style={{ marginTop: 6 }}>
@@ -169,7 +173,7 @@ export function Hill() {
         <ToolHeader title="The hill" sub="Measure how far the horizon dips below level. The dip depends on your height and the planet’s radius." />
         <div className="panel panel-pad stack">
           <b>Where are you?</b>
-          <div className="stack">
+          <div className="stack" data-tut="hill-stations">
             {stations.map((st, i) => (
               <button key={st.name} className={`btn ${i === at ? 'primary' : ''}`} style={{ justifyContent: 'space-between' }} disabled={moving} onClick={() => climb(i)}>
                 <span>{st.name}</span>
@@ -203,6 +207,14 @@ export function Hill() {
               <dt>Radius R</dt>
               <dd className="blue">{fmt(result.R / 1000, 0)} km</dd>
             </dl>
+            <SanityWarning
+              msgs={[
+                result.untouched && 'You haven’t moved the instrument since arriving — the horizon is probably not on the crosshair. Drag the view first.',
+                (result.R < 1500e3 || result.R > 20000e3) && 'A planet this size is very unlikely. Check the horizon sits exactly on the red line.',
+                stations[at].h < 100 && 'You are close to the ground: the dip is tiny, so this reading has a huge error. Climb higher.',
+                outlierNote(result.R, keptR, 0.1),
+              ]}
+            />
             <div className="row">
               <button
                 className="btn primary"
@@ -220,10 +232,10 @@ export function Hill() {
             </div>
           </div>
         )}
-        <div className="panel panel-pad">
+        <div className="panel panel-pad" data-tut="hill-log">
           <b>Radius log</b>
           <ReadingsTable k="R1" />
-          <SendReadings k="R1" />
+          <SendReadings k="R1" tut="hill-send" />
         </div>
       </div>
     </div>

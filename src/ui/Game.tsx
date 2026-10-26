@@ -26,6 +26,7 @@ const NAV: { screen: Screen; label: string; ico: string }[] = [
 export function Game() {
   const screen = useGame((s) => s.screen);
   const go = useGame((s) => s.go);
+  const tutorial = useGame((s) => s.tutorial.active);
 
   useEffect(() => {
     useGame.getState().say(ECHO.welcome);
@@ -44,16 +45,16 @@ export function Game() {
       {screen === 'workshop' && <Workshop />}
       {screen === 'codex' && <Codex />}
       <Hud />
-      {screen === 'hub' && <MissionPanel />}
-      <nav className="nav panel">
+      {screen === 'hub' && !tutorial && <MissionPanel />}
+      <nav className="nav panel" data-tut="nav">
         {NAV.map((n) => (
-          <button key={n.screen} className={`btn ghost ${screen === n.screen ? 'active' : ''}`} onClick={() => go(n.screen)}>
+          <button key={n.screen} data-tut={`nav-${n.label.toLowerCase()}`} className={`btn ghost ${screen === n.screen ? 'active' : ''}`} onClick={() => go(n.screen)}>
             <span className="ico">{n.ico}</span>
             {n.label}
           </button>
         ))}
       </nav>
-      <Echo />
+      {!tutorial && <Echo />}
     </div>
   );
 }

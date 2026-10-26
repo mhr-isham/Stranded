@@ -11,12 +11,14 @@ import { Intro } from './Intro';
 import { Results } from './launch/Results';
 import { Flight } from './launch/Flight';
 import { Title } from './Title';
+import { Tutorial } from './tutorial/Tutorial';
 
 if (import.meta.env.DEV) {
   // Test hooks for automated browser checks (dev server only).
   Object.assign(window, {
     __game: useGame,
     __clock: clock,
+    __tut: { tutorial: () => import('../game/tutorial'), steps: () => import('./tutorial/steps') },
     __botFill: () => {
       const { system } = currentWorld();
       const { primaries } = botMeasure(system, COMPETENT, makeRng(7));
@@ -27,6 +29,7 @@ if (import.meta.env.DEV) {
 
 export default function App() {
   const phase = useGame((s) => s.phase);
+  const tutorial = useGame((s) => s.tutorial.active);
 
   // One simulation loop for the whole game, independent of which canvas is shown.
   useEffect(() => {
@@ -65,6 +68,7 @@ export default function App() {
       {phase === 'play' && <Game />}
       {phase === 'flight' && <Flight />}
       {phase === 'results' && <Results />}
+      {tutorial && <Tutorial />}
       <ToastHost />
     </>
   );

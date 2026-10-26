@@ -7,6 +7,7 @@ export interface DrawArgs {
   dpr: number;
   now: number; // performance.now()
   dt: number; // seconds since last frame
+  canvas: HTMLCanvasElement;
 }
 
 interface Props {
@@ -41,7 +42,7 @@ export function CanvasView({ draw, className = 'fill-canvas', ...rest }: Props) 
       }
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
-      drawRef.current({ ctx, w: cw, h: ch, dpr, now, dt });
+      drawRef.current({ ctx, w: cw, h: ch, dpr, now, dt, canvas });
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);

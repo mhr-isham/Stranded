@@ -6,6 +6,7 @@ import { useGame } from '../game/store';
 import { lifeSupportEnd } from '../game/survival';
 import { dayNumber, hhmm, localSolarHours } from '../game/time';
 import { fmt } from '../game/format';
+import { flag } from '../game/tutorial';
 import { Modal, Toggle, useClockState, useGameTime } from './common/widgets';
 
 export function Hud() {
@@ -24,7 +25,7 @@ export function Hud() {
   return (
     <>
       <div className="hud">
-        <div className="panel hud-block hud-time">
+        <div className="panel hud-block hud-time" data-tut="hud-time">
           <span style={{ fontSize: 20 }}>{night ? '🌙' : '☀️'}</span>
           <div>
             <div className="day">Day {dayNumber(t)}</div>
@@ -34,22 +35,22 @@ export function Hud() {
             </div>
           </div>
         </div>
-        <div className="panel hud-block warp">
-          <button className="btn icon small" aria-label="Slower" onClick={() => setWarp(clock.warpIndex - 1)} disabled={clock.realtime}>
+        <div className="panel hud-block warp" data-tut="hud-warp">
+          <button className="btn icon small" aria-label="Slower" onClick={() => (setWarp(clock.warpIndex - 1), flag('warp-changed'))} disabled={clock.realtime}>
             ◀
           </button>
-          <button className="btn small hide-phone" onClick={togglePause} style={{ minWidth: 40 }} aria-label="Pause">
+          <button className="btn small hide-phone" onClick={() => (togglePause(), flag('warp-changed'))} style={{ minWidth: 40 }} aria-label="Pause">
             {clock.paused ? '▶' : '❚❚'}
           </button>
-          <button className="rate btn ghost small" onClick={togglePause} title="Tap to pause / resume">
+          <button className="rate btn ghost small" onClick={() => (togglePause(), flag('warp-changed'))} title="Tap to pause / resume">
             {clock.realtime ? 'real time' : clock.paused ? 'paused' : WARPS[clock.warpIndex].label}
           </button>
-          <button className="btn icon small" aria-label="Faster" onClick={() => setWarp(clock.warpIndex + 1)} disabled={clock.realtime}>
+          <button className="btn icon small" aria-label="Faster" onClick={() => (setWarp(clock.warpIndex + 1), flag('warp-changed'))} disabled={clock.realtime}>
             ▶
           </button>
         </div>
         <div className="spacer hide-phone" />
-        <div className="panel hud-block hud-life">
+        <div className="panel hud-block hud-life" data-tut="hud-life">
           <div>
             <div className="meter-label">
               Life<span className="hide-phone"> support</span>
@@ -68,7 +69,7 @@ export function Hud() {
             {s.survival.leak && <span className="red">⚠</span>}
           </button>
         )}
-        <div className="panel hud-block hide-phone">
+        <div className="panel hud-block hide-phone" data-tut="hud-fuel">
           <div>
             <div className="meter-label">Fuel Δv</div>
             <div className="mono" style={{ fontSize: 14 }}>{fmt(fuel / 1000, 2)} km/s</div>

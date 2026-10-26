@@ -158,7 +158,7 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 /* Tool screens */
 .tool { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 360px; z-index: 5; }
 .tool-stage { position: relative; overflow: hidden; }
-.tool-side { overflow: auto; padding: calc(var(--hud-h) + var(--safe-top)) 10px calc(90px + var(--safe-bottom)) 0; display: flex; flex-direction: column; gap: 10px; }
+.tool-side { overflow: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 0 10px calc(90px + var(--safe-bottom)) 0; display: flex; flex-direction: column; gap: 10px; }
 .tool-side .panel h2 { font-size: 18px; margin-bottom: 6px; }
 .tool-title { position: absolute; left: 12px; top: calc(var(--hud-h) + var(--safe-top)); z-index: 6; }
 .readout { font-family: var(--mono); font-size: 28px; font-weight: 600; letter-spacing: 0.02em; }
@@ -180,7 +180,7 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .log tr.off td { opacity: 0.4; text-decoration: line-through; }
 
 /* Modal */
-.modal-back { position: fixed; inset: 0; background: rgba(2, 4, 10, 0.6); backdrop-filter: blur(4px); z-index: 60; display: grid; place-items: center; padding: 16px; animation: fade 0.2s; }
+.modal-back { position: fixed; inset: 0; background: rgba(2, 4, 10, 0.6); z-index: 89; display: grid; place-items: center; padding: 16px; animation: fade 0.2s; }
 .modal { width: min(520px, 100%); max-height: calc(100% - 32px); overflow: auto; padding: 20px; animation: pop 0.25s ease-out; }
 .modal h2 { font-size: 20px; margin-bottom: 8px; }
 @keyframes fade { from { opacity: 0; } }
@@ -224,7 +224,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   :root { --hud-h: 62px; }
   body { font-size: 14px; }
   .tool { grid-template-columns: 1fr; grid-template-rows: minmax(52%, 1fr) auto; }
-  .tool-side { padding: 8px 8px calc(80px + var(--safe-bottom)); max-height: 46vh; }
+  .tool-side { margin-top: 0; padding: 8px 8px calc(80px + var(--safe-bottom)); max-height: 46vh; }
   .tool-stage .tool-title { display: none; }
   .missions { width: auto; right: 8px; top: auto; bottom: calc(76px + var(--safe-bottom)); max-height: 40%; }
   .missions.collapsed .mission-list, .missions.collapsed .mission-why { display: none; }
@@ -247,4 +247,50 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ---------------- Flight School (tutorial) ---------------- */
+.lesson { display: flex; flex-direction: column; gap: 12px; }
+.lesson-head h2 { font-size: 24px; }
+.lesson-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.lesson-text { font-size: 15px; line-height: 1.6; color: #d6e0f5; }
+.lesson-text b { color: #fff; }
+.lesson-formula { font-family: var(--mono); font-size: 15px; color: var(--amber); background: rgba(255, 196, 107, 0.08); border: 1px solid rgba(255, 196, 107, 0.2); border-radius: 10px; padding: 10px 12px; margin: 10px 0; line-height: 1.7; }
+.callout { border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 14px; border: 1px solid; }
+.callout b { display: block; margin-bottom: 2px; }
+.callout.key { background: rgba(108, 196, 255, 0.08); border-color: rgba(108, 196, 255, 0.3); }
+.callout.warn { background: rgba(255, 107, 125, 0.08); border-color: rgba(255, 107, 125, 0.35); }
+.callout.tip { background: rgba(91, 227, 164, 0.07); border-color: rgba(91, 227, 164, 0.3); }
+.demo-box { background: radial-gradient(ellipse at 50% 30%, #0e1a36 0%, #060912 80%); border: 1px solid var(--panel-border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.demo-box svg { width: 100%; height: auto; display: block; }
+.lslider { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--muted); }
+.lesson-modal { width: min(1100px, 100%); max-height: calc(100% - 16px); overflow: auto; padding: 22px; background: var(--panel-solid); }
+.lesson-back { position: fixed; inset: 0; z-index: 95; background: rgba(2, 4, 10, 0.78); display: grid; place-items: center; padding: 8px; animation: fade 0.2s; }
+
+.tut-ring { position: fixed; z-index: 88; pointer-events: none; border-radius: 12px; border: 2px solid var(--amber); box-shadow: 0 0 0 9999px rgba(2, 4, 10, 0.55), 0 0 24px rgba(255, 196, 107, 0.8); transition: all 0.25s ease; }
+.tut-ring.soft { box-shadow: 0 0 24px rgba(255, 196, 107, 0.8); }
+.tut-ring::after { content: ''; position: absolute; inset: -8px; border-radius: 16px; border: 2px solid rgba(255, 196, 107, 0.6); animation: pulse 1.6s ease-out infinite; }
+.tut-arrow { position: fixed; z-index: 89; pointer-events: none; font-size: 30px; color: var(--amber); text-shadow: 0 0 12px rgba(255, 196, 107, 0.9); transition: left 0.25s, top 0.25s; }
+.tut-arrow.down { animation: bob-down 0.9s ease-in-out infinite; }
+.tut-arrow.up { animation: bob-up 0.9s ease-in-out infinite; }
+.tut-arrow.left { animation: bob-left 0.9s ease-in-out infinite; }
+.tut-arrow.right { animation: bob-right 0.9s ease-in-out infinite; }
+@keyframes bob-down { 50% { transform: translateY(8px); } }
+@keyframes bob-up { 50% { transform: translateY(-8px); } }
+@keyframes bob-left { 50% { transform: translateX(-8px); } }
+@keyframes bob-right { 50% { transform: translateX(8px); } }
+.tut-card { position: fixed; z-index: 90; background: rgba(11, 17, 32, 0.96); width: min(440px, calc(100% - 16px)); padding: 14px 16px; border-color: rgba(255, 196, 107, 0.45); box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6); max-height: 46vh; overflow: auto; }
+.tut-card h3 { font-size: 17px; margin: 2px 0 6px; }
+.tut-card .body { font-size: 14px; line-height: 1.55; color: #d6e0f5; }
+.tut-card .body p { margin: 0 0 8px; }
+.tut-progress { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin: 6px 0 2px; }
+.tut-progress > i { display: block; height: 100%; background: var(--amber); }
+.tut-done { color: var(--green); font-weight: 700; }
+.tut-card.mini .body, .tut-card.mini .callout { display: none; }
+@media (max-width: 860px) {
+  .lesson-grid { grid-template-columns: 1fr; }
+  .lesson-modal { padding: 14px; }
+  .lesson-head h2 { font-size: 20px; }
+  .tut-card { left: 8px !important; right: 8px; width: auto; max-height: 38vh; padding: 10px 12px; }
+  .tut-card .body { font-size: 13px; }
 }

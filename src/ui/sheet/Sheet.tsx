@@ -6,6 +6,7 @@ import { fmt, fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions, currentWorld } from '../../game/sim';
 import { readingStats, useGame, type Screen } from '../../game/store';
 import { HINTS, NODE_INFO } from './nodeInfo';
+import { flag } from '../../game/tutorial';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -52,7 +53,7 @@ export function Sheet() {
   return (
     <div className="tool">
       <div className="tool-stage" style={{ background: 'radial-gradient(ellipse at 40% 40%, #0c1630 0%, #05070f 70%)' }}>
-        <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 'calc(64px + var(--safe-top)) 8px 80px 8px', width: 'calc(100% - 16px)', height: 'calc(100% - 150px)' }}>
+        <svg data-tut="sheet-map" viewBox={vb} preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 'calc(64px + var(--safe-top)) 8px 80px 8px', width: 'calc(100% - 16px)', height: 'calc(100% - 150px)' }}>
           <defs>
             <filter id="glow" x="-1" y="-1" width="3" height="3">
               <feGaussianBlur stdDeviation="0.08" />
@@ -83,7 +84,7 @@ export function Sheet() {
             const fuzz = e === null ? 0.12 : Math.max(0.1, Math.min(0.42, 0.1 + 0.08 * (Math.log10(Math.max(e, 1e-5)) + 4)));
             const selected = sel === k;
             return (
-              <g key={k} onClick={() => (setSel(k), sfx('click'))} style={{ cursor: 'pointer' }}>
+              <g key={k} data-tut={`sheet-node-${k}`} onClick={() => (setSel(k), sfx('click'), flag(`sheet-node-${k}`))} style={{ cursor: 'pointer' }}>
                 <circle cx={x} cy={y} r={0.42} fill="transparent" />
                 {lit && <circle cx={x} cy={y} r={fuzz * 1.6} fill={isLaunch ? 'rgba(255,196,107,0.5)' : 'url(#star)'} filter="url(#glow)" opacity={0.9} />}
                 <circle cx={x} cy={y} r={lit ? 0.07 : 0.05} fill={lit ? (isLaunch ? '#ffc46b' : '#fff') : 'rgba(150,165,200,0.35)'} />
@@ -157,7 +158,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   };
 
   return (
-    <div className="panel panel-pad stack">
+    <div className="panel panel-pad stack" data-tut="sheet-panel">
       <div className="row between">
         <h2>
           {info.symbol} <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}>{info.label}</span>
@@ -202,6 +203,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
       )}
 
       <hr className="sep" />
+      <div data-tut="sheet-hints" className="stack">
       <div className="row between">
         <b style={{ fontSize: 13 }}>Hints</b>
         <span className="faint" style={{ fontSize: 12 }}>each costs score</span>
@@ -229,6 +231,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
           {verdict && <div className="hint">{verdict}</div>}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -254,7 +257,7 @@ function Checks() {
   if (g) rows.push({ name: 'Escape speed estimate', text: s.sheet.R1 ? `${fmt(Math.sqrt(2 * g * s.sheet.R1.value) / 1000, 2)} km/s` : 'needs R₁', ok: null });
   if (!rows.length) return null;
   return (
-    <div className="panel panel-pad stack">
+    <div className="panel panel-pad stack" data-tut="sheet-checks">
       <b>Consistency checks</b>
       <div className="faint" style={{ fontSize: 12 }}>Free. They never reveal the truth — only whether your numbers hang together.</div>
       {rows.map((r) => (
