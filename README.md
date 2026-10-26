@@ -6,6 +6,8 @@ Every measurement error comes from how you use the tools (reaction time, aiming,
 
 ## Play
 
+**Live:** https://mhr-isham.github.io/Stranded/
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173
