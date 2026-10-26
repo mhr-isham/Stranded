@@ -110,7 +110,7 @@ export function Tutorial() {
   useEffect(() => {
     step.onEnter?.();
     if (clock.warpIndex > 3 && clock.stopAt === Infinity) setWarp(3);
-    setMini(false);
+    setMini(!!step.compact && window.innerWidth <= 860);
     setExtra(null);
     if (step.autoLesson && step.lesson) setLesson(step.lesson);
     // Scroll the target into view if it lives in a scrolling side panel.
@@ -156,8 +156,12 @@ export function Tutorial() {
   const targetLow = box ? box.y + box.h / 2 > vh * 0.5 : false;
   const targetRight = box ? box.x + box.w / 2 > vw * 0.5 : true;
   if (!box && s.phase === 'flight') {
-    cardStyle.top = 'calc(12px + var(--safe-top))';
-    if (!phone) cardStyle.left = 16;
+    // Keep clear of ECHO's flight panel (top on phones, bottom on desktop).
+    if (phone) cardStyle.bottom = 'calc(12px + var(--safe-bottom))';
+    else {
+      cardStyle.top = 'calc(12px + var(--safe-top))';
+      cardStyle.left = 16;
+    }
   } else if (!box && step.target) {
     // Target not on screen yet: stay out of the way.
     cardStyle.bottom = 'calc(84px + var(--safe-bottom))';
@@ -188,7 +192,7 @@ export function Tutorial() {
           {arrow.ch}
         </div>
       )}
-      <div className={`tut-card panel ${mini ? 'mini' : ''}`} style={cardStyle} role="dialog" aria-label="Flight School">
+      <div className={`tut-card panel ${mini ? 'mini' : ''} ${box ? '' : 'free'}`} style={cardStyle} role="dialog" aria-label="Flight School">
         <div className="row between">
           <span className="meter-label" style={{ color: 'var(--amber)' }}>
             🎓 Flight School · {chapterNo}/{chapters.length} {step.chapter}

@@ -50,6 +50,8 @@ export interface TutStep {
   action?: { label: string; run: () => void };
   doIt?: { label?: string; run: () => void };
   onEnter?: () => void;
+  /** Start minimised on phones: the player needs to tap the picture behind the card. */
+  compact?: boolean;
   /** Wait for Next even after the step is done (e.g. to read a report). */
   noAuto?: boolean;
   /** Dim the rest of the screen (default true when there is a target). */
@@ -294,6 +296,7 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'hill-aim',
+    compact: true,
     chapter: 'Radius',
     title: 'Line up the horizon',
     target: 'hill-stage',
@@ -430,6 +433,7 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'sky-select',
+    compact: true,
     chapter: 'Night sky',
     title: 'Find the steady light',
     target: 'anchor:planet',
@@ -513,6 +517,7 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'year-log1',
+    compact: true,
     chapter: 'Year',
     title: 'Centre it and log',
     target: 'year-log',
@@ -603,6 +608,7 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'rover-blink',
+    compact: true,
     chapter: 'Distance',
     title: 'The blink comparator',
     target: 'rover-blink',
@@ -655,6 +661,7 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'micro-measure',
+    compact: true,
     chapter: 'Size',
     title: 'Set the wires on the edges',
     target: 'micro-log',

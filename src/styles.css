@@ -295,5 +295,6 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .tut-card h3 { font-size: 15px; margin: 0 0 4px; }
   .tut-card .body p { margin: 0 0 4px; }
   .tut-card .chip { cursor: pointer; }
+  .tut-card.free { max-height: 48vh; }
   .tut-card .body { font-size: 13px; }
 }
