@@ -1,5 +1,7 @@
 # Stranded — Engagement & Gamification Review
 
+> Part 2 — research-backed deep dive, player journey, new mechanics and the revised roadmap: [`ENGAGEMENT-DEEP-DIVE.md`](ENGAGEMENT-DEEP-DIVE.md).
+
 *How to make players want to keep playing — and which ideas would cost us learning or realism.*
 
 Legend used throughout:
