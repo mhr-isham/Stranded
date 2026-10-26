@@ -34,12 +34,14 @@ function targetBox(target: string | undefined): Box | null {
     for (const el of els) {
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
-      if (r.bottom > 0 && r.top < window.innerHeight) return { x: r.left, y: r.top, w: r.width, h: r.height };
-      // Present but scrolled away (e.g. in a side panel): bring it back, gently.
-      if (performance.now() - lastScroll > 800) {
+      // Keep the target clear of the HUD (top) and the nav bar (bottom).
+      const navTop = document.querySelector('nav.nav')?.getBoundingClientRect().top ?? window.innerHeight;
+      const hidden = r.top > navTop - 12 || r.bottom < 70 || (r.bottom > navTop && r.height < navTop * 0.5);
+      if (hidden && performance.now() - lastScroll > 800) {
         lastScroll = performance.now();
-        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
+      if (r.bottom > 0 && r.top < window.innerHeight) return { x: r.left, y: r.top, w: r.width, h: r.height };
     }
   }
   return null;
@@ -83,6 +85,7 @@ export function Tutorial() {
   const [lesson, setLesson] = useState<LessonId | null>(null);
   const [mini, setMini] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [extra, setExtra] = useState<'warn' | 'tip' | null>(null);
   const done = step.done ? step.done(s) : false;
   const advancing = useRef<number | null>(null);
 
@@ -108,11 +111,12 @@ export function Tutorial() {
     step.onEnter?.();
     if (clock.warpIndex > 3 && clock.stopAt === Infinity) setWarp(3);
     setMini(false);
+    setExtra(null);
     if (step.autoLesson && step.lesson) setLesson(step.lesson);
     // Scroll the target into view if it lives in a scrolling side panel.
     setTimeout(() => {
       const id = step.target?.split(' ')[0];
-      if (id && !id.startsWith('anchor:')) document.querySelector(`[data-tut~="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (id && !id.startsWith('anchor:')) document.querySelector(`[data-tut~="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 250);
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -219,13 +223,27 @@ export function Tutorial() {
             </ul>
           </div>
         )}
-        {step.warn && !mini && (
+        {phone && !mini && (step.warn || step.tip) && (
+          <div className="row" style={{ gap: 6 }}>
+            {step.warn && (
+              <button className={`chip ${extra === 'warn' ? 'red' : ''}`} onClick={() => setExtra(extra === 'warn' ? null : 'warn')}>
+                ⚠ Watch out
+              </button>
+            )}
+            {step.tip && (
+              <button className={`chip ${extra === 'tip' ? 'green' : ''}`} onClick={() => setExtra(extra === 'tip' ? null : 'tip')}>
+                💡 Tip
+              </button>
+            )}
+          </div>
+        )}
+        {step.warn && !mini && (!phone || extra === 'warn') && (
           <div className="callout warn">
             <b>⚠ Watch out</b>
             {rich(step.warn)}
           </div>
         )}
-        {step.tip && !mini && (
+        {step.tip && !mini && (!phone || extra === 'tip') && (
           <div className="callout tip">
             <b>💡 Tip</b>
             {rich(step.tip)}

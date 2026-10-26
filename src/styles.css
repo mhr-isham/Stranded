@@ -291,6 +291,9 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .lesson-grid { grid-template-columns: 1fr; }
   .lesson-modal { padding: 14px; }
   .lesson-head h2 { font-size: 20px; }
-  .tut-card { left: 8px !important; right: 8px; width: auto; max-height: 38vh; padding: 10px 12px; }
+  .tut-card { left: 8px !important; right: 8px; width: auto; max-height: 32vh; padding: 8px 12px; }
+  .tut-card h3 { font-size: 15px; margin: 0 0 4px; }
+  .tut-card .body p { margin: 0 0 4px; }
+  .tut-card .chip { cursor: pointer; }
   .tut-card .body { font-size: 13px; }
 }
