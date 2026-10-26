@@ -1,0 +1,416 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { PRIMARY_KEYS, QUANTITY_INFO } from '../../engine/chain';
+import { DAY, DEG, G } from '../../engine/constants';
+import { simulateLaunch } from '../../engine/launch';
+import { propagate } from '../../engine/orbits';
+import {
+  bestTransfer,
+  hohmannFor,
+  modelFromPrimaries,
+  planTransfer,
+  posAt,
+  predictedWindows,
+  sampleModel,
+  systemFromModel,
+  velAt,
+  type PlannedTransfer,
+} from '../../engine/planner';
+import { makeRng } from '../../engine/rng';
+import { add, scale, unit, type Vec3 } from '../../engine/vec';
+import { sfx } from '../../game/audio';
+import { WARPS, clock } from '../../game/clock';
+import { ECHO } from '../../game/echo';
+import { fmt } from '../../game/format';
+import { currentWorld } from '../../game/sim';
+import { useGame } from '../../game/store';
+import { lifeSupportEnd } from '../../game/survival';
+import { CanvasView, canvasPoint } from '../common/CanvasView';
+import { Formula, ToolHeader } from '../common/sheetBits';
+import { toast, useGameTime } from '../common/widgets';
+
+interface McResult {
+  fuelLeft: number[];
+  paths: Vec3[][];
+  success: number;
+}
+
+export function Launch() {
+  const s = useGame();
+  const { system: sys } = currentWorld();
+  const t = useGameTime(2);
+  const model = useMemo(() => modelFromPrimaries(s.sheet), [s.sheet]);
+  const end = lifeSupportEnd(s, sys);
+  const budget = sys.fuelDv - s.penaltyDv;
+  const [dep, setDep] = useState<number | null>(null); // days
+  const [autoTof, setAutoTof] = useState(true);
+  const [tofDays, setTofDays] = useState(200);
+  const [mc, setMc] = useState<McResult | null>(null);
+  const [confirm, setConfirm] = useState(false);
+
+  useEffect(() => {
+    if (model && !s.missionsDone.includes('plan')) {
+      s.set({ missionsDone: [...s.missionsDone, 'plan'] });
+      s.say(ECHO.plan);
+    }
+  }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hoh = model ? hohmannFor(model) : null;
+  const windows = model ? predictedWindows(model, t, end) : [];
+  const depDay = dep ?? (windows[0] ?? t) / DAY;
+  const plan: PlannedTransfer | null = useMemo(() => {
+    if (!model) return null;
+    return autoTof ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
+  }, [model, depDay, autoTof, tofDays]);
+
+  // Porkchop: estimated total delta-v over departure date x flight time.
+  const pork = useMemo(() => {
+    if (!model || !hoh) return null;
+    const nx = 56;
+    const ny = 30;
+    const d0 = Math.floor(t / DAY);
+    const d1 = Math.max(d0 + 5, Math.floor(end / DAY));
+    const tof0 = hoh.tof * 0.5;
+    const tof1 = hoh.tof * 1.6;
+    const v = new Float32Array(nx * ny);
+    for (let i = 0; i < nx; i++)
+      for (let j = 0; j < ny; j++) {
+        const p = planTransfer(model, (d0 + ((d1 - d0) * i) / (nx - 1)) * DAY, tof0 + ((tof1 - tof0) * j) / (ny - 1));
+        v[j * nx + i] = p ? p.total : Infinity;
+      }
+    return { nx, ny, d0, d1, tof0, tof1, v };
+    // Recompute when the model changes or every ~10 days of game time.
+  }, [model, hoh, end, Math.floor(t / (10 * DAY))]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Monte Carlo over the player's own error bars (never the truth).
+  useEffect(() => {
+    setMc(null);
+    if (!plan || !model) return;
+    const id = setTimeout(() => {
+      const rng = makeRng(42);
+      const fuelLeft: number[] = [];
+      const paths: Vec3[][] = [];
+      for (let i = 0; i < 36; i++) {
+        const m = sampleModel(s.sheet, rng);
+        if (!m) continue;
+        const u = { ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity };
+        const r = simulateLaunch(u, plan.plan);
+        fuelLeft.push(r.fuelLeft);
+        if (i < 24) paths.push(r.path);
+      }
+      setMc({ fuelLeft, paths, success: fuelLeft.filter((f) => f >= 0).length / Math.max(1, fuelLeft.length) });
+    }, 250);
+    return () => clearTimeout(id);
+  }, [plan, model, s.sheet, sys, budget]);
+
+  if (!model || !hoh) {
+    const missing = PRIMARY_KEYS.filter((k) => !s.sheet[k]);
+    return (
+      <div className="tool">
+        <div className="tool-stage" />
+        <div className="tool-side">
+          <ToolHeader title="Launch planner" sub="Plot a course to the blue planet using your own measurements." />
+          <div className="panel panel-pad stack">
+            <b>Not enough data yet</b>
+            <div className="muted">The planner needs every measured quantity on the progress sheet. Still missing:</div>
+            {missing.map((k) => (
+              <div key={k} className="row between" style={{ fontSize: 13 }}>
+                <span>{QUANTITY_INFO[k].label}</span>
+                <span className="faint">{QUANTITY_INFO[k].symbol}</span>
+              </div>
+            ))}
+            <button className="btn" onClick={() => s.go('sheet')}>
+              Open progress sheet
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const nowDay = t / DAY;
+  const ready = Math.abs(depDay - nowDay) < 0.5;
+  const leadNow = (((TAU_DEG * (t - model.tOpp)) / model.P2 - (TAU_DEG * (t - model.tOpp)) / model.P1) % 360 + 360) % 360;
+  const margin = plan ? budget - plan.total : NaN;
+
+  const launch = () => {
+    const p = autoTof ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, tofDays * DAY);
+    if (!p) return toast('No transfer found for this date.');
+    const result = simulateLaunch({ ...sys, fuelDv: budget }, p.plan);
+    sfx('launch');
+    useGame.setState({ outcome: { plan: p.plan, result, sheet: s.sheet }, phase: 'flight' });
+  };
+
+  const warpTo = () => {
+    clock.stopAt = depDay * DAY;
+    clock.warpIndex = WARPS.length - 1;
+    clock.paused = false;
+    clock.emit();
+    toast('Warping to departure…');
+  };
+
+  return (
+    <div className="tool">
+      <div className="tool-stage">
+        <Orrery model={model} plan={plan} mc={mc} t={t} depDay={depDay} />
+      </div>
+      <div className="tool-side">
+        <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
+        <div className="panel panel-pad stack">
+          <div className="row between">
+            <b>Departure</b>
+            <span className="mono">day {fmt(depDay, 1)}</span>
+          </div>
+          <input type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
+          <div className="row">
+            {windows.slice(0, 3).map((w, i) => (
+              <button key={w} className="btn small" onClick={() => setDep(w / DAY)}>
+                Window {i + 1}: day {fmt(w / DAY, 1)}
+              </button>
+            ))}
+            <button className="btn small ghost" onClick={() => setDep(nowDay)}>
+              Now
+            </button>
+          </div>
+          <label className="row" style={{ fontSize: 13 }}>
+            <input type="checkbox" checked={autoTof} onChange={(e) => setAutoTof(e.target.checked)} /> Cheapest flight time automatically
+          </label>
+          {!autoTof && (
+            <>
+              <div className="row between">
+                <span className="muted">Flight time</span>
+                <span className="mono">{fmt(tofDays, 0)} days</span>
+              </div>
+              <input type="range" min={Math.round((hoh.tof / DAY) * 0.5)} max={Math.round((hoh.tof / DAY) * 1.6)} value={tofDays} onChange={(e) => setTofDays(Number(e.target.value))} />
+            </>
+          )}
+          {pork && <Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} />}
+          <Formula>t = π√((a₁+a₂)³ / 8GM★),  φ = 180° − 360°·t/P₂</Formula>
+          <dl className="kv">
+            <dt>Hohmann flight time</dt>
+            <dd>{fmt(hoh.tof / DAY, 1)} days</dd>
+            <dt>Required lead angle φ</dt>
+            <dd>{fmt(hoh.lead / DEG, 1)}°</dd>
+            <dt>Lead angle now</dt>
+            <dd>{fmt(leadNow, 1)}°</dd>
+          </dl>
+        </div>
+
+        {plan && (
+          <div className="panel panel-pad stack">
+            <b>Fuel (your estimate)</b>
+            <dl className="kv">
+              <dt>Escape from surface</dt>
+              <dd>{fmt(plan.departCost / 1000, 3)} km/s</dd>
+              <dt>Capture into orbit</dt>
+              <dd>{fmt(plan.captureCost / 1000, 3)} km/s</dd>
+              <dt>Total planned</dt>
+              <dd>{fmt(plan.total / 1000, 3)} km/s</dd>
+              <dt>Ship carries</dt>
+              <dd>{fmt(budget / 1000, 3)} km/s</dd>
+              <dt>Margin for corrections</dt>
+              <dd className={margin > 0 ? 'green' : 'red'}>{fmt(margin / 1000, 3)} km/s</dd>
+            </dl>
+            <FuelBar plan={plan} budget={budget} />
+            <div className="stack" style={{ gap: 4 }}>
+              <div className="row between">
+                <span className="muted" style={{ fontSize: 13 }}>Chance of success, given your error bars</span>
+                <span className={`mono ${mc && mc.success > 0.8 ? 'green' : mc && mc.success > 0.4 ? 'amber' : 'red'}`}>{mc ? `${Math.round(mc.success * 100)}%` : '…'}</span>
+              </div>
+              <div className="faint" style={{ fontSize: 12 }}>
+                ECHO flew this plan through {mc?.fuelLeft.length ?? '…'} versions of the system that are consistent with your measurements. Honest error
+                bars make this forecast honest too.
+              </div>
+            </div>
+            {ready ? (
+              confirm ? (
+                <div className="row">
+                  <button className="btn danger big" onClick={launch} style={{ flex: 1 }}>
+                    🚀 Confirm launch
+                  </button>
+                  <button className="btn" onClick={() => setConfirm(false)}>
+                    Wait
+                  </button>
+                </div>
+              ) : (
+                <button className="btn amber big" onClick={() => setConfirm(true)}>
+                  Launch now
+                </button>
+              )
+            ) : depDay > nowDay ? (
+              <button className="btn primary" onClick={warpTo}>
+                Warp to day {fmt(depDay, 1)} ({fmt(depDay - nowDay, 0)} days of life support)
+              </button>
+            ) : (
+              <div className="amber">That date has passed.</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const TAU_DEG = 360;
+
+function FuelBar({ plan, budget }: { plan: PlannedTransfer; budget: number }) {
+  const parts = [
+    { v: plan.departCost, c: '#6cc4ff', l: 'escape' },
+    { v: plan.captureCost, c: '#b59cff', l: 'capture' },
+  ];
+  const total = Math.max(budget, plan.total);
+  return (
+    <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }} title="fuel use">
+      {parts.map((p) => (
+        <div key={p.l} style={{ width: `${(100 * p.v) / total}%`, background: p.c }} />
+      ))}
+      <div style={{ flex: 1, background: plan.total > budget ? 'var(--red)' : 'rgba(91,227,164,0.55)' }} />
+    </div>
+  );
+}
+
+function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; ny: number; d0: number; d1: number; tof0: number; tof1: number; v: Float32Array }; budget: number; depDay: number; tof: number; onPick: (d: number, tofDays: number) => void }) {
+  const min = useMemo(() => Math.min(...pork.v), [pork]);
+  return (
+    <div>
+      <div className="row between" style={{ fontSize: 12 }}>
+        <span className="muted">Cost map: departure date → (flight time ↑)</span>
+        <span className="faint">tap to choose</span>
+      </div>
+      <div style={{ height: 130, position: 'relative' }}>
+        <CanvasView
+          style={{ borderRadius: 8 }}
+          onPointerDown={(e) => {
+            const p = canvasPoint(e);
+            const c = e.currentTarget;
+            const d = pork.d0 + (p.x / c.width) * (pork.d1 - pork.d0);
+            const tf = pork.tof1 - (p.y / c.height) * (pork.tof1 - pork.tof0);
+            onPick(d, tf / DAY);
+          }}
+          draw={({ ctx, w, h, dpr }) => {
+            const cw = w / pork.nx;
+            const ch = h / pork.ny;
+            for (let i = 0; i < pork.nx; i++)
+              for (let j = 0; j < pork.ny; j++) {
+                const v = pork.v[j * pork.nx + i];
+                const x = (v - min) / Math.max(1, budget - min); // 0 = cheapest, 1 = whole budget
+                let col: string;
+                if (!Number.isFinite(v) || x > 1) col = 'rgba(40,20,30,1)';
+                else {
+                  const q = Math.pow(x, 0.5);
+                  col = `rgb(${Math.round(40 + 200 * q)},${Math.round(200 - 140 * q)},${Math.round(160 - 110 * q)})`;
+                }
+                ctx.fillStyle = col;
+                ctx.fillRect(i * cw, h - (j + 1) * ch, cw + 1, ch + 1);
+              }
+            const x = ((depDay - pork.d0) / (pork.d1 - pork.d0)) * w;
+            const y = h - ((tof - pork.tof0) / (pork.tof1 - pork.tof0)) * h;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2 * dpr;
+            ctx.beginPath();
+            ctx.arc(x, y, 6 * dpr, 0, Math.PI * 2);
+            ctx.stroke();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<typeof modelFromPrimaries>>; plan: PlannedTransfer | null; mc: McResult | null; t: number; depDay: number }) {
+  const anim = useRef(0);
+  return (
+    <CanvasView
+      draw={({ ctx, w, h, dpr, dt }) => {
+        anim.current = (anim.current + dt * 0.15) % 1;
+        ctx.fillStyle = '#04060c';
+        ctx.fillRect(0, 0, w, h);
+        const cx = w / 2;
+        const cy = h * 0.47;
+        const S = (Math.min(w, h) * 0.42) / (model.a2 * 1.12);
+        const X = (v: Vec3) => cx + v[0] * S;
+        const Y = (v: Vec3) => cy - v[1] * S;
+        // Orbits.
+        for (const [a, c] of [
+          [model.a1, 'rgba(255,190,120,0.35)'],
+          [model.a2, 'rgba(108,196,255,0.35)'],
+        ] as const) {
+          ctx.strokeStyle = c;
+          ctx.lineWidth = dpr;
+          ctx.beginPath();
+          ctx.arc(cx, cy, a * S, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // Star.
+        const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * dpr);
+        sg.addColorStop(0, '#fff6dc');
+        sg.addColorStop(0.3, 'rgba(255,200,110,0.7)');
+        sg.addColorStop(1, 'rgba(255,200,110,0)');
+        ctx.fillStyle = sg;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 26 * dpr, 0, Math.PI * 2);
+        ctx.fill();
+        // Uncertainty spaghetti from the Monte Carlo.
+        if (mc) {
+          ctx.lineWidth = dpr;
+          for (const p of mc.paths) {
+            ctx.strokeStyle = 'rgba(255,196,107,0.13)';
+            ctx.beginPath();
+            p.forEach((v, i) => (i ? ctx.lineTo(X(v), Y(v)) : ctx.moveTo(X(v), Y(v))));
+            ctx.stroke();
+          }
+        }
+        const td = depDay * DAY;
+        if (plan) {
+          // Planned transfer in the player's model.
+          const r1 = posAt(model.a1, model.P1, model, td);
+          const v1 = velAt(model.a1, model.P1, model, td);
+          const vInf = add(scale(unit(r1), plan.plan.vInfRadial), scale(unit(v1), plan.plan.vInfPrograde));
+          const v0 = add(v1, vInf);
+          const mu = G * model.Mstar;
+          ctx.strokeStyle = '#ffc46b';
+          ctx.lineWidth = 2 * dpr;
+          ctx.setLineDash([6 * dpr, 5 * dpr]);
+          ctx.beginPath();
+          for (let i = 0; i <= 80; i++) {
+            const [r] = propagate(r1, v0, (plan.plan.tof * i) / 80, mu);
+            if (i) ctx.lineTo(X(r), Y(r));
+            else ctx.moveTo(X(r), Y(r));
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // Ship marker animating along the plan.
+          const [rs] = propagate(r1, v0, plan.plan.tof * anim.current, mu);
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(X(rs), Y(rs), 3 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+          // Planet 2 at arrival (ghost).
+          const r2a = posAt(model.a2, model.P2, model, td + plan.plan.tof);
+          ctx.strokeStyle = 'rgba(108,196,255,0.8)';
+          ctx.beginPath();
+          ctx.arc(X(r2a), Y(r2a), 8 * dpr, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(108,196,255,0.8)';
+          ctx.font = `${11 * dpr}px Inter`;
+          ctx.fillText('arrival', X(r2a) + 10 * dpr, Y(r2a));
+        }
+        // Planets at departure and now.
+        const planet = (v: Vec3, c: string, r: number, label: string) => {
+          ctx.fillStyle = c;
+          ctx.beginPath();
+          ctx.arc(X(v), Y(v), r * dpr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(230,238,252,0.85)';
+          ctx.font = `600 ${11 * dpr}px Inter`;
+          ctx.fillText(label, X(v) + 9 * dpr, Y(v) - 6 * dpr);
+        };
+        planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, 'home @ departure');
+        planet(posAt(model.a2, model.P2, model, td), '#6cc4ff', 6, 'blue @ departure');
+        ctx.globalAlpha = 0.45;
+        planet(posAt(model.a1, model.P1, model, t), '#ffb26b', 4, 'now');
+        planet(posAt(model.a2, model.P2, model, t), '#6cc4ff', 4, '');
+        ctx.globalAlpha = 1;
+      }}
+    />
+  );
+}

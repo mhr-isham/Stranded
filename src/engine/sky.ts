@@ -128,3 +128,29 @@ export function starCatalog(seed: number, count = 2600): CatalogStar[] {
 }
 
 export const distance = (v: Vec3) => norm(v);
+
+/**
+ * Faint unresolved stars concentrated along a great circle tilted to the
+ * ecliptic: this system's Milky Way. Returns [x, y, z, brightness] tuples.
+ */
+export function milkyWay(seed: number, count = 5000): Float32Array {
+  const rng = makeRng(hash32(seed, 0x6a1a));
+  const tilt = rng.range(50, 70) * (Math.PI / 180);
+  const node = rng.range(0, TAU);
+  const out = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    const lon = rng.range(0, TAU);
+    // Thicker towards a "galactic centre".
+    const dc = ((lon - Math.PI + TAU) % TAU) - Math.PI;
+    const core = Math.exp(-(dc * dc) / 1.2);
+    const lat = rng.normal(0, 0.07 + 0.1 * core);
+    const c = Math.cos(lat);
+    let v: Vec3 = [c * Math.cos(lon), c * Math.sin(lon), Math.sin(lat)];
+    v = rotX(v, tilt);
+    const cn = Math.cos(node);
+    const sn = Math.sin(node);
+    v = [v[0] * cn - v[1] * sn, v[0] * sn + v[1] * cn, v[2]];
+    out.set([v[0], v[1], v[2], 0.25 + 0.75 * core * rng.next()], i * 4);
+  }
+  return out;
+}

@@ -45,11 +45,11 @@ export function modelFromPrimaries(p: Primaries): PlayerModel | null {
   };
 }
 
-const posAt = (a: number, P: number, m: PlayerModel, t: number): Vec3 => {
+export const posAt = (a: number, P: number, m: PlayerModel, t: number): Vec3 => {
   const th = (TAU * (t - m.tOpp)) / P;
   return [a * Math.cos(th), a * Math.sin(th), 0];
 };
-const velAt = (a: number, P: number, m: PlayerModel, t: number): Vec3 => {
+export const velAt = (a: number, P: number, m: PlayerModel, t: number): Vec3 => {
   const th = (TAU * (t - m.tOpp)) / P;
   const v = (TAU * a) / P;
   return [-v * Math.sin(th), v * Math.cos(th), 0];
