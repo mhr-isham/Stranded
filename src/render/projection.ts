@@ -25,6 +25,8 @@ export interface Projector {
   /** Screen position, or null when behind the camera. */
   project(d: Dir): { x: number; y: number; z: number } | null;
   unproject(x: number, y: number): Dir;
+  /** Allocation-free projection for hot loops: writes into out, returns false if behind. */
+  projectXYZ(dx: number, dy: number, dz: number, out: { x: number; y: number }): boolean;
   scale: number; // pixels per radian at the centre
 }
 
@@ -47,6 +49,14 @@ export function makeProjector(cam: Camera): Projector {
       const x = d[0] * r[0] + d[1] * r[1] + d[2] * r[2];
       const y = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
       return { x: cx + x * s, y: cy - y * s, z };
+    },
+    projectXYZ(dx, dy, dz, out) {
+      const z = dx * f[0] + dy * f[1] + dz * f[2];
+      if (z < -0.3) return false;
+      const s = (2 * k) / (1 + z);
+      out.x = cx + (dx * r[0] + dy * r[1] + dz * r[2]) * s;
+      out.y = cy - (dx * u[0] + dy * u[1] + dz * u[2]) * s;
+      return true;
     },
     unproject(px, py) {
       const X = (px - cx) / (2 * k);

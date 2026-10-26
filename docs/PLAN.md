@@ -1,7 +1,17 @@
 # Stranded — Build Plan, Design Review & Feature Suggestions
 
 Source: *Stranded: astro navigation game design* (8-page design doc).
-Status: **plan only, no code yet.** Open questions in §7 need answers before the generator is written.
+Status: **first playable version built** (see README). Decisions taken:
+
+| Question | Decision |
+|---|---|
+| Planets | 2: home planet and the blue outer target (with a moon). |
+| Absolute distance scale | Two-site parallax of the blue planet against background stars (rover baseline, blink comparator). Distances read at any time are converted with the law of cosines, so measuring exactly at opposition is not required. Opposition is still the best time. |
+| Survival layer | Built, behind a toggle at the start of each expedition. |
+| Arrival | The fuel budget covers escape from the surface, one mid-course correction and capture into a parking orbit at 1.3 R₂. The heat shield handles the landing. This gives M₂ and R₂ a real job. |
+| Art | Real sky physics rendered in a clean, stylised way: sky colours follow the star's altitude, stars twinkle, planets don't. |
+| Platform | Single static web page (Vite + React + Canvas), phone and laptop, no sign-in, English. |
+| Year length | Measured from the star's drift against the stars at twilight (faster than the analemma). |
 
 ---
 

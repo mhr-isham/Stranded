@@ -133,7 +133,7 @@ export const distance = (v: Vec3) => norm(v);
  * Faint unresolved stars concentrated along a great circle tilted to the
  * ecliptic: this system's Milky Way. Returns [x, y, z, brightness] tuples.
  */
-export function milkyWay(seed: number, count = 5000): Float32Array {
+export function milkyWay(seed: number, count = 3800): Float32Array {
   const rng = makeRng(hash32(seed, 0x6a1a));
   const tilt = rng.range(50, 70) * (Math.PI / 180);
   const node = rng.range(0, TAU);

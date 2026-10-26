@@ -56,10 +56,10 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
     const m = scene.milky;
     const sz = Math.max(1, o.dpr * Math.min(2.2, P.scale / 700));
     ctx.fillStyle = 'rgb(200,210,255)';
+    const p = { x: 0, y: 0 };
     for (let i = 0; i < m.length; i += 4) {
       if (m[i + 2] < 0) continue;
-      const p = P.project([m[i], m[i + 1], m[i + 2]]);
-      if (!p || p.x < 0 || p.y < 0 || p.x > w || p.y > h) continue;
+      if (!P.projectXYZ(m[i], m[i + 1], m[i + 2], p) || p.x < 0 || p.y < 0 || p.x > w || p.y > h) continue;
       ctx.globalAlpha = a0 * m[i + 3];
       ctx.fillRect(p.x, p.y, sz * 1.6, sz * 1.6);
     }
@@ -70,18 +70,19 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
   if (lim > -1) {
     const tw = o.realTime / 1000;
     const s = scene.stars;
+    const p = { x: 0, y: 0 };
+    const sizeK = o.dpr * Math.min(1.6, Math.max(0.7, P.scale / 900));
     for (let i = 0; i < catalog.length; i++) {
       const st = catalog[i];
       if (st.mag > lim) continue;
       const up = s[i * 3 + 2];
       if (up < -0.05) continue;
-      const p = P.project([s[i * 3], s[i * 3 + 1], up]);
-      if (!p || p.x < -4 || p.y < -4 || p.x > w + 4 || p.y > h + 4) continue;
+      if (!P.projectXYZ(s[i * 3], s[i * 3 + 1], up, p) || p.x < -4 || p.y < -4 || p.x > w + 4 || p.y > h + 4) continue;
       // Scintillation grows near the horizon where the air path is longer.
       const air = 1 / Math.max(0.12, up);
       const twinkle = 1 + Math.min(0.6, 0.12 * air) * Math.sin(tw * (7 + (i % 5)) + st.twinklePhase) * Math.sin(tw * 2.3 + i);
       const a = Math.max(0, Math.min(1, (lim - st.mag) / 2.2)) * twinkle;
-      const r = Math.max(0.55, 1.9 - 0.32 * st.mag) * o.dpr * Math.min(1.6, Math.max(0.7, P.scale / 900));
+      const r = Math.max(0.55, 1.9 - 0.32 * st.mag) * sizeK;
       const c = st.color;
       ctx.fillStyle = `rgba(${(c[0] * 255) | 0},${(c[1] * 255) | 0},${(c[2] * 255) | 0},${Math.min(1, a)})`;
       if (r < 1.1) ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);

@@ -46,6 +46,8 @@ export function advance(dtReal: number) {
   if (t1 >= clock.stopAt && clock.stopAt !== Infinity) {
     clock.stopAt = Infinity;
     clock.warpIndex = Math.min(clock.warpIndex, 3);
+    if (clock.pauseAtStop) clock.paused = true;
+    clock.pauseAtStop = false;
     clock.emit();
   }
   if (t1 >= end) {

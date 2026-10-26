@@ -59,8 +59,9 @@ export function survivalDay(s: GameState, _sys: StarSystem, d0: number, d1: numb
   const roverBusy = s.rover.arriveAt > d0 * DAY;
   for (let day = d0 + 1; day <= d1; day++) {
     const storm = inStorm(s.seed, day);
-    const solar = 45 * (storm ? 0.25 : 1) * (sv.upgrades.includes('panels') ? 1.4 : 1);
-    const draw = 30 + (s.trackOn ? 8 : 0) + (s.moonTrackOn ? 6 : 0) + (roverBusy ? 12 : 0) + (sv.upgrades.includes('greenhouse') ? 6 : 0);
+    const solar = 48 * (storm ? 0.2 : 1) * (sv.upgrades.includes('panels') ? 1.4 : 1);
+    const draw = 26 + (s.trackOn ? 5 : 0) + (s.moonTrackOn ? 4 : 0) + (roverBusy ? 10 : 0) + (sv.upgrades.includes('greenhouse') ? 5 : 0);
+    const wasFlat = sv.power <= 0;
     sv.power = Math.max(0, Math.min(100, sv.power + solar - draw));
     sv.o2 -= o2Rate(sv);
     sv.food -= foodRate();
@@ -70,7 +71,8 @@ export function survivalDay(s: GameState, _sys: StarSystem, d0: number, d1: numb
       sv.leak = true;
       sv.log.unshift(`Day ${day}: micrometeorite! Oxygen tank leaking — repair it in the workshop.`);
     }
-    if (sv.power <= 0 && rand(s.seed, day, 41) < 0.2) sv.log.unshift(`Day ${day}: batteries flat — scrubbers struggling, oxygen use up 50%.`);
+    if (sv.power <= 0 && !wasFlat) sv.log.unshift(`Day ${day}: batteries flat — scrubbers struggling, oxygen use up 50%. Turn off trackers or build panels.`);
+    if (sv.power > 0 && wasFlat) sv.log.unshift(`Day ${day}: power restored.`);
   }
   sv.log = sv.log.slice(0, 30);
   sv.lastDay = d1;

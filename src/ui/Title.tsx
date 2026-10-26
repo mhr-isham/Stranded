@@ -27,7 +27,7 @@ export function Title() {
     return { sys, cat: starCatalog(sys.seed), land: makeLandscape(sys.seed, sys.hillHeight) };
   }, []);
   const tRef = useRef(0);
-  const canContinue = s.missionsDone.length > 0 || s.readings.length > 0;
+  const canContinue = s.savedT > 0 && !s.outcome;
 
   const start = (seed: number) => {
     useGame.getState().newGame(seed, settings);

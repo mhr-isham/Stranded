@@ -27,6 +27,8 @@ export const clock = {
   realtime: false,
   /** Hard stop: the clock will not advance past this time (e.g. "wait until"). */
   stopAt: Infinity as number,
+  /** Pause (instead of slowing down) when stopAt is reached. */
+  pauseAtStop: false,
   listeners: new Set<Listener>(),
   get rate() {
     if (this.paused) return 0;

@@ -41,7 +41,7 @@ export function Launch() {
   const model = useMemo(() => modelFromPrimaries(s.sheet), [s.sheet]);
   const end = lifeSupportEnd(s, sys);
   const budget = sys.fuelDv - s.penaltyDv;
-  const [dep, setDep] = useState<number | null>(null); // days
+  const [dep, setDep] = useState<number | 'now' | null>(null); // days
   const [autoTof, setAutoTof] = useState(true);
   const [tofDays, setTofDays] = useState(200);
   const [mc, setMc] = useState<McResult | null>(null);
@@ -54,9 +54,9 @@ export function Launch() {
     }
   }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hoh = model ? hohmannFor(model) : null;
-  const windows = model ? predictedWindows(model, t, end) : [];
-  const depDay = dep ?? (windows[0] ?? t) / DAY;
+  const hoh = useMemo(() => (model ? hohmannFor(model) : null), [model]);
+  const windows = useMemo(() => (model ? predictedWindows(model, t, end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (windows[0] ?? t) / DAY);
   const plan: PlannedTransfer | null = useMemo(() => {
     if (!model) return null;
     return autoTof ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
@@ -128,7 +128,7 @@ export function Launch() {
   }
 
   const nowDay = t / DAY;
-  const ready = Math.abs(depDay - nowDay) < 0.5;
+  const ready = Math.abs(depDay - nowDay) < 1.5;
   const leadNow = (((TAU_DEG * (t - model.tOpp)) / model.P2 - (TAU_DEG * (t - model.tOpp)) / model.P1) % 360 + 360) % 360;
   const margin = plan ? budget - plan.total : NaN;
 
@@ -142,6 +142,7 @@ export function Launch() {
 
   const warpTo = () => {
     clock.stopAt = depDay * DAY;
+    clock.pauseAtStop = true;
     clock.warpIndex = WARPS.length - 1;
     clock.paused = false;
     clock.emit();
@@ -167,7 +168,7 @@ export function Launch() {
                 Window {i + 1}: day {fmt(w / DAY, 1)}
               </button>
             ))}
-            <button className="btn small ghost" onClick={() => setDep(nowDay)}>
+            <button className={`btn small ${dep === 'now' ? 'primary' : 'ghost'}`} onClick={() => setDep('now')}>
               Now
             </button>
           </div>
@@ -269,7 +270,26 @@ function FuelBar({ plan, budget }: { plan: PlannedTransfer; budget: number }) {
 }
 
 function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; ny: number; d0: number; d1: number; tof0: number; tof1: number; v: Float32Array }; budget: number; depDay: number; tof: number; onPick: (d: number, tofDays: number) => void }) {
-  const min = useMemo(() => Math.min(...pork.v), [pork]);
+  // Render the cost map once per data change into a small offscreen image.
+  const img = useMemo(() => {
+    const min = Math.min(...pork.v);
+    const c = document.createElement('canvas');
+    c.width = pork.nx;
+    c.height = pork.ny;
+    const g = c.getContext('2d')!;
+    for (let i = 0; i < pork.nx; i++)
+      for (let j = 0; j < pork.ny; j++) {
+        const v = pork.v[j * pork.nx + i];
+        const x = (v - min) / Math.max(1, budget - min); // 0 = cheapest, 1 = whole budget
+        if (!Number.isFinite(v) || x > 1) g.fillStyle = 'rgb(40,20,30)';
+        else {
+          const q = Math.pow(x, 0.5);
+          g.fillStyle = `rgb(${Math.round(40 + 200 * q)},${Math.round(200 - 140 * q)},${Math.round(160 - 110 * q)})`;
+        }
+        g.fillRect(i, pork.ny - 1 - j, 1, 1);
+      }
+    return c;
+  }, [pork, budget]);
   return (
     <div>
       <div className="row between" style={{ fontSize: 12 }}>
@@ -287,21 +307,8 @@ function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; n
             onPick(d, tf / DAY);
           }}
           draw={({ ctx, w, h, dpr }) => {
-            const cw = w / pork.nx;
-            const ch = h / pork.ny;
-            for (let i = 0; i < pork.nx; i++)
-              for (let j = 0; j < pork.ny; j++) {
-                const v = pork.v[j * pork.nx + i];
-                const x = (v - min) / Math.max(1, budget - min); // 0 = cheapest, 1 = whole budget
-                let col: string;
-                if (!Number.isFinite(v) || x > 1) col = 'rgba(40,20,30,1)';
-                else {
-                  const q = Math.pow(x, 0.5);
-                  col = `rgb(${Math.round(40 + 200 * q)},${Math.round(200 - 140 * q)},${Math.round(160 - 110 * q)})`;
-                }
-                ctx.fillStyle = col;
-                ctx.fillRect(i * cw, h - (j + 1) * ch, cw + 1, ch + 1);
-              }
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(img, 0, 0, w, h);
             const x = ((depDay - pork.d0) / (pork.d1 - pork.d0)) * w;
             const y = h - ((tof - pork.tof0) / (pork.tof1 - pork.tof0)) * h;
             ctx.strokeStyle = '#fff';
@@ -318,6 +325,17 @@ function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; n
 
 function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<typeof modelFromPrimaries>>; plan: PlannedTransfer | null; mc: McResult | null; t: number; depDay: number }) {
   const anim = useRef(0);
+  // The planned transfer arc in the player's model, computed once per plan.
+  const arc = useMemo(() => {
+    if (!plan) return [];
+    const td = depDay * DAY;
+    const r1 = posAt(model.a1, model.P1, model, td);
+    const v1 = velAt(model.a1, model.P1, model, td);
+    const vInf = add(scale(unit(r1), plan.plan.vInfRadial), scale(unit(v1), plan.plan.vInfPrograde));
+    const v0 = add(v1, vInf);
+    const mu = G * model.Mstar;
+    return Array.from({ length: 121 }, (_, i) => propagate(r1, v0, (plan.plan.tof * i) / 120, mu)[0]);
+  }, [plan, model, depDay]);
   return (
     <CanvasView
       draw={({ ctx, w, h, dpr, dt }) => {
@@ -362,28 +380,21 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
         const td = depDay * DAY;
         if (plan) {
           // Planned transfer in the player's model.
-          const r1 = posAt(model.a1, model.P1, model, td);
-          const v1 = velAt(model.a1, model.P1, model, td);
-          const vInf = add(scale(unit(r1), plan.plan.vInfRadial), scale(unit(v1), plan.plan.vInfPrograde));
-          const v0 = add(v1, vInf);
-          const mu = G * model.Mstar;
           ctx.strokeStyle = '#ffc46b';
           ctx.lineWidth = 2 * dpr;
           ctx.setLineDash([6 * dpr, 5 * dpr]);
           ctx.beginPath();
-          for (let i = 0; i <= 80; i++) {
-            const [r] = propagate(r1, v0, (plan.plan.tof * i) / 80, mu);
-            if (i) ctx.lineTo(X(r), Y(r));
-            else ctx.moveTo(X(r), Y(r));
-          }
+          arc.forEach((r, i) => (i ? ctx.lineTo(X(r), Y(r)) : ctx.moveTo(X(r), Y(r))));
           ctx.stroke();
           ctx.setLineDash([]);
           // Ship marker animating along the plan.
-          const [rs] = propagate(r1, v0, plan.plan.tof * anim.current, mu);
-          ctx.fillStyle = '#fff';
-          ctx.beginPath();
-          ctx.arc(X(rs), Y(rs), 3 * dpr, 0, Math.PI * 2);
-          ctx.fill();
+          const rs = arc[Math.min(arc.length - 1, Math.floor(anim.current * arc.length))];
+          if (rs) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(X(rs), Y(rs), 3 * dpr, 0, Math.PI * 2);
+            ctx.fill();
+          }
           // Planet 2 at arrival (ghost).
           const r2a = posAt(model.a2, model.P2, model, td + plan.plan.tof);
           ctx.strokeStyle = 'rgba(108,196,255,0.8)';

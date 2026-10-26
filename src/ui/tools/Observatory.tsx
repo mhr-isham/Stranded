@@ -325,7 +325,15 @@ export function Observatory() {
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
             {TABS.map((tb) => (
-              <button key={tb.id} className={`btn small ${tab === tb.id ? 'primary' : 'ghost'}`} onClick={() => setTab(tb.id)} style={{ flex: 1 }}>
+              <button
+                key={tb.id}
+                className={`btn small ${tab === tb.id ? 'primary' : 'ghost'}`}
+                onClick={() => {
+                  setTab(tb.id);
+                  if (tb.id === 'micro') calip.current = { ...calip.current, x1: -fov / 10, x2: fov / 10 };
+                }}
+                style={{ flex: 1 }}
+              >
                 {tb.label}
               </button>
             ))}
@@ -571,7 +579,10 @@ function MoonPanel() {
   const [band, setBand] = useState<[number, number] | null>(null);
   const pts = s.moonTrack.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
   const used = pts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
-  const fit = used.length >= 8 ? sineFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60) : null;
+  const span = used.length ? used[used.length - 1].x - used[0].x : 0;
+  // The swing looks bigger when the planet is closer, so a fit over months is meaningless.
+  const tooLong = span > 50;
+  const fit = used.length >= 8 && !tooLong ? sineFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60) : null;
   const mid = used.length ? (used[0].x + used[used.length - 1].x) / 2 : 0;
   const curve = fit && used.length ? Array.from({ length: 300 }, (_, i) => {
     const x = used[0].x + ((used[used.length - 1].x - used[0].x) * i) / 299;
@@ -592,6 +603,7 @@ function MoonPanel() {
       </div>
       {pts.length > 1 && <Chart series={[{ pts, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) }, ...(curve.length ? [{ pts: curve, color: '#6cc4ff', kind: 'line' as const }] : [])]} xLabel="day" yLabel="moon offset (″)" band={band} onBand={setBand} brushMode="band" yFmt={(y) => y.toFixed(0)} />}
       {pts.length > 1 && <div className="faint" style={{ fontSize: 12 }}>Drag to choose the stretch of data to fit — near opposition is best, when the planet is closest.</div>}
+      {tooLong && <div className="amber" style={{ fontSize: 13 }}>Choose a stretch of at most ~50 days (drag across the chart): the swing looks smaller when the planet is further away.</div>}
       {fit && (
         <>
           <dl className="kv">
