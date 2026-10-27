@@ -9,6 +9,7 @@ import { ToastHost } from './common/widgets';
 import { Game } from './Game';
 import { Intro } from './Intro';
 import { Prologue } from './Prologue';
+import { StoryHost } from './StoryScene';
 import { Results } from './launch/Results';
 import { Flight } from './launch/Flight';
 import { Title } from './Title';
@@ -71,6 +72,7 @@ export default function App() {
       {phase === 'flight' && <Flight />}
       {phase === 'results' && <Results />}
       {tutorial && <Tutorial />}
+      {phase !== 'title' && phase !== 'prologue' && <StoryHost />}
       <ToastHost />
     </>
   );

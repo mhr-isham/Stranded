@@ -127,6 +127,9 @@ export interface GameState {
   names: SystemNames;
   /** Every finished run, kept across expeditions. */
   atlas: AtlasCard[];
+  /** Story logs unlocked (kept across expeditions) and scenes waiting to play. */
+  logs: string[];
+  storyQueue: string[];
   /** Acts whose end card the player has seen. */
   actsSeen: number[];
   checkpointsUsed: number;
@@ -193,6 +196,8 @@ const initial = {
   names: {} as SystemNames,
   atlas: [] as AtlasCard[],
   actsSeen: [] as number[],
+  logs: [] as string[],
+  storyQueue: [] as string[],
   checkpointsUsed: 0,
   rewindsUsed: 0,
   debriefSeen: false,
@@ -220,6 +225,7 @@ export const useGame = create<GameState>()(
           codex: get().codex,
           achievements: get().achievements,
           atlas: get().atlas ?? [],
+          logs: get().logs ?? [],
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
         });
       },

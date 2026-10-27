@@ -25,6 +25,7 @@ import { currentWorld } from '../game/sim';
 import { useGame, type CampInfo } from '../game/store';
 import { CanvasView } from './common/CanvasView';
 import { beginPlay } from './Intro';
+import { unlockLog } from '../game/story';
 
 type Stage = 'tumble' | 'stabilize' | 'deorbit' | 'entry' | 'descent' | 'landed';
 
@@ -165,6 +166,7 @@ export function Prologue() {
 
   const finish = (camp: CampInfo) => {
     stopRumble();
+    unlockLog('fall', false);
     useGame.setState({ camp, phase: 'intro' });
   };
 

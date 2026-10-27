@@ -21,8 +21,11 @@ import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
 import { PredictCard } from '../common/Predict';
+import { relaySunlit, relayTopocentric } from '../../engine/relay';
+import { toLocal as toLocalDir } from '../../render/scene';
+import { unlockLog } from '../../game/story';
 
-type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'catalog'; i: number };
+type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
 type Tab = 'sky' | 'year' | 'track' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -89,6 +92,7 @@ export function Observatory() {
   const objDir = (sl: Sel, tt: number): Vec3 => {
     if (sl.kind === 'star') return unit(topocentric(sys, 'star', tt, sys.site));
     if (sl.kind === 'target') return unit(topocentric(sys, 'target', tt, sys.site));
+    if (sl.kind === 'relay') return unit(relayTopocentric(sys, tt, sys.site));
     return catalog[sl.i].dir;
   };
   const pointing = (tt: number): Vec3 | null => {
@@ -107,6 +111,7 @@ export function Observatory() {
     if (!sl) return 'Nothing selected';
     if (sl.kind === 'star') return 'The star (our sun)';
     if (sl.kind === 'target') return s.identified ? 'The blue planet' : 'Unknown light';
+    if (sl.kind === 'relay') return s.logs.includes('relay') ? 'The Halcyon relay' : 'A moving light';
     return 'Unknown light';
   };
 
@@ -135,6 +140,7 @@ export function Observatory() {
     };
     test({ kind: 'star' }, topocentric(sys, 'star', clock.t, sys.site));
     test({ kind: 'target' }, topocentric(sys, 'target', clock.t, sys.site));
+    if (relayVisible(clock.t)) test({ kind: 'relay' }, relayTopocentric(sys, clock.t, sys.site));
     catalog.forEach((c, i) => c.mag < 2.6 && test({ kind: 'catalog', i }, c.dir));
     if (best) {
       setSel(best);
@@ -143,6 +149,14 @@ export function Observatory() {
       sfx('click');
     }
   };
+
+  /** The relay shows only in a dark sky while it is still in sunlight, above the horizon. */
+  function relayVisible(tt: number) {
+    const f = localFrame(sys, tt, sys.site);
+    if (toHorizontal(topocentric(sys, 'star', tt, sys.site), f).alt > -6 * DEG) return false;
+    if (toHorizontal(relayTopocentric(sys, tt, sys.site), f).alt < 3 * DEG) return false;
+    return relaySunlit(sys, tt);
+  }
 
   const identify = () => {
     if (sel?.kind === 'target') {
@@ -220,8 +234,27 @@ export function Observatory() {
                 ctx.fillText(text, p.x + 16 * dpr, p.y + 4 * dpr);
               };
               if (s.identified) label(scene.target, 'Blue planet', 'rgba(108,196,255,0.9)');
+              // The Halcyon relay: a faint light that moves across the sky in minutes.
+              if (relayVisible(clock.t)) {
+                const rd = toLocalDir(relayTopocentric(sys, clock.t, sys.site), scene.frame);
+                const rp = P.project(rd);
+                if (rp && rd[2] > 0) {
+                  ctx.fillStyle = 'rgba(235,240,255,0.85)';
+                  ctx.beginPath();
+                  ctx.arc(rp.x, rp.y, 1.4 * dpr, 0, Math.PI * 2);
+                  ctx.fill();
+                  if (s.logs.includes('relay')) label(rd, 'Halcyon relay', 'rgba(181,156,255,0.9)');
+                }
+              }
               if (sel) {
-                const d = sel.kind === 'star' ? scene.sun : sel.kind === 'target' ? scene.target : ([scene.stars[sel.i * 3], scene.stars[sel.i * 3 + 1], scene.stars[sel.i * 3 + 2]] as [number, number, number]);
+                const d =
+                  sel.kind === 'star'
+                    ? scene.sun
+                    : sel.kind === 'target'
+                      ? scene.target
+                      : sel.kind === 'relay'
+                        ? toLocalDir(relayTopocentric(sys, clock.t, sys.site), scene.frame)
+                        : ([scene.stars[sel.i * 3], scene.stars[sel.i * 3 + 1], scene.stars[sel.i * 3 + 2]] as [number, number, number]);
                 label(d, '', 'rgba(255,196,107,0.95)');
               }
               // Compass.
@@ -400,7 +433,8 @@ export function Observatory() {
                 shows a disk.
               </div>
             )}
-            {mode === 'scope' && sel && sel.kind !== 'star' && !s.identified && (
+            {sel?.kind === 'relay' && <RelayInfo />}
+            {mode === 'scope' && sel && sel.kind !== 'star' && sel.kind !== 'relay' && !s.identified && (
               <button className="btn primary" onClick={identify} data-tut="obs-identify">
                 This is the blue planet
               </button>
@@ -827,5 +861,33 @@ function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
         makePrediction({ kind: 'moon', made: clock.t, due: e + 0.05 * DAY, value, sigma });
       }}
     />
+  );
+}
+
+/** A light that moves against the stars in minutes can only be something in orbit around us. */
+function RelayInfo() {
+  const { system: sys } = currentWorld();
+  const s = useGame();
+  const t = useGameTime(2);
+  const f = localFrame(sys, t, sys.site);
+  const a = unit(relayTopocentric(sys, t, sys.site));
+  const b = unit(relayTopocentric(sys, t + 60, sys.site));
+  // Angle moved against the background stars in one minute.
+  const deg = (Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])) * 180) / Math.PI;
+  const alt = toHorizontal(relayTopocentric(sys, t, sys.site), f).alt / DEG;
+  const known = s.logs.includes('relay');
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <div className="muted" style={{ fontSize: 13 }}>
+        It moves about <b>{fmt(deg, 2)}°</b> against the stars every minute (altitude {fmt(alt, 0)}°). The star and the planets take hours to move that far.
+      </div>
+      {!known ? (
+        <button className="btn primary" onClick={() => unlockLog('relay')}>
+          Track the moving light
+        </button>
+      ) : (
+        <div className="hint">The Halcyon’s dead relay satellite, in orbit around this planet.</div>
+      )}
+    </div>
   );
 }

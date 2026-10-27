@@ -129,6 +129,7 @@ function stepTo(t1Wanted: number, dtReal: number) {
     if (s.track[n - 1].v < s.track[n - 2].v) s.say(ECHO.retrograde);
   }
   if (s.identified && Math.abs(t1 - nearestOpposition(t1)) < 25 * DAY) s.say(ECHO.parallax);
+  if (s.missionsDone.includes('year') && !s.logs.includes('relay') && !s.tutorial.active) s.say(ECHO.relayHint);
   if (s.identified && !s.names.target && !s.tutorial.active && s.missionsDone.includes('identify')) s.say(ECHO.nameIt);
 
   missionTimer += dtReal;

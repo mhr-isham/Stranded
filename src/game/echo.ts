@@ -94,6 +94,10 @@ export const ECHO: Record<string, EchoLine> = {
     coach: true,
     text: 'With two logs you can already call your shot: predict where the star will be in a couple of weeks. Reason from your own line, give an honest range — I’ll tell you how it went.',
   },
+  relayHint: {
+    id: 'relayHint',
+    text: 'One more thing from the night sky: just after dusk I keep catching a faint light that moves while the stars stand still. If you see it in the Sky view, tap it.',
+  },
   nameIt: {
     id: 'nameIt',
     text: 'Nobody has ever named that blue world. If you’d like to, the progress sheet has a “Name this system” button. Only we will know.',

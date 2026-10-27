@@ -5,6 +5,7 @@ import { useGame } from '../game/store';
 import { LESSONS, LESSON_IDS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
 import { AtlasGrid, CalibrationPanel } from './Atlas';
+import { LOGS, playLog } from '../game/story';
 
 export function Codex() {
   const s = useGame();
@@ -16,6 +17,23 @@ export function Codex() {
         <div className="muted">Every system you’ve measured, and how honest your error bars have been.</div>
         <CalibrationPanel />
         <AtlasGrid />
+        <h1 style={{ fontSize: 28, marginTop: 16 }}>Logs</h1>
+        <div className="muted">Scenes, discoveries and journal pages. Tap one to read it again.</div>
+        {s.logs.length === 0 ? (
+          <div className="faint" style={{ fontSize: 13 }}>Nothing yet.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+            {s.logs.filter((id) => LOGS[id]).map((id) => (
+              <button key={id} className="panel panel-pad btn" style={{ justifyContent: 'flex-start', textAlign: 'left', height: 'auto', whiteSpace: 'normal' }} onClick={() => playLog(id)}>
+                <span style={{ fontSize: 22 }}>{LOGS[id].kind === 'journal' ? '📓' : LOGS[id].kind === 'discovery' ? '🛰' : '🎞'}</span>
+                <span>
+                  <b>{LOGS[id].title}</b>
+                  <div className="faint" style={{ fontSize: 11 }}>Chapter {LOGS[id].chapter}</div>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <h1 style={{ fontSize: 28, marginTop: 16 }}>Physics lessons</h1>
         <div className="muted">Interactive explanations of every method in the game — open any of them, any time.</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>

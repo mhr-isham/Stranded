@@ -15,6 +15,7 @@ import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
 import { countText, modeOf } from '../../game/modes';
 import { predictionPoints } from '../../game/predictions';
 import { nameOf, type AtlasCard } from '../../game/atlas';
+import { unlockLog } from '../../game/story';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
   success: {
@@ -147,6 +148,8 @@ function Debrief() {
   const earned = useMemo(() => evaluateAchievements(s, sys, kind, rows), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!s.debriefSeen) useGame.setState({ debriefSeen: true });
+    // Reaching the beacon: the Halcyon cache and the first journal pages.
+    if (kind === 'success') ['cache1', 'mira1', 'mira2'].forEach((id) => unlockLog(id));
     // Every run, success or not, becomes a finished card in the Atlas.
     const g = useGame.getState();
     if (!g.tutorial.active && !g.atlas.some((c) => c.id === g.runId)) {

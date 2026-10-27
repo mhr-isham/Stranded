@@ -6,6 +6,7 @@ import { ACTS, completedActs } from '../game/acts';
 import { sfx } from '../game/audio';
 import { clock } from '../game/clock';
 import { useGame } from '../game/store';
+import { unlockLog } from '../game/story';
 
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 
@@ -30,7 +31,11 @@ export function ActCard() {
   }, [act?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!act || s.tutorial.active) return null;
-  const seen = () => useGame.setState({ actsSeen: [...s.actsSeen, act.n] });
+  const seen = () => {
+    useGame.setState({ actsSeen: [...s.actsSeen, act.n] });
+    // Midway through the chapter, ECHO risks a thaw to check the Commander.
+    if (act.n === 3) unlockLog('vale1');
+  };
   return (
     <div className="modal-back">
       <div className="modal panel act-card">
