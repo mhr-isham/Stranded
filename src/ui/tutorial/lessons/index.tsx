@@ -4,6 +4,7 @@ import type { ComponentType } from 'react';
 import { DeltaVLesson, HonestyLesson, MeasureLesson, PropagationLesson } from './basics';
 import { AngularLesson, MoonLesson, ParallaxLesson } from './distance';
 import { HohmannLesson } from './flight';
+import { EstimateLesson } from './estimate';
 import { HorizonLesson, MassLesson, PendulumLesson } from './ground';
 import { KeplerLesson, RetrogradeLesson, SynodicLesson, TwinkleLesson, YearLesson } from './sky';
 
@@ -24,6 +25,7 @@ export const LESSONS = {
   moon: { title: 'Weighing a planet with its moon', icon: '🌙', C: MoonLesson },
   hohmann: { title: 'The Hohmann transfer', icon: '🚀', C: HohmannLesson },
   deltav: { title: 'Fuel is Δv', icon: '⛽', C: DeltaVLesson },
+  estimate: { title: 'Making a good estimate', icon: '🎯', C: EstimateLesson },
 } satisfies Record<string, { title: string; icon: string; C: ComponentType }>;
 
 export type LessonId = keyof typeof LESSONS;

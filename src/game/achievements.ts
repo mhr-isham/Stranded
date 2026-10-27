@@ -16,6 +16,8 @@ export const ACHIEVEMENTS: Record<string, { name: string; icon: string; text: st
   lean: { name: 'Lean Burn', icon: '⛽', text: 'Arrive with at least 15% of your fuel.' },
   unaided: { name: 'No Help Needed', icon: '🧠', text: 'Succeed without hints or verification.' },
   survivor: { name: 'Survivor', icon: '🔥', text: 'Succeed in survival mode.' },
+  oracle: { name: 'Called It', icon: '🎯', text: 'A prediction inside its range, scoring 80 points or more.' },
+  seer: { name: 'Halley', icon: '☄️', text: 'Three predictions inside their ranges in one run.' },
   early: { name: 'Early Bird', icon: '🐦', text: 'Launch with more than a third of life support left.' },
 };
 
@@ -37,5 +39,8 @@ export function evaluateAchievements(s: GameState, sys: StarSystem, outcome: str
   if (ok && s.hintsUsed === 0 && s.checksUsed === 0) got.push('unaided');
   if (ok && s.settings.survival) got.push('survivor');
   if (ok && s.outcome && (sys.lifeSupport - s.outcome.plan.departTime) / sys.lifeSupport > 1 / 3) got.push('early');
+  const hits = s.predictions.filter((p) => p.result && p.result.z <= 1);
+  if (hits.some((p) => p.result!.points >= 80)) got.push('oracle');
+  if (hits.length >= 3) got.push('seer');
   return got;
 }

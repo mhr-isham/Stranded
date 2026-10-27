@@ -13,6 +13,7 @@ import { evaluateAchievements, ACHIEVEMENTS } from '../../game/achievements';
 import { toast } from '../common/widgets';
 import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
 import { countText, modeOf } from '../../game/modes';
+import { predictionPoints } from '../../game/predictions';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
   success: {
@@ -120,7 +121,7 @@ function Debrief() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty, predictionPoints: predictionPoints(s) });
   const [copied, setCopied] = useState(false);
 
   // Error budget: how much correction fuel each measurement cost, found by
@@ -187,6 +188,14 @@ function Debrief() {
               <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
               <dt>Hints used</dt>
               <dd>{s.hintsUsed}</dd>
+              {s.predictions.some((p) => p.result) && (
+                <>
+                  <dt>Predictions</dt>
+                  <dd>
+                    {s.predictions.filter((p) => p.result && p.result.z <= 1).length}/{s.predictions.filter((p) => p.result).length} inside · {predictionPoints(s)} pts
+                  </dd>
+                </>
+              )}
               {s.rewindsUsed > 0 && (
                 <>
                   <dt>Rewinds used</dt>

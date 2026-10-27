@@ -13,6 +13,11 @@ import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlie
 import { Modal } from '../common/widgets';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
+import { explain, makePrediction, resolveNow } from '../../game/predictions';
+import { useMode } from '../../game/modes';
+import { pendulumPeriod } from '../../engine/measure';
+import { PredictCard } from '../common/Predict';
+import { toast } from '../common/widgets';
 
 const BOB_R = 0.025; // m
 
@@ -352,6 +357,7 @@ export function Pendulum() {
           <ReadingsTable k="g" />
           <SendReadings k="g" tut="pend-send" />
         </div>
+        {keptG.length > 0 && !running && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
       </div>
 
       {ask && (
@@ -455,6 +461,64 @@ function Scale({ trueL, nominal, value, onChange }: { trueL: number; nominal: nu
             ctx.fillStyle = '#e02f4a';
             ctx.fillRect(x - 0.75 * dpr, 0, 1.5 * dpr, h);
           }
+        }}
+      />
+    </div>
+  );
+}
+
+/** Knot offset of the string at a knob setting (the same hidden offset the rig uses). */
+const knotL = (seed: number, nominal: number) => nominal + ((hash32(seed, Math.round(nominal * 100)) / 4294967296) * 3 - 1.5) / 100;
+
+/** "Use a ratio": predict the swing time at a new length before trying it. */
+function PendulumPrediction({ nominal, setNominal, keptG, g }: { nominal: number; setNominal: (v: number) => void; keptG: number[]; g: number }) {
+  const { system: sys } = currentWorld();
+  const preds = useGame((s) => s.predictions).filter((p) => p.kind === 'pendulum');
+  const tutorial = useGame((s) => s.tutorial.active);
+  const mode = useMode();
+  const [shown, setShown] = useState<string | null>(null);
+  if (tutorial || preds.length >= 2) {
+    const last = preds[preds.length - 1];
+    return last?.result && shown === last.id ? (
+      <div className="panel panel-pad">
+        <div className="hint">{explain(last, mode.coaching)}</div>
+      </div>
+    ) : null;
+  }
+  const k = nominal >= 2.4 ? 0.25 : nominal <= 0.75 ? 4 : nominal >= 1.5 ? 0.5 : 2;
+  const L2 = Math.round(nominal * k * 10) / 10;
+  const gMean = keptG.reduce((a, b) => a + b, 0) / keptG.length;
+  const own = 2 * Math.PI * Math.sqrt(L2 / gMean);
+  const last = preds[preds.length - 1] ?? null;
+  return (
+    <div className="panel panel-pad stack">
+      {last?.result && shown === last.id && <div className="hint">{explain(last, mode.coaching)}</div>}
+      <PredictCard
+        kind="pendulum"
+        question={
+          <>
+            Your string is set to about <b>{fmt(nominal, 1)} m</b>. If you set it to <b>{fmt(L2, 1)} m</b> ({k > 1 ? `${k}×` : `1/${1 / k}`} the length), how long
+            will one full swing take? Predict first, then try it.
+          </>
+        }
+        helper={`Use a ratio: swing time grows with the square root of the length. ${k > 1 ? `${k}× longer` : `${1 / k}× shorter`} means √${k > 1 ? k : 1 / k} = ${fmt(Math.sqrt(k > 1 ? k : 1 / k), 2)}× ${k > 1 ? 'slower' : 'faster'}.`}
+        pts={[]}
+        axis="y"
+        xMax={0}
+        xLabel=""
+        yLabel=""
+        ownFit={{ value: own }}
+        sigma0={0.1}
+        sigmaMax={1}
+        pending={null}
+        last={null}
+        onCommit={(value, sigma) => {
+          const id = makePrediction({ kind: 'pendulum', made: clock.t, due: clock.t, value, sigma, at: L2 });
+          const truth = pendulumPeriod(g, knotL(sys.seed, L2), 3 * DEG);
+          resolveNow(id, truth);
+          setShown(id);
+          setNominal(L2);
+          toast(`String set to ${fmt(L2, 1)} m — release it and time it yourself.`);
         }}
       />
     </div>

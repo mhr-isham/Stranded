@@ -305,3 +305,10 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .tut-card.free { max-height: 48vh; }
   .tut-card .body { font-size: 13px; }
 }
+
+/* Predictions */
+.panel-inset { border: 1px solid var(--panel-border); border-radius: 12px; padding: 12px; background: rgba(255, 255, 255, 0.025); }
+.predict { margin-top: 8px; }
+.predict-plot { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--panel-border); background: rgba(5, 8, 16, 0.9); touch-action: none; cursor: crosshair; }
+.check-line { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check-line input { width: auto; flex: none; margin: 0; }

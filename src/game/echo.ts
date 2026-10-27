@@ -89,6 +89,11 @@ export const ECHO: Record<string, EchoLine> = {
     coach: true,
     text: 'The chain is complete. Let’s open the launch planner. The cheapest path — a Hohmann transfer — opens once per synodic period. Missing it costs fuel; waiting costs air.',
   },
+  predict: {
+    id: 'predict',
+    coach: true,
+    text: 'With two logs you can already call your shot: predict where the star will be in a couple of weeks. Reason from your own line, give an honest range — I’ll tell you how it went.',
+  },
   lowLife: {
     id: 'lowLife',
     text: 'Warning: life support below 15%. Whatever we know now is what we launch with.',

@@ -19,6 +19,8 @@ import { Chart, unwrapDeg } from '../common/Chart';
 import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierNote } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
+import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
+import { PredictCard } from '../common/Predict';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'catalog'; i: number };
 type Tab = 'sky' | 'year' | 'track' | 'micro' | 'moon';
@@ -539,7 +541,55 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
       <Formula>P₁ = 360° / (daily drift)</Formula>
       {P1 && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
       </div>
+      {pts.length >= 2 && <StarPrediction pts={pts} fit={fit} />}
     </div>
+  );
+}
+
+/** "Extend the line": where will the star be against the stars on a future day? */
+function StarPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { slope: number; intercept: number } | null }) {
+  const s = useGame();
+  const t = useGameTime(1);
+  const [ahead, setAhead] = useState(14);
+  const pending = pendingOf(s, 'star');
+  useEffect(() => {
+    if (!s.tutorial.active) useGame.getState().say(ECHO.predict);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (s.tutorial.active) return null;
+  const nowDay = Math.floor(t / DAY);
+  const xT = nowDay + ahead;
+  const own = fit ? { value: fit.intercept + fit.slope * xT, line: [pts[0].x, xT].map((x) => ({ x, y: fit.intercept + fit.slope * x })) } : null;
+  return (
+    <PredictCard
+      kind="star"
+      question={
+        <>
+          Where will the star stand against the background stars on <b>day {xT}</b>?
+        </>
+      }
+      helper="Extend the line: the star drifts at a steady rate. Follow the trend of your logs out to the dashed line — and widen your range a little, because any error in the rate grows with time."
+      extra={
+        <div className="row" style={{ gap: 6 }}>
+          {[7, 14, 30].map((d) => (
+            <button key={d} className={`btn small ${ahead === d ? 'primary' : ''}`} onClick={() => setAhead(d)}>
+              in {d} days
+            </button>
+          ))}
+        </div>
+      }
+      pts={pts}
+      axis="y"
+      xT={xT}
+      xMax={xT + 2}
+      xLabel="day"
+      yLabel="star longitude (°)"
+      ownFit={own}
+      sigma0={1}
+      sigmaMax={20}
+      pending={pending}
+      last={lastOf(s, 'star')}
+      onCommit={(value, sigma) => makePrediction({ kind: 'star', made: clock.t, due: xT * DAY, value, sigma, at: xT })}
+    />
   );
 }
 
@@ -628,9 +678,57 @@ function TrackerPanel() {
           )}
         </div>
       )}
+      <RetroPrediction pts={pts} />
     </div>
   );
 }
+
+/** "Bracket it": the loop is symmetric about opposition, so the end mirrors the start. */
+function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
+  const s = useGame();
+  const t = useGameTime(1);
+  const pending = pendingOf(s, 'retro');
+  const last = lastOf(s, 'retro');
+  if (s.tutorial.active || pts.length < 5) return null;
+  const n = pts.length;
+  // Going backwards now: the last few nightly logs decrease.
+  const backwards = pts[n - 1].y < pts[Math.max(0, n - 4)].y;
+  const recent = last && t - last.made < 150 * DAY;
+  if (!pending && (!backwards || recent)) return null;
+  // When did it turn back? The last maximum of the track.
+  let iMax = n - 1;
+  while (iMax > 0 && pts[iMax - 1].y >= pts[iMax].y) iMax--;
+  const start = pts[iMax].x;
+  const opp = [...s.oppPicks].map((p) => p / DAY).filter((p) => p > start).pop();
+  const own = opp !== undefined ? { value: opp + (opp - start) } : null;
+  return (
+    <PredictCard
+      kind="retro"
+      question={
+        <>
+          The blue planet is moving <b>backwards</b> (retrograde). On which day will it stop and move forwards again?
+        </>
+      }
+      helper={`Bracket it: it can't be before opposition. The loop is a mirror image around opposition — it turned back around day ${start.toFixed(0)}; ${opp !== undefined ? `you marked opposition on day ${opp.toFixed(0)}, so mirror the gap.` : 'find the middle of the loop (opposition) and mirror the gap.'}`}
+      pts={pts.slice(Math.max(0, iMax - 30))}
+      axis="x"
+      xMax={t / DAY + 120}
+      xLabel="day"
+      yLabel="longitude (°)"
+      ownFit={own}
+      sigma0={5}
+      sigmaMax={40}
+      pending={pending}
+      last={last}
+      onCommit={(value, sigma) => {
+        const st = nextStationary(s.seed, s.settings.difficulty, clock.t);
+        if (st === null) return;
+        makePrediction({ kind: 'retro', made: clock.t, due: st + DAY, value, sigma });
+      }}
+    />
+  );
+}
+
 
 function MoonPanel() {
   const s = useGame();
@@ -681,6 +779,53 @@ function MoonPanel() {
         </>
       )}
       </div>
+      <MoonPrediction pts={pts} fit={fit} />
     </div>
+  );
+}
+
+/** "Use a ratio": peak to peak is one moon period. */
+function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { model: (x: number) => number; period: number } | null }) {
+  const s = useGame();
+  const t = useGameTime(1);
+  const pending = pendingOf(s, 'moon');
+  if (s.tutorial.active || pts.length < 8) return null;
+  const nowDay = t / DAY;
+  const recent = pts.filter((p) => p.x > nowDay - 20);
+  if (recent.length < 8 && !pending) return null;
+  // The player's own fit gives the next peak after now.
+  let own: { value: number } | null = null;
+  if (fit) {
+    let best = -Infinity;
+    for (let x = nowDay; x < nowDay + fit.period * 1.05; x += fit.period / 400) {
+      const y = fit.model(x);
+      if (y > best) {
+        best = y;
+        own = { value: x };
+      }
+    }
+  }
+  const span = fit ? Math.max(4, fit.period * 1.6) : 12;
+  return (
+    <PredictCard
+      kind="moon"
+      question="When will the moon next be at its farthest point east of the planet (the top of the swing)?"
+      helper="Use a ratio: from one top of the swing to the next is one full moon period. Measure it peak to peak on your chart, then add it to the latest peak."
+      pts={recent}
+      axis="x"
+      xMax={nowDay + span}
+      xLabel="day"
+      yLabel="moon offset (″)"
+      ownFit={own}
+      sigma0={0.5}
+      sigmaMax={5}
+      pending={pending}
+      last={null}
+      onCommit={(value, sigma) => {
+        const e = nextMoonEast(s.seed, s.settings.difficulty, clock.t);
+        if (e === null) return;
+        makePrediction({ kind: 'moon', made: clock.t, due: e + 0.05 * DAY, value, sigma });
+      }}
+    />
   );
 }

@@ -7,6 +7,7 @@ import type { LaunchPlan, LaunchResult } from '../engine/launch';
 import type { Difficulty } from '../engine/types';
 import { clock } from './clock';
 import { modeOf } from './modes';
+import type { Prediction } from './predictions';
 
 export type Screen =
   | 'hub'
@@ -109,6 +110,7 @@ export interface GameState {
   tutorial: TutorialState;
   /** Identifies this run, so checkpoints from an older run are ignored. */
   runId: number;
+  predictions: Prediction[];
   checkpointsUsed: number;
   rewindsUsed: number;
   /** The player has seen the true values; no more rewinds. */
@@ -168,6 +170,7 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   runId: 0,
+  predictions: [] as Prediction[],
   checkpointsUsed: 0,
   rewindsUsed: 0,
   debriefSeen: false,

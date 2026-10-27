@@ -14,6 +14,7 @@ import { WARPS } from './clock';
 import { useGame, type GameState, type TimedValue } from './store';
 import { isCloudy, lifeSupportEnd, survivalDay } from './survival';
 import { world } from './world';
+import { resolvePredictions } from './predictions';
 
 const TRACK_RES = 0.01 * DEG; // tracker reading resolution
 const MOON_RES = 0.5 * ARCSEC;
@@ -118,6 +119,7 @@ function stepTo(t1Wanted: number, dtReal: number) {
   }
 
   if (Object.keys(patch).length) useGame.setState(patch);
+  resolvePredictions(t1);
 
   // Story beats tied to time.
   const life = (end - t1) / end;
