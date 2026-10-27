@@ -24,6 +24,9 @@ const WARPS = [1, 10, 60, 240];
 const WHEEL_R = 0.35; // m
 
 /** Small bumps on top of the smooth strip profile (m). */
+/** Crawl-gear pull as a share of g: enough to climb the steepest slope on the strip (~45°). */
+const LOW_GEAR = 0.85;
+
 const bumps = (x: number) => 0.1 * Math.sin(x / 2.3) + 0.05 * Math.sin(x / 0.9 + 1.3) + 0.22 * Math.sin(x / 7.1 + 0.4);
 
 export function RoverDrive() {
@@ -35,6 +38,9 @@ export function RoverDrive() {
   const campX = s.camp?.x ?? 0;
   const vmax = (ROVER_KMH * (hasChallenge(s, 'rover') ? 0.5 : 1)) / 3.6;
   const ground = (x: number) => tr.height(x) + bumps(x);
+  // The slope the wheels climb: across the wheelbase, ignoring the small bumps
+  // (the rocker-bogie rides over those).
+  const climbSlope = (x: number) => Math.atan((tr.height(x + 1.5) - tr.height(x - 1.5)) / 3);
   const st = useRef({
     x: s.surface.roverX ?? campX + 12,
     v: 0,
@@ -64,7 +70,7 @@ export function RoverDrive() {
     window.addEventListener('keyup', up);
     const id = setInterval(() => {
       const S = st.current;
-      setHud({ x: S.x, v: S.v, battery: S.battery, slope: Math.atan((ground(S.x + 1) - ground(S.x - 1)) / 2) });
+      setHud({ x: S.x, v: S.v, battery: S.battery, slope: climbSlope(S.x) });
     }, 120);
     // While driving the clock runs at real time (like at the pendulum); the warp buttons speed it up.
     clock.realtime = true;
@@ -99,14 +105,21 @@ export function RoverDrive() {
     const n = Math.max(1, Math.ceil(dtGame / 0.1));
     const h = dtGame / n;
     for (let i = 0; i < n; i++) {
-      const slope = Math.atan((ground(S.x + 1) - ground(S.x - 1)) / 2);
+      const slope = climbSlope(S.x);
       const canDrive = S.battery > 0 && thr !== 0;
-      // Motors push up to a third of g; gravity pulls back on a climb; rolling friction brakes.
-      let a = canDrive ? thr * 0.35 * g : 0;
-      a -= g * Math.sin(slope) * 0.9;
-      if (!canDrive) a -= Math.sign(S.v) * Math.min(Math.abs(S.v) / h, 0.6 * g * 0.3);
-      S.v = Math.max(-vmax * 0.6, Math.min(vmax, S.v + a * h));
-      if (!canDrive && Math.abs(S.v) < 0.05) S.v = 0;
+      const pull = g * Math.sin(slope);
+      let a: number;
+      if (canDrive) {
+        // Motors push a third of g at speed; below a third of top speed they shift
+        // to a crawl gear with enough force for any slope on the strip.
+        const ahead = S.v * thr;
+        a = thr * (ahead < vmax / 3 ? LOW_GEAR * g : 0.35 * g) - pull;
+      } else {
+        // Brakes: they slow the rover and hold it still on any slope on the strip (up to ~48°).
+        const hold = 0.75 * g;
+        a = -pull + Math.max(-hold, Math.min(hold, -S.v / h + pull));
+      }
+      S.v = Math.max(-vmax, Math.min(vmax, S.v + a * h));
       const dx = S.v * h;
       const nx = Math.max(-STRIP, Math.min(STRIP, S.x + dx));
       const moved = Math.abs(nx - S.x);
@@ -295,7 +308,9 @@ export function RoverDrive() {
       <div className="drive-hud panel">
         <dl className="kv">
           <dt>Speed</dt>
-          <dd>{fmt(Math.abs(hud.v) * 3.6, 1)} km/h</dd>
+          <dd>
+            {fmt(Math.abs(hud.v) * 3.6, 1)} km/h{Math.abs(hud.slope) > 15 * DEG && Math.abs(hud.v) > 0.05 && Math.abs(hud.v) < vmax / 3 + 0.05 ? ' · crawl gear' : ''}
+          </dd>
           <dt>Slope</dt>
           <dd className={Math.abs(hud.slope) > 12 * DEG ? 'amber' : ''}>{fmt(hud.slope / DEG, 0)}°</dd>
           <dt>Battery</dt>
