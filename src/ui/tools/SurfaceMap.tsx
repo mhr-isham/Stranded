@@ -20,13 +20,13 @@ import {
   SURFACE_RULES,
   TOW_KMH,
   findsFor,
-  hopCost,
   spareFuel,
   terrainFor,
 } from '../../game/surface';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { drawStarship } from '../../render/ship';
 import { drawRover } from '../../render/rover';
+import { hopBudget, hopEstimate, hopParams } from '../../engine/hop';
 import { hasChallenge } from '../../game/challenges';
 import { ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
@@ -72,17 +72,28 @@ export function SurfaceMap() {
     toast(`Towing the camp ${fmt(dist / 1000, 1)} km — about ${fmt(dist / 1000 / TOW_KMH / 24, 1)} days`);
   };
 
+  // A hop as the ship really flies it: the fuel a good pilot uses, and the tank load for flying it by hand.
+  const hopInfo = useMemo(() => {
+    if (target === null) return null;
+    const p = hopParams(g, mode.landingAssist);
+    const d = Math.abs(target - campX);
+    return { est: hopEstimate(p, d).cost, budget: hopBudget(p, d) };
+  }, [target, campX, g, mode.landingAssist]);
+
   const hop = () => {
-    if (target === null) return;
-    // You fly it: the ideal ballistic hop costs 2√(g·d); the tank is loaded with
-    // 60% more for piloting, and you pay for what you actually burn.
-    const cost = hopCost(g, Math.abs(target - campX));
-    const budget = 1.6 * cost;
+    if (target === null || !hopInfo) return;
+    const { est, budget } = hopInfo;
     const fromLaunch = Math.max(0, budget - hopTank);
-    if (fromLaunch > 0 && !confirm(`A hop there ideally costs ${fmt(cost, 0)} m/s. ${hopTank > 0 ? `The hop tank has ${fmt(hopTank, 0)} m/s; anything` : 'Anything'} more you burn comes out of the launch fuel (up to ${fmt(fromLaunch, 0)} m/s). Go?`)) return;
+    if (
+      fromLaunch > 0 &&
+      !confirm(
+        `Flown well, this hop takes about ${fmt(est, 0)} m/s. ${hopTank > 0 ? `The hop tank has ${fmt(hopTank, 0)} m/s; anything` : 'Anything'} more you burn comes out of the launch fuel (up to ${fmt(fromLaunch, 0)} m/s). Go?`,
+      )
+    )
+      return;
     useGame.setState({
       surface: { ...sf, hopTank, roverX: null },
-      hop: { toX: target, cost, fromX: campX, budget },
+      hop: { toX: target, cost: est, fromX: campX, budget },
       phase: 'hop',
     });
     sfx('launch');
@@ -224,7 +235,7 @@ export function SurfaceMap() {
                 🚙 Let it drive itself ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
               </button>
               <button className="btn" disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
-                🚀 Hop the ship there ({fmt(hopCost(g, Math.abs(target - campX)), 0)} m/s{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
+                🚀 Hop the ship there (≈{fmt(hopInfo?.est ?? 0, 0)} m/s flown well{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
               </button>
             </div>
           )}

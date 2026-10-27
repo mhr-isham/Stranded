@@ -26,6 +26,7 @@ import { currentWorld } from '../game/sim';
 import { useGame, type CampInfo } from '../game/store';
 import { CanvasView } from './common/CanvasView';
 import { drawStarship } from '../render/ship';
+import { hopEstimate, hopPilot, type HopPhase } from '../engine/hop';
 import { beginPlay } from './Intro';
 import { unlockLog } from '../game/story';
 import { chapterOf } from '../game/campaign';
@@ -67,6 +68,10 @@ interface Sim {
   shake: number;
   /** A hop has left the ground (until then, touching it isn't a landing). */
   launched: boolean;
+  /** Last engine throttle (for the flame), and ECHO flying the hop. */
+  thr: number;
+  echoFly: boolean;
+  pilot: { phase: HopPhase; n: number };
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
@@ -134,6 +139,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const later = s.chapter > 1 && !arrival && !hop;
   const hopTo = hop ? (s.hop?.toX ?? 0) : 0;
   const hopFrom = hop ? (s.hop?.fromX ?? s.camp?.x ?? 0) : 0;
+  const [echoFly, setEchoFly] = useState(false);
+  const hopPlan = useMemo(() => (hop ? hopEstimate(params, Math.abs(hopTo - hopFrom)).plan : { burnDeg: 45, brakeMargin: 1.05, hoverH: 10 }), [params, hop, hopTo, hopFrom]);
   const sim = useRef<Sim>({
     stage: hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble',
     stageT: 0,
@@ -156,6 +163,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     shieldDrop: null,
     shake: 0,
     launched: !hop,
+    thr: 0,
+    echoFly: false,
+    pilot: { phase: 'lift', n: 0 },
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
@@ -409,12 +419,26 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const ground = terrain.height(S.d.x);
       const h = S.d.y - ground;
       // Rescue: the prologue can't kill you.
-      if (S.launched && !S.rescued && ((h < 260 && S.d.vy < -40) || (h < 70 && S.d.vy < -13) || (h < 35 && Math.abs(S.d.vx) > 12))) {
+      // Rescue only when the engine really can't stop us in time (a late, hard
+      // braking burn is fine), or when skidding in sideways, or falling with an empty tank.
+      // Already burning: the engine brakes as it points now. Coasting: allow for
+      // swinging upright first, about √(2|tilt|/turn rate) seconds of falling.
+      const burning = u.thrust && S.d.fuel > 0;
+      const tUp = burning ? 0 : Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3;
+      const hLeft = h - 2 - Math.max(0, -S.d.vy) * tUp;
+      const brakeNeed = S.d.vy < 0 ? (S.d.vy * S.d.vy) / (2 * Math.max(1, hLeft)) : 0;
+      const brakeHave = (params.thrust * (burning ? Math.max(0.2, Math.cos(S.d.th)) : 1) - g) * (S.d.fuel > 0 ? 1 : 0);
+      const doomed =
+        !(hop && S.echoFly) &&
+        ((h < 2500 && brakeNeed > 1.05 * Math.max(0.1, brakeHave)) || (h < 35 && Math.abs(S.d.vx) > 12) || (S.d.fuel <= 0 && S.d.vy < -8 && h < 400));
+      if (S.launched && !S.rescued && doomed) {
         S.rescued = true;
         sfx('bad');
         setLine('Taking control! Hold on.');
       }
       let uu = { turn, throttle: u.thrust ? 1 : 0 };
+      // ECHO flies the hop the way a good pilot would.
+      if (hop && S.echoFly && !S.rescued) uu = hopPilot(params, S.d, hopTo, terrain.height(S.d.x), hopPlan, S.pilot);
       if (S.rescued) {
         const targetVy = -Math.max(2, h * 0.12);
         const thCmd = Math.max(-0.45, Math.min(0.45, -S.d.vx * 0.035));
@@ -427,6 +451,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const speedUp = h > 2500 && !S.rescued ? 3 : 1;
       const n = Math.ceil((dt * speedUp) / 0.02);
       for (let i = 0; i < n; i++) S.d = stepDescent(params, S.d, uu, (dt * speedUp) / n);
+      S.thr = S.d.fuel > 0 ? uu.throttle : 0;
       if (!S.launched) {
         // Still on the pad: the ground holds us up until the engine lifts us.
         const gh = terrain.height(S.d.x);
@@ -1004,7 +1029,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         }
       }
     }
-    const thr = S.stage === 'descent' && (input.current.thrust || S.rescued) && d.fuel > 0 ? 1 : 0;
+    const thr = S.stage === 'descent' ? S.thr : 0;
     const turn = (input.current.right ? 1 : 0) - (input.current.left ? 1 : 0);
     const legs = Math.max(0, Math.min(1, (450 - hAlt) / 250));
     // Light falling on the ground under a firing engine.
@@ -1111,7 +1136,19 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
                 🪂 {hud.chute === 'stowed' ? 'Parachute' : hud.chute === 'open' ? 'Chute open' : 'Chute torn'}
               </button>
             )}
-            {(stage === 'deorbit' || stage === 'descent') && <HoldButton label="BURN" aria="Burn" big on={(v) => (input.current.thrust = v)} />}
+            {hop && stage === 'descent' && (
+              <button
+                className={`btn ${echoFly ? 'primary' : ''}`}
+                onClick={() => {
+                  sim.current.echoFly = !echoFly;
+                  setEchoFly(!echoFly);
+                  setLine(!echoFly ? 'I have it. Steep climb out of the thick air, coast, turn round, brake, settle.' : 'Your ship, Navigator.');
+                }}
+              >
+                {echoFly ? '🤖 ECHO is flying' : '🤖 Let ECHO fly'}
+              </button>
+            )}
+            {(stage === 'deorbit' || stage === 'descent') && !(hop && echoFly) && <HoldButton label="BURN" aria="Burn" big on={(v) => (input.current.thrust = v)} />}
           </div>
         </div>
       )}

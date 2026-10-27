@@ -45,7 +45,10 @@ export function campDistances(tr: Terrain, x: number) {
   };
 }
 
-/** Δv for a ballistic hop of distance d (up and down again, 45° launch). */
+/**
+ * Textbook Δv for an impulsive ballistic hop of distance d (45° launch). Real
+ * hops cost far more (finite thrust, drag, the landing): see engine/hop.ts.
+ */
 export const hopCost = (g: number, d: number) => 2 * Math.sqrt(g * Math.max(0, d));
 
 export interface SurfaceRules {
@@ -60,10 +63,11 @@ export interface SurfaceRules {
 }
 
 export const SURFACE_RULES: Record<Difficulty, SurfaceRules> = {
-  stargazer: { hopTank: 1200, hopRefill: 'nightly', isruDays: 1, isruCap: 0.4 },
-  cadet: { hopTank: 900, hopRefill: 'nightly', isruDays: 2, isruCap: 0.4 },
-  navigator: { hopTank: 700, hopRefill: 'slow', isruDays: 3, isruCap: 0.25 },
-  astronomer: { hopTank: 500, hopRefill: 'ice', isruDays: 4, isruCap: 0.15 },
+  // Sized from flown hops (engine/hop.ts): a well-flown 5 km hop at 1 g takes about 1.3 km/s.
+  stargazer: { hopTank: 4000, hopRefill: 'nightly', isruDays: 1, isruCap: 0.4 },
+  cadet: { hopTank: 3000, hopRefill: 'nightly', isruDays: 2, isruCap: 0.4 },
+  navigator: { hopTank: 2200, hopRefill: 'slow', isruDays: 3, isruCap: 0.25 },
+  astronomer: { hopTank: 1400, hopRefill: 'ice', isruDays: 4, isruCap: 0.15 },
   legend: { hopTank: 0, hopRefill: 'none', isruDays: 5, isruCap: 0.1 },
 };
 
@@ -108,7 +112,7 @@ export function advanceSurface(s: GameState, sys: StarSystem, t0: number, t1: nu
     } else if (task.kind === 'process') {
       const cap = rules.isruCap * spareFuel(sys);
       if (rules.hopRefill === 'ice' && sf.hopTank < rules.hopTank) {
-        sf = { ...sf, hopTank: Math.min(rules.hopTank, sf.hopTank + ICE_LOAD_DV * 2), iceLoads: Math.max(0, sf.iceLoads - 1) };
+        sf = { ...sf, hopTank: Math.min(rules.hopTank, sf.hopTank + ICE_LOAD_DV * 4), iceLoads: Math.max(0, sf.iceLoads - 1) };
       } else {
         const add = Math.max(0, Math.min(ICE_LOAD_DV, cap - sf.fuelMade));
         sf = { ...sf, fuelMade: sf.fuelMade + add, iceLoads: Math.max(0, sf.iceLoads - 1) };
