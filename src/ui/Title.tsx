@@ -11,10 +11,17 @@ import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
 import { AtlasGrid, CalibrationPanel } from './Atlas';
-import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId } from '../game/challenges';
+import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId, challengeRedundant } from '../game/challenges';
 import { CHAPTERS, chapterOf, chapterUnlocked } from '../game/campaign';
 import { LESSONS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
+
+/** Starting something new replaces the run in progress: ask first. */
+function okToReplace() {
+  const g = useGame.getState();
+  const inProgress = g.savedT > 0 && !g.debriefSeen;
+  return !inProgress || confirm('Start something new? The expedition in progress will be lost.');
+}
 
 export function Title() {
   const s = useGame();
@@ -30,11 +37,12 @@ export function Title() {
     return { sys, cat: starCatalog(sys.seed), land: makeLandscape(sys.seed, sys.hillHeight) };
   }, []);
   const tRef = useRef(0);
-  const canContinue = s.savedT > 0 && !s.outcome;
+  // A run is over once its debrief has been seen (it shows the true values).
+  const canContinue = s.savedT > 0 && !s.debriefSeen;
   const inTutorial = s.tutorial.active;
 
   const start = (seed: number) => {
-    useGame.getState().newGame(seed, settings);
+    if (okToReplace()) useGame.getState().newGame(seed, settings);
   };
 
   return (
@@ -60,7 +68,7 @@ export function Title() {
               {inTutorial ? 'Continue Flight School' : 'Continue'}
             </button>
           )}
-          <button className={`btn big ${canContinue ? '' : 'amber'}`} onClick={startTutorial}>
+          <button className={`btn big ${canContinue ? '' : 'amber'}`} onClick={() => okToReplace() && startTutorial()}>
             🎓 Flight School <span style={{ fontWeight: 500, fontSize: 13, opacity: 0.8 }}>· start here</span>
           </button>
           <button className={`btn big ${canContinue ? '' : 'primary'}`} onClick={() => setCampaign(true)}>
@@ -181,7 +189,12 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
                     difficulty: id,
                     challenges: id === 'astronomer' || id === 'legend' ? settings.challenges : [],
                     formulas: MODES[id].formulas,
-                    survival: MODES[id].survivalForced ? true : MODES[settings.difficulty].survivalForced ? false : settings.survival,
+                    survival:
+                      MODES[id].survivalForced || ((id === 'astronomer' || id === 'legend') && settings.challenges?.includes('survival'))
+                        ? true
+                        : MODES[settings.difficulty].survivalForced
+                          ? false
+                          : settings.survival,
                   })
                 }
               >
@@ -215,7 +228,13 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
               <b>Astronomer Challenges · +5% score each</b>
               <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                 {CHALLENGE_IDS.map((id) => (
-                  <button key={id} className={`btn small ${chosen.includes(id) ? 'primary' : ''}`} title={CHALLENGES[id].text} onClick={() => toggleChallenge(id)}>
+                  <button
+                    key={id}
+                    className={`btn small ${chosen.includes(id) ? 'primary' : ''}`}
+                    disabled={challengeRedundant(settings.difficulty, id)}
+                    title={challengeRedundant(settings.difficulty, id) ? `Already part of ${MODES[settings.difficulty].name}` : CHALLENGES[id].text}
+                    onClick={() => toggleChallenge(id)}
+                  >
                     {CHALLENGES[id].icon} {CHALLENGES[id].name}
                   </button>
                 ))}
@@ -318,7 +337,7 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
           )}
           <ModeSettings settings={settings} setSettings={setSettings} />
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-            <button className="btn primary big" onClick={() => useGame.getState().newGame(randomSeed(), settings, ch.n)}>
+            <button className="btn primary big" onClick={() => okToReplace() && useGame.getState().newGame(randomSeed(), settings, ch.n)}>
               Start chapter {ch.n}
             </button>
           </div>
@@ -354,7 +373,7 @@ function FreeRoamModal({ onClose }: { onClose: () => void }) {
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
         <button
           className="btn primary big"
-          onClick={() => useGame.getState().newGame(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
+          onClick={() => okToReplace() && useGame.getState().newGame(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
         >
           Start exploring
         </button>

@@ -33,7 +33,7 @@ export const ECHO: Record<string, EchoLine> = {
   },
   welcome: {
     id: 'welcome',
-    text: 'Hello again, Navigator. I’m ECHO — what is left of me. Your missions are on the left. Start with the pendulum rig next to the ship: let’s find out how heavy things are here.',
+    text: 'Hello again, Navigator. I’m ECHO — what is left of me. Your missions are listed under Missions. Start with the pendulum rig next to the ship: let’s find out how heavy things are here.',
   },
   gravity: {
     id: 'gravity',

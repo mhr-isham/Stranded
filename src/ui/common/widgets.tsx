@@ -1,11 +1,28 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { clock, subscribeClock } from '../../game/clock';
 
-export function Modal({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
-  return (
-    <div className="modal-back" onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className="modal panel">{children}</div>
-    </div>
+/** A dialog. Closes on the backdrop, Esc or its ✕ when it has `onClose`; `top` puts it above the tutorial card. */
+export function Modal({ children, onClose, top }: { children: ReactNode; onClose?: () => void; top?: boolean }) {
+  useEffect(() => {
+    if (!onClose) return;
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+  // Rendered at the top of the page, so no parent's stacking (the HUD's) can bury it.
+  return createPortal(
+    <div className={`modal-back ${top ? 'top' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div className="modal panel">
+        {onClose && (
+          <button type="button" className="modal-x btn ghost small" aria-label="Close" onClick={onClose}>
+            ✕
+          </button>
+        )}
+        {children}
+      </div>
+    </div>,
+    document.body,
   );
 }
 

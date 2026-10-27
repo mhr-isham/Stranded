@@ -17,7 +17,8 @@ import { countText, modeOf } from '../../game/modes';
 import { predictionPoints } from '../../game/predictions';
 import { nameOf, type AtlasCard } from '../../game/atlas';
 import { unlockLog } from '../../game/story';
-import { chapterOf } from '../../game/campaign';
+import { CHAPTERS, chapterOf, chapterUnlocked } from '../../game/campaign';
+import { randomSeed } from '../../game/world';
 import { CHAPTER_CODEX } from '../../game/codex';
 import { ANOMALIES, affectedReadings, sharpEyePoints } from '../../game/anomalies';
 import { CHALLENGES, challengeBonus } from '../../game/challenges';
@@ -278,6 +279,11 @@ function Debrief() {
             <button className="btn" onClick={() => useGame.getState().newGame(s.seed, s.settings, s.chapter)}>
               Retry this system
             </button>
+            {kind === 'success' && !s.tutorial.active && !s.settings.freeRoam && CHAPTERS.some((c) => c.n === s.chapter + 1) && chapterUnlocked(s, s.chapter + 1) && (
+              <button className="btn primary" onClick={() => useGame.getState().newGame(randomSeed(), s.settings, s.chapter + 1)}>
+                Chapter {s.chapter + 1}: {chapterOf(s.chapter + 1).title} →
+              </button>
+            )}
             <button className="btn" onClick={() => useGame.setState({ phase: 'title', outcome: null })}>
               Title screen
             </button>
@@ -288,7 +294,8 @@ function Debrief() {
           <div className="panel panel-pad stack" data-tut="results-budget">
             <h2 style={{ fontSize: 18 }}>Where your fuel went</h2>
             <div className="muted" style={{ fontSize: 13 }}>Correction fuel saved if that one measurement had been perfect:</div>
-            {budget.slice(0, 6).map((b) => (
+            {budget.every((b) => b.saved < 0.5) && <div className="faint" style={{ fontSize: 13 }}>No single measurement cost a whole m/s: the corrections were small all round.</div>}
+            {budget.filter((b) => b.saved >= 0.5).slice(0, 6).map((b) => (
               <div key={b.k} className="row" style={{ gap: 10 }}>
                 <span style={{ width: 170, fontSize: 13 }}>{QUANTITY_INFO[b.k].label}</span>
                 <div style={{ flex: 1, height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 5 }}>

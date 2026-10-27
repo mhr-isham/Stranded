@@ -6,6 +6,8 @@ import { DAY } from '../engine/constants';
 import { unitHash } from '../engine/rng';
 import type { GameState } from './store';
 import { ANOMALIES } from './anomalies';
+import { MODES } from './modes';
+import type { Difficulty } from '../engine/types';
 
 export type ChallengeId = 'stopwatch' | 'seeing' | 'rover' | 'noFormula' | 'survival' | 'handFit' | 'noSanity' | 'shortAir';
 
@@ -28,7 +30,12 @@ export const challengesUnlocked = (s: Pick<GameState, 'atlas'>) => s.atlas.some(
 export const hasChallenge = (s: Pick<GameState, 'settings'>, id: ChallengeId) => !!s.settings.challenges?.includes(id);
 
 /** Score bonus: 5% per challenge. */
-export const challengeBonus = (s: Pick<GameState, 'settings'>) => 1 + 0.05 * (s.settings.challenges?.length ?? 0);
+/** A challenge the mode already imposes (Legend's survival, formula sheet and warnings) earns nothing. */
+export const challengeRedundant = (d: Difficulty, id: ChallengeId) =>
+  (id === 'survival' && !!MODES[d].survivalForced) || (id === 'noFormula' && !!MODES[d].formulasLocked) || (id === 'noSanity' && !MODES[d].sanity);
+
+export const challengeBonus = (s: Pick<GameState, 'settings'>) =>
+  1 + 0.05 * (s.settings.challenges ?? []).filter((c) => !challengeRedundant(s.settings.difficulty, c)).length;
 
 /** Telescope seeing multiplier for this night (bad-seeing season, or a real bad night in the hard modes). */
 export function seeingFactor(s: Pick<GameState, 'settings' | 'seed'>, t: number) {

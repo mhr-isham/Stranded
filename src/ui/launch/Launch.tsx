@@ -61,7 +61,8 @@ export function Launch() {
   }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hoh = useMemo(() => (model ? hohmannFor(model) : null), [model]);
-  const windows = useMemo(() => (model ? predictedWindows(model, t, end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A window stays listed for a day after it opens, so warping onto it doesn't make it vanish.
+  const windows = useMemo(() => (model ? predictedWindows(model, Math.max(0, t - DAY), end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
   const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (windows[0] ?? t) / DAY);
   const plan: PlannedTransfer | null = useMemo(() => {
     if (!model) return null;
@@ -161,6 +162,7 @@ export function Launch() {
       toast('ECHO skipped ahead to the launch window');
       return;
     }
+    setDep(depDay);
     clock.stopAt = depDay * DAY;
     clock.pauseAtStop = true;
     clock.warpIndex = WARPS.length - 1;

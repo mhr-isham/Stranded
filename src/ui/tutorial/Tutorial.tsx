@@ -287,7 +287,7 @@ export function Tutorial() {
               className="btn small primary"
               onClick={() => {
                 exitTutorial();
-                useGame.setState({ phase: 'title', outcome: null });
+                useGame.setState({ phase: 'title', outcome: null, debriefSeen: true });
               }}
             >
               Finish

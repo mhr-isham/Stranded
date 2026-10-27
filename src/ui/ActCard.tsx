@@ -19,7 +19,8 @@ export function ActCard() {
   const next = act ? acts.find((a) => a.n === act.n + 1) : null;
 
   useEffect(() => {
-    if (!act) return;
+    // No act cards (and so no pause) in Flight School or Free Roam.
+    if (!act || s.tutorial.active || s.settings.freeRoam) return;
     const wasPaused = clock.paused;
     clock.paused = true;
     clock.emit();

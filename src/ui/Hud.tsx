@@ -95,7 +95,7 @@ export function Hud() {
         </button>
       </div>
       {menu && (
-        <Modal onClose={() => setMenu(false)}>
+        <Modal top onClose={() => setMenu(false)}>
           <h2>Expedition</h2>
           <dl className="kv" style={{ margin: '8px 0 12px' }}>
             <dt>System seed</dt>
