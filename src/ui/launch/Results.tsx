@@ -156,7 +156,7 @@ function Debrief() {
     // Reaching the beacon: the Halcyon cache and the chapter's journal pages.
     if (kind === 'success') chapterOf(g0.chapter).successLogs.forEach((id) => unlockLog(id));
     // Campaign progress: chapter done, best grade per mode.
-    if (!g0.tutorial.active) {
+    if (!g0.tutorial.active && !g0.settings.freeRoam) {
       const c = g0.campaign[g0.chapter] ?? { done: false, best: {} };
       const prev = c.best[g0.settings.difficulty];
       const best = !prev || grade.total > prev.score ? { grade: grade.letter, score: grade.total } : prev;
@@ -164,7 +164,7 @@ function Debrief() {
     }
     // Every run, success or not, becomes a finished card in the Atlas.
     const g = useGame.getState();
-    if (!g.tutorial.active && !g.atlas.some((c) => c.id === g.runId)) {
+    if (!g.tutorial.active && !g.settings.freeRoam && !g.atlas.some((c) => c.id === g.runId)) {
       const card: AtlasCard = {
         id: g.runId,
         seed: g.seed,
@@ -181,7 +181,7 @@ function Debrief() {
       };
       useGame.setState({ atlas: [...g.atlas, card] });
     }
-    earned.forEach((a) => useGame.getState().unlock('achievements', a));
+    if (!useGame.getState().settings.freeRoam) earned.forEach((a) => useGame.getState().unlock('achievements', a));
     sfx(kind === 'success' ? 'unlock' : 'bad');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -200,7 +200,8 @@ function Debrief() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(24px + var(--safe-top)) 14px 40px' }} className="stack">
         <div className="panel panel-pad" style={{ textAlign: 'center' }} data-tut="results-grade">
           <div className="meter-label">
-            Mission debrief · {s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
+            {s.settings.freeRoam ? 'Free Roam · not scored · ' : 'Mission debrief · '}
+            {s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
           </div>
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}

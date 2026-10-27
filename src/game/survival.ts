@@ -47,6 +47,8 @@ export const o2Rate = (sv: SurvivalState) => (sv.upgrades.includes('recycler') ?
 export const foodRate = () => 1;
 
 export function lifeSupportEnd(s: GameState, sys: StarSystem) {
+  // Free Roam: the air never runs out; a horizon that moves with time keeps planning finite.
+  if (s.settings.freeRoam) return clock.t + 3 * sys.synodic;
   if (!s.settings.survival) return sys.lifeSupport;
   const sv = s.survival;
   const days = Math.min(sv.o2 / o2Rate(sv), sv.food / foodRate());

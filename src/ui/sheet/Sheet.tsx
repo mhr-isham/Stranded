@@ -208,6 +208,12 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
               <input key={`s-${k}-${e?.sigma}`} className="input" inputMode="decimal" defaultValue={e ? sig(toDisplay(k, e.sigma), 3) : ''} onBlur={(ev) => edit('sigma', ev.target.value)} />
             </div>
           </div>
+          {s.settings.freeRoam && s.settings.showTruth && (
+            <div className="callout tip" style={{ margin: 0, fontSize: 13 }}>
+              <b>Sandbox · true value</b>
+              {sig(toDisplay(k, truthValues(sys, s.sheet, probeTruth(s))[k]), 6)} {info.unit}
+            </div>
+          )}
           {stats && (
             <div className="muted" style={{ fontSize: 12 }}>
               Log: {stats.n} kept reading{stats.n > 1 ? 's' : ''}, mean {sig(toDisplay(k, stats.mean), 5)}

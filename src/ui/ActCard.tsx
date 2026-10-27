@@ -31,7 +31,7 @@ export function ActCard() {
     };
   }, [act?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!act || s.tutorial.active) return null;
+  if (!act || s.tutorial.active || s.settings.freeRoam) return null;
   const seen = () => {
     useGame.setState({ actsSeen: [...s.actsSeen, act.n] });
     // Midway through the chapter, ECHO risks a thaw to check the Commander.

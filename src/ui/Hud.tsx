@@ -63,7 +63,7 @@ export function Hud() {
               <i style={{ width: `${lifeFrac * 100}%`, background: lifeFrac < 0.15 ? 'var(--red)' : lifeFrac < 0.35 ? 'var(--amber)' : 'var(--green)' }} />
             </div>
           </div>
-          <span className="mono" style={{ fontSize: 13 }}>{fmt(daysLeft, 0)} d</span>
+          <span className="mono" style={{ fontSize: 13 }}>{s.settings.freeRoam ? '∞' : `${fmt(daysLeft, 0)} d`}</span>
         </div>
         {s.settings.survival && (
           <button className="panel hud-block btn hide-phone" style={{ gap: 10 }} onClick={() => s.go('workshop')} title="Camp supplies">
@@ -91,7 +91,7 @@ export function Hud() {
             <dt>System seed</dt>
             <dd>{s.seed}</dd>
             <dt>Mode</dt>
-            <dd>{mode.name}</dd>
+            <dd>{s.settings.freeRoam ? 'Free Roam' : mode.name}</dd>
             <dt>Survival mode</dt>
             <dd>{s.settings.survival ? 'on' : 'off'}</dd>
             <dt>Fuel budget</dt>
@@ -103,6 +103,14 @@ export function Hud() {
             label="Formula sheet"
             sub={mode.formulasLocked ? `Not available in ${mode.name}.` : 'Shown in tools and on the progress sheet.'}
           />
+          {s.settings.freeRoam && (
+            <Toggle
+              on={!!s.settings.showTruth}
+              onChange={(v) => s.set({ settings: { ...s.settings, showTruth: v } })}
+              label="Sandbox: show the true values"
+              sub="Free Roam only. The sheet shows the real value next to yours — a way to explore, never scored."
+            />
+          )}
           {!s.tutorial.active && <CheckpointPanel onDone={() => setMenu(false)} />}
           <Toggle on={s.settings.sound} onChange={(v) => s.set({ settings: { ...s.settings, sound: v } })} label="Sound" />
           <div className="row" style={{ justifyContent: 'space-between', marginTop: 16 }}>

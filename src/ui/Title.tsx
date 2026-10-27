@@ -21,6 +21,7 @@ export function Title() {
   const [how, setHow] = useState(false);
   const [atlas, setAtlas] = useState(false);
   const [campaign, setCampaign] = useState(false);
+  const [roam, setRoam] = useState(false);
   const [settings, setSettings] = useState<Settings>({ ...s.settings });
   const [seedText, setSeedText] = useState('');
   const demo = useMemo(() => {
@@ -67,6 +68,9 @@ export function Title() {
           <button className="btn big" onClick={() => setSetup(true)}>
             Single expedition
           </button>
+          <button className="btn big" onClick={() => setRoam(true)}>
+            🔭 Free Roam
+          </button>
           <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
             <button className="btn" onClick={() => setHow(true)}>
               How to play
@@ -100,6 +104,7 @@ export function Title() {
         </Modal>
       )}
 
+      {roam && <FreeRoamModal onClose={() => setRoam(false)} />}
       {campaign && <CampaignModal settings={settings} setSettings={setSettings} onClose={() => setCampaign(false)} />}
 
       {atlas && (
@@ -290,6 +295,40 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
           {lesson && <LessonModal id={lesson} onClose={() => setLesson(null)} />}
         </>
       )}
+    </Modal>
+  );
+}
+
+/** No deadline, no score: explore any system you have reached, with an optional true-value overlay. */
+function FreeRoamModal({ onClose }: { onClose: () => void }) {
+  const s = useGame();
+  const options = CHAPTERS.filter((c) => c.ready && (c.n === 1 || s.campaign[c.n]?.done || chapterUnlocked(s, c.n)));
+  const [ch, setCh] = useState(1);
+  return (
+    <Modal onClose={onClose}>
+      <h2>Free Roam</h2>
+      <p className="muted" style={{ margin: '2px 0 10px', fontSize: 13 }}>
+        No deadline and no score. All the tools, the rover, the ship and the sky — measure, explore, hop around, draw your own conclusions. In the menu
+        you can switch on a sandbox overlay that shows the true values.
+      </p>
+      <div className="field">
+        <label>Kind of system</label>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {options.map((c) => (
+            <button key={c.n} className={`btn small ${ch === c.n ? 'primary' : ''}`} onClick={() => setCh(c.n)}>
+              {c.n}. {c.title}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
+        <button
+          className="btn primary big"
+          onClick={() => useGame.getState().newGame(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
+        >
+          Start exploring
+        </button>
+      </div>
     </Modal>
   );
 }
