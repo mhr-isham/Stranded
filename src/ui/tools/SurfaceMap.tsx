@@ -11,7 +11,7 @@ import { fmt } from '../../game/format';
 import { useMode } from '../../game/modes';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
-import { unlockLog } from '../../game/story';
+import { FIND_TEXT, collectFind } from '../../game/finds';
 import {
   ICE_LOAD_DV,
   ROVER_KMH,
@@ -23,18 +23,13 @@ import {
   hopCost,
   spareFuel,
   terrainFor,
-  type Find,
 } from '../../game/surface';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
+import { drawStarship } from '../../render/ship';
+import { drawRover } from '../../render/rover';
 import { hasChallenge } from '../../game/challenges';
 import { ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
-
-const FIND_TEXT: Record<Find['kind'], { icon: string; name: string; text: string }> = {
-  parts: { icon: '🔩', name: 'Wreckage', text: 'A torn hull panel from the crash, with usable parts.' },
-  meteorite: { icon: '☄️', name: 'Meteorite', text: 'A heavy, rust-crusted stone — iron and nickel. Meteorites like this are leftovers from when the planets formed.' },
-  clue: { icon: '🧰', name: 'Halcyon toolbox', text: 'A dented toolbox stamped HALCYON. Inside: a page of horizon-dip readings in neat handwriting, each with an error bar.' },
-};
 
 export function SurfaceMap() {
   const { system: sys } = currentWorld();
@@ -79,28 +74,21 @@ export function SurfaceMap() {
 
   const hop = () => {
     if (target === null) return;
+    // You fly it: the ideal ballistic hop costs 2√(g·d); the tank is loaded with
+    // 60% more for piloting, and you pay for what you actually burn.
     const cost = hopCost(g, Math.abs(target - campX));
-    const fromTank = Math.min(cost, hopTank);
-    const fromLaunch = cost - fromTank;
-    if (fromLaunch > 0 && !confirm(`This hop costs ${fmt(cost, 0)} m/s. ${fromTank > 0 ? `${fmt(fromTank, 0)} from the hop tank and ` : ''}${fmt(fromLaunch, 0)} m/s from the launch fuel. Go?`)) return;
+    const budget = 1.6 * cost;
+    const fromLaunch = Math.max(0, budget - hopTank);
+    if (fromLaunch > 0 && !confirm(`A hop there ideally costs ${fmt(cost, 0)} m/s. ${hopTank > 0 ? `The hop tank has ${fmt(hopTank, 0)} m/s; anything` : 'Anything'} more you burn comes out of the launch fuel (up to ${fmt(fromLaunch, 0)} m/s). Go?`)) return;
     useGame.setState({
-      surface: { ...sf, hopTank: hopTank - fromTank, roverX: null },
-      penaltyDv: s.penaltyDv + fromLaunch,
-      hop: { toX: target, cost },
+      surface: { ...sf, hopTank, roverX: null },
+      hop: { toX: target, cost, fromX: campX, budget },
       phase: 'hop',
     });
     sfx('launch');
   };
 
-  const collect = (f: Find) => {
-    const patch: Record<string, unknown> = { surface: { ...sf, collected: [...sf.collected, f.id] } };
-    if (f.kind === 'parts' && s.settings.survival) patch.survival = { ...s.survival, parts: s.survival.parts + 2 };
-    if (f.kind === 'meteorite') useGame.getState().unlock('codex', 'meteorite');
-    useGame.setState(patch);
-    if (f.kind === 'clue') unlockLog('toolbox');
-    toast(`${FIND_TEXT[f.kind].name} collected${f.kind === 'parts' ? (s.settings.survival ? ': +2 spare parts' : '') : ''}`);
-    sfx('unlock');
-  };
+  const collect = collectFind;
 
   return (
     <div className="tool">
@@ -129,7 +117,7 @@ export function SurfaceMap() {
             }
           }}
           onWheel={(e) => (view.current.span = Math.max(4e3, Math.min(80e3, view.current.span * (e.deltaY > 0 ? 1.15 : 0.87))))}
-          draw={({ ctx, w, h, dpr }) => {
+          draw={({ ctx, w, h, dpr, now }) => {
             const span = view.current.span;
             const cx = view.current.cx;
             const X = (x: number) => w / 2 + ((x - cx) / span) * w;
@@ -171,9 +159,8 @@ export function SurfaceMap() {
               ctx.globalAlpha = 1;
             }
             // Camp and rover.
-            ctx.font = `${20 * dpr}px Inter`;
-            ctx.fillText('⛺', X(campX), Y(tr.height(campX)) - 6 * dpr);
-            if (sf.roverX !== null) ctx.fillText('🚙', X(sf.roverX), Y(tr.height(sf.roverX)) - 6 * dpr);
+            drawStarship(ctx, X(campX), Y(tr.height(campX)) - 13 * dpr, 0, 28 * dpr, { now, legs: 1, shield: false, light: 1 });
+            if (sf.roverX !== null) drawRover(ctx, X(sf.roverX), Y(tr.height(sf.roverX)), 30 * dpr, { now, lights: true });
             // Rover range from camp.
             ctx.strokeStyle = 'rgba(108,196,255,0.4)';
             ctx.setLineDash([4 * dpr, 4 * dpr]);
@@ -226,13 +213,25 @@ export function SurfaceMap() {
           {target !== null && (
             <div className="stack" style={{ gap: 6 }}>
               <b style={{ fontSize: 13 }}>Chosen spot: {fmt((target - campX) / 1000, 1)} km from camp</b>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={() => useGame.setState({ driveTarget: target, screen: 'drive' })}
+              >
+                🕹 Drive the rover there yourself
+              </button>
               <button className="btn" disabled={busy} onClick={drive}>
-                🚙 Drive the rover there ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
+                🚙 Let it drive itself ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
               </button>
               <button className="btn" disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
                 🚀 Hop the ship there ({fmt(hopCost(g, Math.abs(target - campX)), 0)} m/s{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
               </button>
             </div>
+          )}
+          {!busy && (
+            <button className="btn" onClick={() => useGame.setState({ driveTarget: target, screen: 'drive' })}>
+              🕹 Take the rover for a drive
+            </button>
           )}
           {sf.roverX !== null && !busy && (
             <button className="btn" onClick={tow}>

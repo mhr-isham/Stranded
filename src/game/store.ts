@@ -14,6 +14,7 @@ import type { AtlasCard, SystemNames } from './atlas';
 
 export type Screen =
   | 'map'
+  | 'drive'
   | 'probe'
   | 'gnomon'
   | 'hub'
@@ -157,7 +158,9 @@ export interface GameState {
     lastRefill: number;
   };
   /** A hop of the ship in progress (the landing is flown). */
-  hop: { toX: number; cost: number } | null;
+  hop: { toX: number; cost: number; fromX?: number; budget?: number } | null;
+  /** Where the player wants to drive the rover (chosen on the map), if anywhere. */
+  driveTarget: number | null;
   /** A launch waiting for the hand-flown ascent. */
   pendingLaunch: { plan: LaunchPlan } | null;
   /** Fuel the hand-flown ascent cost beyond ECHO's profile (m/s; negative = saved). */
@@ -258,6 +261,7 @@ const initial = {
   pendingLaunch: null as GameState['pendingLaunch'],
   surface: { roverX: null, roverBattery: 120e3, busyUntil: 0, task: null, found: [], collected: [], hopTank: -1, iceLoads: 0, fuelMade: 0, lastRefill: 0 } as GameState['surface'],
   hop: null as GameState['hop'],
+  driveTarget: null as number | null,
   ascentPenalty: null as number | null,
   arrival: null as GameState['arrival'],
   probesLaunched: 0,

@@ -65,6 +65,8 @@ interface Sim {
   sparks: { x: number; y: number; vx: number; vy: number; life: number }[];
   shieldDrop: { x: number; y: number; vx: number; vy: number; rot: number } | null;
   shake: number;
+  /** A hop has left the ground (until then, touching it isn't a landing). */
+  launched: boolean;
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
@@ -131,6 +133,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
   const later = s.chapter > 1 && !arrival && !hop;
   const hopTo = hop ? (s.hop?.toX ?? 0) : 0;
+  const hopFrom = hop ? (s.hop?.fromX ?? s.camp?.x ?? 0) : 0;
   const sim = useRef<Sim>({
     stage: hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble',
     stageT: 0,
@@ -142,8 +145,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     gamma: -4.5,
     heat: 0,
     shieldHurt: false,
+    // A hop starts on the ground at camp, with the hop budget in the tank and no parachute.
     d: hop
-      ? { x: hopTo - 350, y: terrain.height(hopTo) + 900, vx: 18, vy: -12, th: 0, om: 0, fuel: mode.landingDv, chute: 'stowed', t: 0 }
+      ? { x: hopFrom, y: terrain.height(hopFrom), vx: 0, vy: 0, th: 0, om: 0, fuel: s.hop?.budget ?? mode.landingDv, chute: 'cut', t: 0 }
       : { x: -3500, y: 8000, vx: 120, vy: -100, th: 0, om: 0, fuel: mode.landingDv, chute: 'stowed', t: 0 },
     rescued: false,
     said: new Set(),
@@ -151,13 +155,14 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     sparks: [],
     shieldDrop: null,
     shake: 0,
+    launched: !hop,
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
   const [stage, setStage] = useState<Stage>(hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble');
   const [line, setLine] = useState(
     hop
-      ? 'Hop! We’re coming down over the new site. Same as before: slow down, stay upright, touch down gently.'
+      ? 'On the pad. Hold BURN to lift off, lean towards the blue flag, cut the engine and coast — then land near it, gently and upright. You pay for the fuel you burn.'
       : arrival
       ? 'Entry interface at the blue planet. Same rules as before: keep the flight-path angle in the green corridor. The beacon is on flat ground ahead.'
       : later
@@ -205,7 +210,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         vs: S.d.vy,
         hs: S.d.vx,
         tilt: S.d.th / DEG,
-        fuel: S.d.fuel / mode.landingDv,
+        fuel: S.d.fuel / (hop ? (s.hop?.budget ?? 1) : mode.landingDv),
         chute: S.d.chute,
         site: siteAt(terrain, S.d.x),
         q: dynPressure(params, S.d),
@@ -231,6 +236,14 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     else setLine('Chute open. It slows us, but not enough to land on its own — you’ll need a last burn near the ground.');
   }
 
+  /** A hop pays for what was burned: hop tank first, the rest from the launch fuel. */
+  const chargeHop = (used: number) => {
+    const g0 = useGame.getState();
+    const tank = Math.max(0, g0.surface.hopTank);
+    const fromTank = Math.min(tank, used);
+    useGame.setState({ surface: { ...g0.surface, hopTank: tank - fromTank }, penaltyDv: g0.penaltyDv + (used - fromTank) });
+  };
+
   const finish = (camp: CampInfo) => {
     stopRumble();
     if (arrival) {
@@ -238,6 +251,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (hop) {
+      chargeHop(Math.max(0, (s.hop?.budget ?? 0) - sim.current.d.fuel));
       useGame.setState({ camp: { ...camp, landing: s.camp?.landing ?? camp.landing }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
@@ -262,6 +276,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (hop) {
+      chargeHop(s.hop?.cost ?? 0);
       useGame.setState({ camp: { ...campAt(hopTo, 'skipped'), landing: s.camp?.landing ?? 'skipped' }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
@@ -394,7 +409,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const ground = terrain.height(S.d.x);
       const h = S.d.y - ground;
       // Rescue: the prologue can't kill you.
-      if (!S.rescued && ((h < 260 && S.d.vy < -40) || (h < 70 && S.d.vy < -13) || (h < 35 && Math.abs(S.d.vx) > 12))) {
+      if (S.launched && !S.rescued && ((h < 260 && S.d.vy < -40) || (h < 70 && S.d.vy < -13) || (h < 35 && Math.abs(S.d.vx) > 12))) {
         S.rescued = true;
         sfx('bad');
         setLine('Taking control! Hold on.');
@@ -412,6 +427,15 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const speedUp = h > 2500 && !S.rescued ? 3 : 1;
       const n = Math.ceil((dt * speedUp) / 0.02);
       for (let i = 0; i < n; i++) S.d = stepDescent(params, S.d, uu, (dt * speedUp) / n);
+      if (!S.launched) {
+        // Still on the pad: the ground holds us up until the engine lifts us.
+        const gh = terrain.height(S.d.x);
+        if (S.d.y <= gh) S.d = { ...S.d, y: gh, vy: Math.max(0, S.d.vy), vx: 0, th: 0, om: 0 };
+        if (S.d.y - gh > 4) {
+          S.launched = true;
+          say('liftoff', 'Liftoff. Lean towards the flag — not too far, or we’ll lose height. Cut the engine once we’re on our way, and save fuel for the landing.');
+        }
+      }
       setRumble(uu.throttle * 0.7 + Math.min(0.3, Math.hypot(S.d.vx, S.d.vy) / 600), uu.throttle > 0 ? 0.3 : 0.7);
       // Dust kicked up near the ground.
       if (uu.throttle > 0 && h < 40) {
@@ -420,10 +444,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const v = Math.hypot(S.d.vx, S.d.vy);
       if (S.d.chute === 'stowed' && dynPressure(params, S.d) < params.chuteMaxQ * 0.8 && h > 1200)
         say('chute', 'We’re slow enough for the parachute now. It saves fuel — but it won’t land us on its own.');
-      if (h < 1500 && v > 60 && !S.rescued) say('slow', 'The ground is coming up fast — burn to slow down.');
-      if (h < 120 && Math.abs(S.d.vy) < 8 && !S.rescued) say('steady', `Steady… keep the descent under ${assist ? 5 : 4} m/s and the ship upright.`);
-      if (S.d.fuel < 0.2 * mode.landingDv && S.d.fuel > 0) say('lowfuel', 'Descent tank under 20%. Use the parachute if you still have it.');
-      if (S.d.y <= ground) {
+      if (S.launched && S.d.vy < 0 && h < 1500 && v > 60 && !S.rescued) say('slow', 'The ground is coming up fast — burn to slow down.');
+      if (S.launched && S.d.vy < 0 && h < 120 && Math.abs(S.d.vy) < 8 && !S.rescued) say('steady', `Steady… keep the descent under ${assist ? 5 : 4} m/s and the ship upright.`);
+      if (!hop && S.d.fuel < 0.2 * mode.landingDv && S.d.fuel > 0) say('lowfuel', 'Descent tank under 20%. Use the parachute if you still have it.');
+      if (hop && S.launched && S.d.fuel < 0.25 * (s.hop?.budget ?? 1) && S.d.fuel > 0) say('lowfuelhop', 'Hop fuel under a quarter. Save it for the landing burn.');
+      if (S.launched && S.d.y <= ground) {
         // Touchdown: a burst of dust and a jolt, harder for a harder landing.
         const impact = Math.min(1, Math.hypot(S.d.vx, S.d.vy) / 12);
         S.shake = 0.35 + 0.65 * impact;
@@ -900,6 +925,40 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ctx.arc(X(p.x), Y(p.y), (3 + (1.5 - p.life) * 5) * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
+    // The hop's destination flag, or an arrow towards it when it is off screen.
+    if (hop) {
+      const fx = X(hopTo);
+      const fy = Y(terrain.height(hopTo));
+      if (fx > -20 && fx < w + 20) {
+        const ph = Math.max(40 * dpr, 12 / mpp);
+        ctx.strokeStyle = '#e8eefc';
+        ctx.lineWidth = 2 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(fx, fy - ph);
+        ctx.stroke();
+        ctx.fillStyle = '#6cc4ff';
+        const wv = Math.sin(now / 200) * 3 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(fx, fy - ph);
+        ctx.lineTo(fx + ph * 0.5, fy - ph * 0.85 + wv);
+        ctx.lineTo(fx, fy - ph * 0.7);
+        ctx.fill();
+      } else {
+        const right = fx > w;
+        const ax = right ? w - 26 * dpr : 26 * dpr;
+        const ay = Math.max(80 * dpr, Math.min(h - 80 * dpr, fy));
+        ctx.fillStyle = '#6cc4ff';
+        ctx.beginPath();
+        ctx.moveTo(ax + (right ? 14 : -14) * dpr, ay);
+        ctx.lineTo(ax, ay - 10 * dpr);
+        ctx.lineTo(ax, ay + 10 * dpr);
+        ctx.fill();
+        ctx.font = `${12 * dpr}px Inter, sans-serif`;
+        ctx.textAlign = right ? 'right' : 'left';
+        ctx.fillText(`flag ${fmtKm(Math.abs(hopTo - d.x))}`, ax + (right ? -6 : 6) * dpr, ay - 16 * dpr);
+      }
+    }
     // Parachute: a striped canopy that breathes.
     const size = Math.max(30 * dpr, 7 / mpp);
     const sx = X(d.x);
@@ -1013,22 +1072,30 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
           <dl className="kv">
             <dt>Altitude</dt>
             <dd>{hud.alt > 1000 ? `${(hud.alt / 1000).toFixed(2)} km` : `${hud.alt.toFixed(0)} m`}</dd>
-            <dt>Falling</dt>
-            <dd className={-hud.vs > (assist ? 5 : 4) && hud.alt < 200 ? 'red' : ''}>{(-hud.vs).toFixed(1)} m/s</dd>
+            <dt>{hud.vs > 0.05 ? 'Climbing' : 'Falling'}</dt>
+            <dd className={-hud.vs > (assist ? 5 : 4) && hud.alt < 200 ? 'red' : ''}>{Math.abs(hud.vs).toFixed(1)} m/s</dd>
             <dt>Drifting</dt>
             <dd className={Math.abs(hud.hs) > 3 && hud.alt < 200 ? 'amber' : ''}>{hud.hs.toFixed(1)} m/s</dd>
             <dt>Tilt</dt>
             <dd>{hud.tilt.toFixed(0)}°</dd>
             <dt>Below</dt>
             <dd>{hud.site === 'rough' ? 'rough ground' : hud.site}</dd>
+            {hop && (
+              <>
+                <dt>To the flag</dt>
+                <dd className="blue">{fmtKm(Math.abs(hopTo - sim.current.d.x))}</dd>
+              </>
+            )}
           </dl>
           <div className="meter-label" style={{ marginTop: 6 }}>
-            Descent tank
+            {hop ? 'Hop fuel' : 'Descent tank'}
           </div>
           <div className="meter" style={{ width: '100%' }}>
             <i style={{ width: `${hud.fuel * 100}%`, background: hud.fuel < 0.2 ? 'var(--red)' : 'var(--blue)' }} />
           </div>
-          <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>Separate from the launch fuel. Land under {assist ? 5 : 4} m/s, nearly upright.</div>
+          <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>
+            {hop ? `Ideal hop: ${(s.hop?.cost ?? 0).toFixed(0)} m/s — you pay for what you burn.` : 'Separate from the launch fuel.'} Land under {assist ? 5 : 4} m/s, nearly upright.
+          </div>
         </div>
       )}
 
@@ -1039,7 +1106,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
             <HoldButton label="⟳" aria="Rotate right" on={(v) => (input.current.right = v)} />
           </div>
           <div className="row" style={{ gap: 10 }}>
-            {stage === 'descent' && (
+            {stage === 'descent' && !hop && (
               <button className="btn" disabled={hud.chute !== 'stowed'} onClick={chute}>
                 🪂 {hud.chute === 'stowed' ? 'Parachute' : hud.chute === 'open' ? 'Chute open' : 'Chute torn'}
               </button>
@@ -1049,7 +1116,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         </div>
       )}
       {stage !== 'landed' && stage !== 'tumble' && (
-        <div className="prologue-keys faint hide-phone">← → or A D rotate · ↑ W or Space burn{stage === 'descent' ? ' · P parachute' : ''}</div>
+        <div className="prologue-keys faint hide-phone">← → or A D rotate · ↑ W or Space burn{stage === 'descent' && !hop ? ' · P parachute' : ''}</div>
       )}
 
       {stage === 'landed' && sim.current.result && (
@@ -1105,3 +1172,5 @@ function HoldButton({ label, aria, on, big }: { label: string; aria: string; on:
     </button>
   );
 }
+
+const fmtKm = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m.toFixed(0)} m`);

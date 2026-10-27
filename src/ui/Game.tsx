@@ -17,6 +17,7 @@ import { Workshop } from './tools/Workshop';
 import { Codex } from './Codex';
 import { ActCard } from './ActCard';
 import { ProbeBay } from './tools/ProbeBay';
+import { RoverDrive } from './tools/RoverDrive';
 import { SurfaceMap } from './tools/SurfaceMap';
 import { Gnomon } from './tools/Gnomon';
 
@@ -52,6 +53,7 @@ export function Game() {
       {screen === 'codex' && <Codex />}
       {screen === 'probe' && <ProbeBay />}
       {screen === 'map' && <SurfaceMap />}
+      {screen === 'drive' && <RoverDrive />}
       {screen === 'gnomon' && <Gnomon />}
       <Hud />
       {screen === 'hub' && !tutorial && <MissionPanel />}

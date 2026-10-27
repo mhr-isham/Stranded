@@ -5,6 +5,7 @@ import { DEG } from '../engine/constants';
 import { css, mix, type RGB } from './color';
 import { dirFromAltAz, type Projector } from './projection';
 import { drawStarship } from './ship';
+import { drawRover } from './rover';
 
 export type StationKind = 'ship' | 'observatory' | 'pendulum' | 'rover' | 'hill' | 'workshop' | 'probe' | 'gnomon';
 
@@ -77,22 +78,8 @@ export function drawStation(ctx: CanvasRenderingContext2D, P: Projector, st: Sta
       break;
     }
     case 'rover': {
-      ctx.translate(x, y);
-      ctx.beginPath();
-      ctx.roundRect(-0.5 * s, -0.55 * s, 1.0 * s, 0.38 * s, 0.06 * s);
-      ctx.fill();
-      ctx.stroke();
-      for (const wx of [-0.34, 0, 0.34]) {
-        ctx.beginPath();
-        ctx.arc(wx * s, -0.12 * s, 0.12 * s, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-      ctx.beginPath();
-      ctx.moveTo(0.3 * s, -0.55 * s);
-      ctx.lineTo(0.36 * s, -0.95 * s);
-      ctx.stroke();
-      glow(ctx, 0.36 * s, -0.95 * s, Math.max(1.5, s * 0.02), [255, 200, 90], blink);
+      const k = Math.max(0, Math.min(1, (6 - sunAlt) / 18));
+      drawRover(ctx, x, y, s * 0.95, { now, lights: sunAlt < 0, shade: 0.12 + 0.7 * k, wheel: 0 });
       break;
     }
     case 'workshop': {
