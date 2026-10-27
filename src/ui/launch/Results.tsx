@@ -127,7 +127,7 @@ function Debrief() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty, predictionPoints: predictionPoints(s) });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival), predictionPoints: predictionPoints(s) });
   const [copied, setCopied] = useState(false);
 
   // Error budget: how much correction fuel each measurement cost, found by
@@ -233,6 +233,22 @@ function Debrief() {
                   </dd>
                 </>
               )}
+              {s.ascentPenalty !== null && (
+                <>
+                  <dt>Your ascent vs ECHO’s</dt>
+                  <dd className={s.ascentPenalty <= 50 ? 'green' : s.ascentPenalty <= 400 ? 'amber' : 'red'}>
+                    {s.ascentPenalty <= 0 ? `${fmt(-s.ascentPenalty, 0)} m/s saved` : `${fmt(s.ascentPenalty, 0)} m/s extra`}
+                  </dd>
+                </>
+              )}
+              {s.arrival && s.arrival.landing !== 'skipped' && (
+                <>
+                  <dt>Landing</dt>
+                  <dd>
+                    {s.arrival.landing === 'clean' ? 'clean (+60)' : s.arrival.landing === 'rough' ? 'hard (+20)' : 'ECHO took over'}
+                  </dd>
+                </>
+              )}
               {s.rewindsUsed > 0 && (
                 <>
                   <dt>Rewinds used</dt>
@@ -318,4 +334,10 @@ function Debrief() {
       </div>
     </div>
   );
+}
+
+/** A good landing at the beacon is worth a little: the peak of the run. */
+function landingBonus(a: { landing: string } | null) {
+  if (!a) return 0;
+  return a.landing === 'clean' ? 60 : a.landing === 'rough' ? 20 : 0;
 }

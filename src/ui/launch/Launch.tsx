@@ -137,12 +137,17 @@ export function Launch() {
   const leadNow = (((TAU_DEG * (t - model.tOpp)) / model.P2 - (TAU_DEG * (t - model.tOpp)) / model.P1) % 360 + 360) % 360;
   const margin = plan ? budget - plan.total : NaN;
 
-  const launch = () => {
+  const launch = (manual = false) => {
     const p = autoTof ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, tofDays * DAY);
     if (!p) return toast('No transfer found for this date.');
-    const result = simulateLaunch({ ...sys, fuelDv: budget }, p.plan);
     sfx('launch');
     if (!s.tutorial.active) savePrelaunch();
+    if (manual) {
+      // Fly the ascent to parking orbit first; the flight is simulated after it.
+      useGame.setState({ pendingLaunch: { plan: p.plan }, phase: 'ascent' });
+      return;
+    }
+    const result = simulateLaunch({ ...sys, fuelDv: budget }, p.plan);
     useGame.setState({ outcome: { plan: p.plan, result, sheet: s.sheet }, phase: 'flight' });
   };
 
@@ -184,9 +189,24 @@ export function Launch() {
               Now
             </button>
           </div>
-          <label className="row" style={{ fontSize: 13 }}>
-            <input type="checkbox" checked={autoTof} onChange={(e) => setAutoTof(e.target.checked)} /> Cheapest flight time automatically
-          </label>
+          <div className="row" style={{ gap: 6 }}>
+            <button className={`btn small ${autoTof ? 'primary' : ''}`} onClick={() => setAutoTof(true)} title="The cheapest flight time for this date">
+              ⛽ Fuel-saver
+            </button>
+            <button
+              className={`btn small ${!autoTof && Math.abs(tofDays - Math.round((hoh.tof / DAY) * 0.75)) <= 1 ? 'primary' : ''}`}
+              onClick={() => (setAutoTof(false), setTofDays(Math.round((hoh.tof / DAY) * 0.75)))}
+              title="A quarter less time in space: saves life support, costs fuel"
+            >
+              ⚡ Fast
+            </button>
+            <button className={`btn small ${!autoTof && Math.abs(tofDays - Math.round((hoh.tof / DAY) * 0.75)) > 1 ? 'primary' : ''}`} onClick={() => setAutoTof(false)}>
+              Custom
+            </button>
+          </div>
+          <div className="faint" style={{ fontSize: 12 }}>
+            Fuel-saver keeps the most fuel for corrections. Fast spends some of that margin to save days of air — worth it only if you trust your error bars.
+          </div>
           {!autoTof && (
             <>
               <div className="row between">
@@ -237,13 +257,21 @@ export function Launch() {
             <div data-tut="launch-go">
             {ready ? (
               confirm ? (
-                <div className="row">
-                  <button className="btn danger big" onClick={launch} style={{ flex: 1 }}>
-                    🚀 Confirm launch
-                  </button>
-                  <button className="btn" onClick={() => setConfirm(false)}>
-                    Wait
-                  </button>
+                <div className="stack" style={{ gap: 6 }}>
+                  <div className="row">
+                    <button className="btn danger big" onClick={() => launch(false)} style={{ flex: 1 }}>
+                      🚀 Confirm launch
+                    </button>
+                    <button className="btn" onClick={() => setConfirm(false)}>
+                      Wait
+                    </button>
+                  </div>
+                  {!s.tutorial.active && (
+                    <button className="btn" onClick={() => launch(true)}>
+                      🕹 Fly the ascent yourself
+                    </button>
+                  )}
+                  {!s.tutorial.active && <div className="faint" style={{ fontSize: 12 }}>ECHO flies the ascent unless you take it. Fuel you waste beyond ECHO’s profile comes out of the margin.</div>}
                 </div>
               ) : (
                 <button className="btn amber big" onClick={() => setConfirm(true)}>

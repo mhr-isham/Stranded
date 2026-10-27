@@ -23,7 +23,7 @@ export type Screen =
   | 'launch'
   | 'workshop'
   | 'codex';
-export type Phase = 'title' | 'prologue' | 'intro' | 'play' | 'flight' | 'results';
+export type Phase = 'title' | 'prologue' | 'intro' | 'play' | 'ascent' | 'flight' | 'landing' | 'results';
 
 export interface Reading {
   id: string;
@@ -127,6 +127,12 @@ export interface GameState {
   chapter: number;
   /** Best result per chapter and mode, kept across runs. */
   campaign: Record<number, { done: boolean; best: Partial<Record<Difficulty, { grade: string; score: number }>> }>;
+  /** A launch waiting for the hand-flown ascent. */
+  pendingLaunch: { plan: LaunchPlan } | null;
+  /** Fuel the hand-flown ascent cost beyond ECHO's profile (m/s; negative = saved). */
+  ascentPenalty: number | null;
+  /** How the landing at the blue planet went. */
+  arrival: { landing: 'clean' | 'rough' | 'rescued' | 'skipped'; site: string } | null;
   /** Chapter 2: the probe sent past the blue planet. */
   probe: ProbeState | null;
   probesLaunched: number;
@@ -212,6 +218,9 @@ const initial = {
   campaign: {} as GameState['campaign'],
   camp: null as CampInfo | null,
   probe: null as ProbeState | null,
+  pendingLaunch: null as GameState['pendingLaunch'],
+  ascentPenalty: null as number | null,
+  arrival: null as GameState['arrival'],
   probesLaunched: 0,
   shadows: [] as GameState['shadows'],
   sunCamOn: false,

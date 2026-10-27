@@ -18,6 +18,7 @@ import {
   type SiteKind,
 } from '../engine/descent';
 import { surfaceGravity } from '../engine/measure';
+import { G } from '../engine/constants';
 import { makeRng } from '../engine/rng';
 import { setRumble, sfx, stopRumble } from '../game/audio';
 import { modeOf } from '../game/modes';
@@ -62,13 +63,19 @@ interface Sim {
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
-export function Prologue() {
+export function Prologue({ arrival = false }: { arrival?: boolean }) {
   const s = useGame();
   const { system: sys } = currentWorld();
   const mode = modeOf(s.settings.difficulty);
   const assist = mode.landingAssist || s.tutorial.active;
-  const g = surfaceGravity(sys);
-  const terrain = useMemo(() => makeTerrain(sys.seed, sys.hillHeight), [sys]);
+  // Arrival at the blue planet uses its own gravity and a terrain around the beacon.
+  const g = arrival ? (G * sys.target.mass) / sys.target.radius ** 2 : surfaceGravity(sys);
+  const terrain = useMemo(() => {
+    if (!arrival) return makeTerrain(sys.seed, sys.hillHeight);
+    const tr = makeTerrain(sys.seed + 101, Math.round(sys.hillHeight * 0.7));
+    const label: Record<string, string> = { flat: 'The beacon — flat ground', ice: 'Frozen lake', hill: 'Highlands' };
+    return { ...tr, features: tr.features.map((f) => ({ ...f, label: label[f.kind] ?? f.label })) };
+  }, [sys, arrival]);
   const params: DescentParams = useMemo(
     () => ({ g, rho0: 1.1, scaleH: 8500, thrust: 2.6 * g, bodyCdA: 0.0025, chuteCdA: 0.1, chuteMaxQ: assist ? 14000 : 9000, turnAccel: 1.4, assist }),
     [g, assist],
@@ -79,9 +86,9 @@ export function Prologue() {
   }, [sys]);
 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
-  const later = s.chapter > 1;
+  const later = s.chapter > 1 && !arrival;
   const sim = useRef<Sim>({
-    stage: later ? 'deorbit' : 'tumble',
+    stage: arrival ? 'entry' : later ? 'deorbit' : 'tumble',
     stageT: 0,
     ang: later ? 0.3 : 0.4,
     spin: later ? 0 : 1.9,
@@ -98,9 +105,11 @@ export function Prologue() {
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
-  const [stage, setStage] = useState<Stage>(later ? 'deorbit' : 'tumble');
+  const [stage, setStage] = useState<Stage>(arrival ? 'entry' : later ? 'deorbit' : 'tumble');
   const [line, setLine] = useState(
-    later
+    arrival
+      ? 'Entry interface at the blue planet. Same rules as before: keep the flight-path angle in the green corridor. The beacon is on flat ground ahead.'
+      : later
       ? 'Fold exit — controlled, this time. Mostly. New star, new planets, and we’re falling toward the nearest one. Turn the nose to the green retrograde marker and burn.'
       : 'Fold exit — irregular. Spin rate high. Navigation… not found.',
   );
@@ -173,6 +182,10 @@ export function Prologue() {
 
   const finish = (camp: CampInfo) => {
     stopRumble();
+    if (arrival) {
+      useGame.setState({ arrival: { landing: camp.landing, site: camp.site }, phase: 'results' });
+      return;
+    }
     if (later) {
       // A new chapter: straight to camp, then the chapter's briefing.
       useGame.setState({ camp });
@@ -189,6 +202,10 @@ export function Prologue() {
     const f = terrain.features.find((q) => q.kind === 'flat')!;
     const x = (f.x0 + f.x1) / 2;
     stopRumble();
+    if (arrival) {
+      useGame.setState({ arrival: { landing: 'skipped', site: 'flat' }, phase: 'results' });
+      return;
+    }
     useGame.setState({ camp: campAt(x, 'skipped') });
     beginPlay();
     const b = later ? chapterOf(s.chapter).briefing : null;
@@ -284,7 +301,7 @@ export function Prologue() {
       if (S.alt <= ENTRY_BOTTOM) {
         goStage('descent');
         sfx('click');
-        setLine('Heat shield away. You have the thrusters: tilt to steer, BURN to slow down. Pick somewhere to set down — I’ve marked what I can see.');
+        setLine(arrival ? 'Heat shield away. The beacon is on the flat ground I’ve marked. Bring us down gently — this is the last landing of the chapter.' : 'Heat shield away. You have the thrusters: tilt to steer, BURN to slow down. Pick somewhere to set down — I’ve marked what I can see.');
       }
     } else if (S.stage === 'descent') {
       const ground = terrain.height(S.d.x);
@@ -365,7 +382,7 @@ export function Prologue() {
     const cx = w / 2;
     const cy = h + R * 0.72;
     const grd = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.6, R * 0.1, cx, cy, R);
-    grd.addColorStop(0, '#8a7a5c');
+    grd.addColorStop(0, arrival ? '#4f7fa8' : '#8a7a5c');
     grd.addColorStop(0.6, '#5b5240');
     grd.addColorStop(1, '#1d1a14');
     ctx.fillStyle = grd;
@@ -434,7 +451,7 @@ export function Prologue() {
     ctx.fillRect(0, 0, w, h);
     // Curved horizon far below.
     const hy = h * (0.72 + 0.2 * (1 - f));
-    ctx.fillStyle = '#3d3528';
+    ctx.fillStyle = arrival ? '#2f5a7a' : '#3d3528';
     ctx.beginPath();
     ctx.moveTo(0, h);
     ctx.quadraticCurveTo(w / 2, hy - h * 0.12 * f, w, h);
@@ -494,8 +511,8 @@ export function Prologue() {
     ctx.lineTo(w, h);
     ctx.closePath();
     const tg = ctx.createLinearGradient(0, Y(ground) - 50 * dpr, 0, h);
-    tg.addColorStop(0, '#6b5a41');
-    tg.addColorStop(1, '#2c241a');
+    tg.addColorStop(0, arrival ? '#4d6a45' : '#6b5a41');
+    tg.addColorStop(1, arrival ? '#1f2d1c' : '#2c241a');
     ctx.fillStyle = tg;
     ctx.fill();
     // Ice field tint and feature labels.
@@ -686,11 +703,15 @@ export function Prologue() {
             <h2>
               {sim.current.result.touch === 'clean' ? 'A clean landing' : sim.current.result.touch === 'rough' ? 'A hard landing' : 'ECHO landed us'}
             </h2>
-            <div style={{ margin: '6px 0' }}>{SITE_TEXT[sim.current.result.site]}</div>
+            <div style={{ margin: '6px 0' }}>{arrival ? (sim.current.result.site === 'flat' ? 'Right beside the beacon.' : 'A walk from the beacon, but down safely.') : SITE_TEXT[sim.current.result.site]}</div>
             <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
               {sim.current.result.touch === 'clean'
-                ? 'No damage. The ship is now your camp.'
-                : 'The landing legs are bent — nothing that stops us measuring. The ship is now your camp.'}
+                ? arrival
+                  ? 'No damage. Welcome to the blue planet.'
+                  : 'No damage. The ship is now your camp.'
+                : arrival
+                  ? 'Bent landing legs, but everyone is alive.'
+                  : 'The landing legs are bent — nothing that stops us measuring. The ship is now your camp.'}
               {sim.current.shieldHurt ? ' The heat shield is scorched, too.' : ''}
             </div>
             <div className="row" style={{ justifyContent: 'flex-end' }}>

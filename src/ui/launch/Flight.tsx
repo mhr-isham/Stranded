@@ -1,6 +1,12 @@
 import { useRef, useState } from 'react';
 import { DAY } from '../../engine/constants';
-import { planetPos } from '../../engine/ephemeris';
+import { planetPos, planetVel } from '../../engine/ephemeris';
+import { G } from '../../engine/constants';
+import { variantOf } from '../../engine/chapters';
+import { modelFromPrimaries, systemFromModel } from '../../engine/planner';
+import { propagate } from '../../engine/orbits';
+import { add, scale, unit } from '../../engine/vec';
+import type { StarSystem } from '../../engine/types';
 import { mulberry32 } from '../../engine/rng';
 import type { Vec3 } from '../../engine/vec';
 import { fmt } from '../../game/format';
@@ -14,10 +20,15 @@ export function Flight() {
   const outcome = useGame((s) => s.outcome);
   const { system: sys } = currentWorld();
   const prog = useRef(0);
+  const modelPath = useRef<Vec3[] | null>(null);
+  const tutorial = useGame((s) => s.tutorial.active);
+  const arrivalDone = useGame((s) => !!s.arrival);
   const [stage, setStage] = useState(0);
   if (!outcome) return null;
   const { plan, result } = outcome;
   const path = (result.path ?? []).filter((v) => v && Number.isFinite(v[0]) && Number.isFinite(v[1]));
+  // Where the player's own numbers said the ship would go (no correction burn).
+  const predicted = modelPath.current ?? (modelPath.current = predictedPath(outcome, sys));
   const noEscape = result.outcome === 'no-escape';
 
   const stages = noEscape
@@ -77,6 +88,15 @@ export function Flight() {
           };
           dot(planetPos(sys.home, tNow), '#ffb26b', 6);
           dot(planetPos(sys.target, tNow), '#6cc4ff', 7);
+          if (predicted.length > 1) {
+            ctx.strokeStyle = 'rgba(181,156,255,0.55)';
+            ctx.setLineDash([5 * dpr, 5 * dpr]);
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.beginPath();
+            predicted.forEach((v, i) => (i ? ctx.lineTo(X(v), Y(v)) : ctx.moveTo(X(v), Y(v))));
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
           if (path.length) {
             const n = Math.min(path.length - 1, Math.floor(p * (path.length - 1)));
             ctx.strokeStyle = '#ffc46b';
@@ -95,6 +115,10 @@ export function Flight() {
           ctx.font = `${12 * dpr}px JetBrains Mono`;
           ctx.textAlign = 'left';
           ctx.fillText(`mission day ${fmt(tNow / DAY, 0)}`, 16 * dpr, h - 20 * dpr);
+          ctx.fillStyle = 'rgba(181,156,255,0.85)';
+          ctx.fillText('- - your numbers’ path (no correction)', 16 * dpr, 28 * dpr);
+          ctx.fillStyle = '#ffc46b';
+          ctx.fillText('—— the real path, with ECHO’s mid-course correction', 16 * dpr, 46 * dpr);
         }}
       />
       <div className="echo panel panel-pad" style={{ bottom: 'calc(30px + var(--safe-bottom))' }}>
@@ -106,12 +130,34 @@ export function Flight() {
             <button className="btn small" onClick={() => (prog.current = 1)}>
               Skip
             </button>
-            <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => useGame.setState({ phase: 'results' })}>
-              Debrief →
-            </button>
+            {result.outcome === 'success' && !tutorial && !arrivalDone ? (
+              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => useGame.setState({ phase: 'landing' })}>
+                Land at the beacon →
+              </button>
+            ) : (
+              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => useGame.setState({ phase: 'results' })}>
+                Debrief →
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+/** The coast your own model predicts for this plan, drawn in the real system's frame. */
+function predictedPath(outcome: NonNullable<ReturnType<typeof useGame.getState>['outcome']>, sys: StarSystem): Vec3[] {
+  const variant = variantOf(sys.features);
+  const m = modelFromPrimaries(outcome.sheet, variant);
+  if (!m) return [];
+  const msys = systemFromModel(m, sys);
+  const t0 = outcome.plan.departTime;
+  const r1 = planetPos(sys.home, t0);
+  const v1 = planetVel(sys.home, t0);
+  const vInf = add(scale(unit(r1), outcome.plan.vInfRadial), scale(unit(v1), outcome.plan.vInfPrograde));
+  const mu = G * msys.star.mass;
+  const out: Vec3[] = [];
+  for (let i = 0; i <= 60; i++) out.push(propagate(r1, add(v1, vInf), (outcome.plan.tof * i) / 60, mu)[0]);
+  return out;
 }
