@@ -19,7 +19,7 @@ export type Screen =
   | 'launch'
   | 'workshop'
   | 'codex';
-export type Phase = 'title' | 'intro' | 'play' | 'flight' | 'results';
+export type Phase = 'title' | 'prologue' | 'intro' | 'play' | 'flight' | 'results';
 
 export interface Reading {
   id: string;
@@ -61,6 +61,15 @@ export interface EchoLine {
   /** Coaching (next steps, discoveries pointed out); silent in modes where ECHO doesn't coach. */
   coach?: boolean;
   mood?: 'calm' | 'alert' | 'happy';
+}
+
+export interface CampInfo {
+  site: 'flat' | 'hill' | 'ice' | 'rough';
+  landing: 'clean' | 'rough' | 'rescued' | 'skipped';
+  /** Position along the landing strip (m) and distances to features (km). */
+  x: number;
+  hillKm: number;
+  iceKm: number;
 }
 
 export interface Outcome {
@@ -110,6 +119,8 @@ export interface GameState {
   tutorial: TutorialState;
   /** Identifies this run, so checkpoints from an older run are ignored. */
   runId: number;
+  /** Where and how the ship came down in the prologue. */
+  camp: CampInfo | null;
   predictions: Prediction[];
   checkpointsUsed: number;
   rewindsUsed: number;
@@ -170,6 +181,7 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   runId: 0,
+  camp: null as CampInfo | null,
   predictions: [] as Prediction[],
   checkpointsUsed: 0,
   rewindsUsed: 0,
@@ -191,7 +203,7 @@ export const useGame = create<GameState>()(
         clock.stopAt = Infinity;
         set({
           ...initial,
-          phase: 'intro',
+          phase: 'prologue',
           runId: Date.now(),
           seed,
           settings,

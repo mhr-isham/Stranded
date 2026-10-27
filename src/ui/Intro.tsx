@@ -20,17 +20,15 @@ export function useTypewriter(text: string, cps = 55) {
 }
 
 export function Intro() {
-  const [i, setI] = useState(0);
+  // After a flown prologue the first log card ("fold exit") has already happened on screen.
+  const flown = useGame((s) => s.camp && s.camp.landing !== 'skipped');
+  const [i, setI] = useState(flown ? 1 : 0);
   const { system: sys, catalog } = currentWorld();
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const tw = useTypewriter(INTRO[i].text);
   const tRef = useRef(0);
 
-  const begin = () => {
-    // Start the game at dusk on day 1 so the first view is beautiful.
-    clock.t = findDusk();
-    useGame.setState({ phase: 'play', screen: 'hub', survival: freshSurvival(sys.lifeSupport / DAY) });
-  };
+  const begin = beginPlay;
   const next = () => {
     if (!tw.done) return tw.finish();
     if (i < INTRO.length - 1) setI(i + 1);
@@ -74,6 +72,17 @@ export function Intro() {
       </div>
     </div>
   );
+}
+
+/** Leave the opening and start the game at dusk on day 1. */
+export function beginPlay() {
+  const { system: sys } = currentWorld();
+  clock.t = findDusk();
+  const g = useGame.getState();
+  const survival = freshSurvival(sys.lifeSupport / DAY);
+  // A hard landing costs a spare part (the landing legs needed fixing).
+  if (g.camp && (g.camp.landing === 'rough' || g.camp.landing === 'rescued')) survival.parts = Math.max(0, survival.parts - 1);
+  useGame.setState({ phase: 'play', screen: 'hub', survival });
 }
 
 /** First evening after landing, when the star is ~4 degrees below the horizon. */

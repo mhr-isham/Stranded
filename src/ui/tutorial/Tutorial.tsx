@@ -131,7 +131,7 @@ export function Tutorial() {
     };
   }, [done, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (s.phase === 'intro' || s.phase === 'title') return null;
+  if (s.phase === 'intro' || s.phase === 'title' || s.phase === 'prologue') return null;
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;

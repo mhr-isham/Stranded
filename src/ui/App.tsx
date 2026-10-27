@@ -8,6 +8,7 @@ import { useGame } from '../game/store';
 import { ToastHost } from './common/widgets';
 import { Game } from './Game';
 import { Intro } from './Intro';
+import { Prologue } from './Prologue';
 import { Results } from './launch/Results';
 import { Flight } from './launch/Flight';
 import { Title } from './Title';
@@ -64,6 +65,7 @@ export default function App() {
   return (
     <>
       {phase === 'title' && <Title />}
+      {phase === 'prologue' && <Prologue />}
       {phase === 'intro' && <Intro />}
       {phase === 'play' && <Game />}
       {phase === 'flight' && <Flight />}

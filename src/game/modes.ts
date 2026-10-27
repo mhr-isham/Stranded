@@ -37,6 +37,10 @@ export interface ModeRules {
   rewindPenalty: number;
   /** Days of dust-storm warning in survival mode. */
   stormForecast: number;
+  /** Landing: attitude hold and wider limits. */
+  landingAssist: boolean;
+  /** Δv in the descent tank (separate from the launch fuel). */
+  landingDv: number;
 }
 
 export const MODES: Record<Difficulty, ModeRules> = {
@@ -60,6 +64,8 @@ export const MODES: Record<Difficulty, ModeRules> = {
     rewinds: Infinity,
     rewindPenalty: 0,
     stormForecast: 3,
+    landingAssist: true,
+    landingDv: 1300,
   },
   cadet: {
     name: 'Cadet',
@@ -81,6 +87,8 @@ export const MODES: Record<Difficulty, ModeRules> = {
     rewinds: 1,
     rewindPenalty: 0,
     stormForecast: 2,
+    landingAssist: true,
+    landingDv: 1100,
   },
   navigator: {
     name: 'Navigator',
@@ -102,6 +110,8 @@ export const MODES: Record<Difficulty, ModeRules> = {
     rewinds: 1,
     rewindPenalty: 150,
     stormForecast: 1,
+    landingAssist: true,
+    landingDv: 900,
   },
   astronomer: {
     name: 'Astronomer',
@@ -123,6 +133,8 @@ export const MODES: Record<Difficulty, ModeRules> = {
     rewinds: 0,
     rewindPenalty: 0,
     stormForecast: 0,
+    landingAssist: false,
+    landingDv: 750,
   },
   legend: {
     name: 'Legend',
@@ -146,6 +158,8 @@ export const MODES: Record<Difficulty, ModeRules> = {
     rewinds: 0,
     rewindPenalty: 0,
     stormForecast: 0,
+    landingAssist: false,
+    landingDv: 650,
   },
 };
 

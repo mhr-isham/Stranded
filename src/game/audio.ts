@@ -117,3 +117,41 @@ export function startAmbient() {
 export function stopAmbient() {
   ambient?.stop();
 }
+
+let rumble: { gain: GainNode; filter: BiquadFilterNode; stop: () => void } | null = null;
+
+/**
+ * Continuous engine / airflow noise for flying scenes. level 0..1 sets the
+ * loudness, tone 0..1 how bright it is (roar vs rushing air). Call stopRumble() when done.
+ */
+export function setRumble(level: number, tone = 0.3) {
+  const a = ac();
+  if (!a) return;
+  if (!rumble) {
+    const buf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) {
+      last = 0.97 * last + 0.03 * (Math.random() * 2 - 1);
+      d[i] = last * 6;
+    }
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const filter = a.createBiquadFilter();
+    filter.type = 'lowpass';
+    const gain = a.createGain();
+    gain.gain.value = 0;
+    src.connect(filter).connect(gain).connect(a.destination);
+    src.start();
+    rumble = { gain, filter, stop: () => src.stop() };
+  }
+  rumble.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.4, a.currentTime, 0.08);
+  rumble.filter.frequency.setTargetAtTime(150 + tone * 1800, a.currentTime, 0.1);
+}
+
+export function stopRumble() {
+  if (!rumble) return;
+  rumble.stop();
+  rumble = null;
+}

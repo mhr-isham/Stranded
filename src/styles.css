@@ -317,3 +317,31 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .predict-plot { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--panel-border); background: rgba(5, 8, 16, 0.9); touch-action: none; cursor: crosshair; }
 .check-line { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .check-line input { width: auto; flex: none; margin: 0; }
+
+/* Prologue */
+.prologue { touch-action: none; user-select: none; -webkit-user-select: none; }
+.prologue-echo { position: absolute; top: calc(12px + var(--safe-top)); left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 100px)); padding: 10px 14px; display: flex; gap: 10px; align-items: baseline; font-size: 14px; z-index: 5; }
+.prologue-skip { position: absolute; top: calc(14px + var(--safe-top)); right: 12px; z-index: 6; }
+.prologue-alert { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); font-family: var(--mono); letter-spacing: 0.2em; color: var(--red); font-size: 15px; animation: blink 0.8s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.2; } }
+.prologue-gauge { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); padding: 10px 14px; }
+.prologue-corridor { position: absolute; right: 14px; top: 30%; padding: 10px 12px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.corridor { position: relative; width: 22px; height: 160px; border-radius: 6px; background: rgba(255, 107, 125, 0.25); overflow: hidden; }
+.corridor .band { position: absolute; left: 0; right: 0; background: rgba(91, 227, 164, 0.55); }
+.corridor .needle { position: absolute; left: -2px; right: -2px; height: 3px; background: #fff; transform: translateY(-1px); }
+.prologue-hud { position: absolute; right: 12px; top: calc(80px + var(--safe-top)); width: 190px; padding: 10px 12px; font-size: 13px; }
+.prologue-controls { position: absolute; left: 12px; right: 12px; bottom: calc(16px + var(--safe-bottom)); display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; }
+.prologue-controls > * { pointer-events: auto; }
+.prologue-controls .row { flex-wrap: nowrap; align-items: flex-end; }
+.prologue-controls .icon-big { width: 64px; height: 64px; font-size: 26px; border-radius: 16px; }
+.prologue-controls .big { min-width: 120px; min-height: 64px; }
+.prologue-keys { position: absolute; bottom: calc(92px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); font-size: 12px; }
+@media (max-width: 640px) {
+  .prologue-echo { width: calc(100% - 24px); top: calc(54px + var(--safe-top)); font-size: 13px; }
+  .prologue-hud { top: calc(150px + var(--safe-top)); right: 8px; width: 136px; font-size: 11px; padding: 8px; }
+  .prologue-hud .faint { display: none; }
+  .prologue-controls .icon-big { width: 56px; height: 56px; }
+  .prologue-controls .big { min-width: 96px; min-height: 56px; }
+  .prologue-controls > .row:last-child { flex-direction: column; align-items: flex-end; }
+  .prologue-corridor { top: 34%; right: 8px; width: 96px; }
+}
