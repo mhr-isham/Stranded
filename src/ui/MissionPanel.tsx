@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MISSIONS, activeMission } from '../game/missions';
 import { useMode } from '../game/modes';
+import { currentAct } from '../game/acts';
 import { useGame } from '../game/store';
 
 export function MissionPanel() {
@@ -15,7 +16,7 @@ export function MissionPanel() {
     <div className={`missions panel panel-pad ${collapsed ? 'collapsed' : ''}`}>
       <div className="row between" onClick={() => setCollapsed(!collapsed)} style={{ cursor: 'pointer' }}>
         <span className="meter-label">
-          Mission {Math.min(MISSIONS.length, s.missionsDone.length + 1)} / {MISSIONS.length}
+          Act {currentAct(s).n} · {currentAct(s).name} — mission {Math.min(MISSIONS.length, s.missionsDone.length + 1)}/{MISSIONS.length}
         </span>
         <span className="muted" style={{ fontSize: 12 }}>
           {collapsed ? '▼ show' : '▲ hide'}

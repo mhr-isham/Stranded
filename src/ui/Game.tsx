@@ -15,6 +15,7 @@ import { Sheet } from './sheet/Sheet';
 import { Launch } from './launch/Launch';
 import { Workshop } from './tools/Workshop';
 import { Codex } from './Codex';
+import { ActCard } from './ActCard';
 
 const NAV: { screen: Screen; label: string; ico: string }[] = [
   { screen: 'hub', label: 'Camp', ico: '⛺' },
@@ -57,6 +58,7 @@ export function Game() {
         ))}
       </nav>
       {!tutorial && <Echo />}
+      <ActCard />
     </div>
   );
 }

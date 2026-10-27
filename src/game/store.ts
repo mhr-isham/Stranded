@@ -122,6 +122,8 @@ export interface GameState {
   /** Where and how the ship came down in the prologue. */
   camp: CampInfo | null;
   predictions: Prediction[];
+  /** Acts whose end card the player has seen. */
+  actsSeen: number[];
   checkpointsUsed: number;
   rewindsUsed: number;
   /** The player has seen the true values; no more rewinds. */
@@ -183,6 +185,7 @@ const initial = {
   runId: 0,
   camp: null as CampInfo | null,
   predictions: [] as Prediction[],
+  actsSeen: [] as number[],
   checkpointsUsed: 0,
   rewindsUsed: 0,
   debriefSeen: false,

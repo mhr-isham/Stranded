@@ -345,3 +345,9 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .prologue-controls > .row:last-child { flex-direction: column; align-items: flex-end; }
   .prologue-corridor { top: 34%; right: 8px; width: 96px; }
 }
+
+/* Act cards */
+.act-card { max-width: 520px; text-align: left; }
+.act-card h2 { font-size: 30px; margin: 4px 0 8px; }
+.act-hook { font-size: 16px; font-style: italic; color: var(--text); margin: 0 0 10px; }
+.act-learned { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
