@@ -11,10 +11,45 @@ import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
 
-const DIFFS: { id: Difficulty; name: string; text: string }[] = [
-  { id: 'cadet', name: 'Cadet', text: 'Generous fuel and time. Formula sheet on. Great for a first flight.' },
-  { id: 'navigator', name: 'Navigator', text: 'The intended experience. Tight but fair margins.' },
-  { id: 'astronomer', name: 'Astronomer', text: 'Thin margins. Every error bar matters.' },
+// What each mode promises. Margins are measured from the generator (see DIFFICULTY in
+// engine/system.ts and docs/DESIGN-V2.md §3); update both together.
+const DIFFS: { id: Difficulty; name: string; tag: string; forWho: string; expect: string[]; formulas: boolean }[] = [
+  {
+    id: 'cadet',
+    name: 'Cadet',
+    tag: 'Forgiving',
+    forWho: 'Your first expeditions after Flight School.',
+    expect: [
+      'Plenty of spare fuel (about 20–40% over the ideal flight) to absorb measurement mistakes.',
+      'Lots of spare air: roughly 3–13 months after the first launch window you can reach.',
+      'Formula sheet on. Small errors still get you there.',
+    ],
+    formulas: true,
+  },
+  {
+    id: 'navigator',
+    name: 'Navigator',
+    tag: 'Standard',
+    forWho: 'Once you are comfortable with every tool.',
+    expect: [
+      'Spare fuel about 10–20%: careful work succeeds, sloppy work does not.',
+      'Spare air roughly 2–8 months — you can miss a window, but not many.',
+      'Formula sheet on (turn it off for a purer run).',
+    ],
+    formulas: true,
+  },
+  {
+    id: 'astronomer',
+    name: 'Astronomer',
+    tag: 'Expert',
+    forWho: 'After a Navigator success.',
+    expect: [
+      'Thin spare fuel, about 6–13%: every error bar matters.',
+      'Spare air roughly 1–5 months — often only one launch window.',
+      'Formula sheet off by default.',
+    ],
+    formulas: false,
+  },
 ];
 
 export function Title() {
@@ -73,11 +108,26 @@ export function Title() {
       {setup && (
         <Modal onClose={() => setSetup(false)}>
           <h2>New expedition</h2>
+          <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
+            The physics is the same in every mode — only the spare fuel, spare air and help change.
+          </p>
           <div className="diff-grid" style={{ margin: '10px 0' }}>
             {DIFFS.map((d) => (
-              <button key={d.id} className={`diff ${settings.difficulty === d.id ? 'on' : ''}`} onClick={() => setSettings({ ...settings, difficulty: d.id })}>
-                <b>{d.name}</b>
-                <span>{d.text}</span>
+              <button
+                key={d.id}
+                className={`diff ${settings.difficulty === d.id ? 'on' : ''}`}
+                aria-pressed={settings.difficulty === d.id}
+                onClick={() => setSettings({ ...settings, difficulty: d.id, formulas: d.formulas })}
+              >
+                <b>
+                  {d.name} <em>{d.tag}</em>
+                </b>
+                <span className="diff-for">{d.forWho}</span>
+                <ul>
+                  {d.expect.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
               </button>
             ))}
           </div>
@@ -91,7 +141,7 @@ export function Title() {
             on={settings.formulas}
             onChange={(v) => setSettings({ ...settings, formulas: v })}
             label="Formula sheet"
-            sub="Show the formula behind every step. Turning it off raises your score ceiling."
+            sub="Show the formula behind every step. Each mode picks a default; you can change it here or during play."
           />
           <Toggle on={settings.sound} onChange={(v) => setSettings({ ...settings, sound: v })} label="Sound" />
           <div className="field" style={{ marginTop: 12 }}>

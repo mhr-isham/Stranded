@@ -1,5 +1,7 @@
 # Stranded — Engagement Deep Dive (part 2)
 
+> **Decisions:** the review comments on this document are answered and turned into decisions in [`DESIGN-V2.md`](DESIGN-V2.md) (modes, chapters, story, flight). Where they differ, DESIGN-V2 wins.
+
 This builds on [`ENGAGEMENT.md`](ENGAGEMENT.md). That document listed ideas; this one goes deeper into **why players stay**, what the research says about **learning games specifically**, and turns it into a **player journey**, **player profiles**, **new mechanics woven into the physics** and a **revised roadmap**.
 
 Legend (as before): ✅ strengthens learning/realism · ⚪ neutral · ⚠️ compromises it — keep out of hard modes or label clearly.

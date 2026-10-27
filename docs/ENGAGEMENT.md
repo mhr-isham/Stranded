@@ -1,5 +1,7 @@
 # Stranded — Engagement & Gamification Review
 
+> **Decisions:** the review comments on this document are answered and turned into decisions in [`DESIGN-V2.md`](DESIGN-V2.md) (modes, chapters, story, flight). Where they differ, DESIGN-V2 wins.
+
 > Part 2 — research-backed deep dive, player journey, new mechanics and the revised roadmap: [`ENGAGEMENT-DEEP-DIVE.md`](ENGAGEMENT-DEEP-DIVE.md).
 
 *How to make players want to keep playing — and which ideas would cost us learning or realism.*
