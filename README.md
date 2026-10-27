@@ -102,4 +102,4 @@ scripts/validate.ts   validation report → reports/validation.md
 
 `npm test` runs the unit tests, which check the orbital mechanics, generator determinism, chain recovery, error propagation and scoring.
 
-The design review and build plan are in [`docs/PLAN.md`](docs/PLAN.md). The current design (modes, chapters, story, flight) is [`docs/DESIGN-V2.md`](docs/DESIGN-V2.md); the engagement research is in [`docs/ENGAGEMENT.md`](docs/ENGAGEMENT.md) and [`docs/ENGAGEMENT-DEEP-DIVE.md`](docs/ENGAGEMENT-DEEP-DIVE.md).
+The design review and build plan are in [`docs/PLAN.md`](docs/PLAN.md). The current design (modes, chapters, story, flight) is [`docs/DESIGN-V2.md`](docs/DESIGN-V2.md), with the camp, rover, ship and fuel redesigned in [`docs/DESIGN-V3.md`](docs/DESIGN-V3.md); the engagement research is in [`docs/ENGAGEMENT.md`](docs/ENGAGEMENT.md) and [`docs/ENGAGEMENT-DEEP-DIVE.md`](docs/ENGAGEMENT-DEEP-DIVE.md).
