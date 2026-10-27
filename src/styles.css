@@ -104,6 +104,7 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .hud-block { display: flex; align-items: center; gap: 10px; padding: 6px 12px; min-height: 48px; }
 .hud-time .day { font-family: var(--display); font-weight: 700; font-size: 17px; }
 .hud-time .clock { font-family: var(--mono); color: var(--muted); font-size: 13px; }
+.show-phone { display: none; }
 .meter { width: 90px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .meter > i { display: block; height: 100%; border-radius: 3px; background: var(--green); transition: width 0.3s; }
 .meter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -239,11 +240,13 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .hud-block { min-height: 46px; padding: 4px 8px; gap: 6px; }
   .hud-time .day { font-size: 15px; }
   .hud-time > span { display: none; }
-  .hud-life { flex: 1; justify-content: space-between; }
+  .hud-life { flex: 1; min-width: 0; flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
+  .hud-life .meter { width: 100%; }
+  .hud-life > span { font-size: 11px !important; text-align: right; }
   .meter { width: 44px; }
   .warp { gap: 2px; }
   .warp .btn.icon { width: 30px; }
-  .warp .rate { min-width: 64px; font-size: 12px; padding: 4px 2px; }
+  .warp .rate { min-width: 52px; font-size: 12px; padding: 4px 2px; }
   .stage-bottom { bottom: 8px !important; }
   .stage-top { top: calc(var(--hud-h) + 6px) !important; }
   .nav { left: 6px; right: 6px; transform: none; justify-content: space-between; }
@@ -251,6 +254,8 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .echo { bottom: auto; top: calc(var(--hud-h) + 6px + var(--safe-top)); animation: none; }
   .mode-chip { font-size: 12px; padding: 8px 2px; }
   .hide-phone { display: none !important; }
+  .show-phone { display: inline !important; }
+  .hud-ready { padding: 4px 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

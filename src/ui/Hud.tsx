@@ -10,6 +10,7 @@ import { flag } from '../game/tutorial';
 import { Modal, Toggle, toast, useClockState, useGameTime } from './common/widgets';
 import { useMode } from '../game/modes';
 import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
+import { quantityName, readiness } from '../game/readiness';
 
 export function Hud() {
   const t = useGameTime(6);
@@ -72,6 +73,7 @@ export function Hud() {
             {s.survival.leak && <span className="red">⚠</span>}
           </button>
         )}
+        {!s.tutorial.active && <ReadinessBlock t={t} end={end} budget={fuel} />}
         <div className="panel hud-block hide-phone" data-tut="hud-fuel">
           <div>
             <div className="meter-label">Fuel Δv</div>
@@ -178,5 +180,73 @@ function CheckpointPanel({ onDone }: { onDone: () => void }) {
         );
       })}
     </div>
+  );
+}
+
+/** Mission readiness from the player's own error bars. Detail depends on the mode. */
+function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: number }) {
+  const s = useGame();
+  const mode = useMode();
+  const { system: sys } = currentWorld();
+  const [open, setOpen] = useState(false);
+  const r = readiness(s.sheet, sys, budget, t, end);
+  const pct = r.success !== null ? Math.round(r.success * 100) : null;
+  const frac = pct !== null ? pct / 100 : r.measured / r.total;
+  const cls = pct === null ? '' : pct >= 80 ? 'green' : pct >= 40 ? 'amber' : 'red';
+  const detail = mode.missions !== 'off';
+  return (
+    <>
+      <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title="Mission readiness">
+        <div className="hide-phone">
+          <div className="meter-label">Ready</div>
+          <div className="meter" style={{ width: 70 }}>
+            <i style={{ width: `${frac * 100}%`, background: pct === null ? 'var(--blue)' : `var(--${cls === 'green' ? 'green' : cls === 'amber' ? 'amber' : 'red'})` }} />
+          </div>
+        </div>
+        <span className={`mono ${cls}`} style={{ fontSize: 13 }}>
+          <span className="show-phone">🎯 </span>
+          {pct !== null ? `${pct}%` : `${r.measured}/${r.total}`}
+        </span>
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)}>
+          <h2>Mission readiness</h2>
+          <p className="muted" style={{ fontSize: 13 }}>
+            Worked out only from your own sheet and error bars — ECHO doesn’t know the true values either.
+          </p>
+          <dl className="kv">
+            <dt>Values measured</dt>
+            <dd>
+              {r.measured} of {r.total}
+            </dd>
+            {pct !== null && (
+              <>
+                <dt>Chance of success at the next window</dt>
+                <dd className={cls}>{pct}%</dd>
+                <dt>Next window</dt>
+                <dd>{r.window !== null ? `day ${fmt(r.window / DAY, 0)}` : '—'}</dd>
+              </>
+            )}
+          </dl>
+          {detail && r.weakest && (
+            <div className="callout tip">
+              <b>{mode.coaching && mode.missions === 'coach' ? 'Improve this next' : 'Weakest value'}</b>
+              {quantityName(r.weakest.k)} causes about {Math.round(r.weakest.share * 100)}% of the flight’s uncertainty.
+              {mode.missions === 'coach' && ' More readings, a longer baseline or a steadier hand on that one will raise your chance the most.'}
+            </div>
+          )}
+          {pct === null && (
+            <div className="faint" style={{ fontSize: 12 }}>
+              Once every value is on the sheet, ECHO flies the plan through versions of the system that fit your error bars and shows how many arrive.
+            </div>
+          )}
+          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+            <button className="btn primary" onClick={() => setOpen(false)}>
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
