@@ -9,7 +9,8 @@ import { horizonDip, moonOffset, parallaxShift, siteEastOf, starLongitude, surfa
 import { makeRng } from '../engine/rng';
 import { localFrame, observerPos, starAltitude, toHorizontal, topocentric } from '../engine/sky';
 import { norm, sub } from '../engine/vec';
-import { PRIMARY_KEYS, QUANTITY_INFO, truthValues, type PrimaryKey } from '../engine/chain';
+import { QUANTITY_INFO, keysFor, truthValues, type PrimaryKey } from '../engine/chain';
+import { variantOf } from '../engine/chapters';
 import { clock } from './clock';
 import { currentWorld, fastForward } from './sim';
 import { readingStats, useGame, type Settings } from './store';
@@ -206,7 +207,8 @@ export function preflightCheck(): string[] {
   const truth = truthValues(sys, s.sheet);
   const sheet = { ...s.sheet };
   const report: string[] = [];
-  for (const k of PRIMARY_KEYS) {
+  // Only what this system's chain needs (other chapters' quantities don't apply here).
+  for (const k of keysFor(variantOf(sys.features))) {
     const e = sheet[k];
     const tv = truth[k];
     const info = QUANTITY_INFO[k];
