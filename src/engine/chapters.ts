@@ -11,6 +11,8 @@ export interface SystemFeatures {
   inner: boolean;
   /** Eccentricity range of the blue planet's orbit (chapter 4); absent = circular. */
   ellipse?: [number, number];
+  /** A red dwarf with a tidally locked home planet: no day and night (chapter 6). */
+  locked?: boolean;
   /** The real Solar System: Mars to Earth (chapter 9). */
   real?: boolean;
 }
@@ -24,6 +26,7 @@ export const CHAPTER_FEATURES: Record<number, SystemFeatures> = {
   3: { moon: true, refraction: 0.55, inner: false },
   4: { moon: true, refraction: 0, inner: false, ellipse: [0.17, 0.26] },
   5: { moon: true, refraction: 0, inner: true },
+  6: { moon: true, refraction: 0, inner: false, locked: true },
   9: { moon: true, refraction: 0, inner: true, real: true },
 };
 

@@ -3,6 +3,7 @@
 // life-support deadline.
 
 import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
+import { flareAt } from '../engine/flares';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { moonOffset, targetLongitude } from '../engine/measure';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
@@ -42,7 +43,8 @@ export function targetObservable(t: number, minAlt = 12 * DEG) {
   const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
   const alt = toHorizontal(topocentric(sys, 'target', t, sys.site), f).alt;
   const cloudy = s.settings.survival && isCloudy(s.seed, t);
-  return { ok: sunAlt < -12 * DEG && alt > minAlt && !cloudy, sunAlt, alt, cloudy };
+  const flare = !!flareAt(sys, t);
+  return { ok: sunAlt < -12 * DEG && alt > minAlt && !cloudy && !flare, sunAlt, alt, cloudy, flare };
 }
 
 export function advance(dtReal: number) {
@@ -90,7 +92,9 @@ function stepTo(t1Wanted: number, dtReal: number) {
   const patch: Partial<GameState> = {};
 
   // Tracker samples eight times per local day.
-  const step = solarDay / 8;
+  // A locked planet has no solar day: log once per 24 hours instead.
+  const logDay = Number.isFinite(solarDay) ? solarDay : DAY;
+  const step = logDay / 8;
   if (s.trackOn || s.moonTrackOn) {
     const track: TimedValue[] = [];
     const moon: TimedValue[] = [];
@@ -99,8 +103,9 @@ function stepTo(t1Wanted: number, dtReal: number) {
       const t = k * step;
       const obs = targetObservable(t);
       if (!obs.ok) continue;
-      const night = Math.floor(t / solarDay);
-      if (s.trackOn && night > lastNight) {
+      const night = Math.floor(t / logDay);
+      // A locked planet has no nights: the tracker logs at every sample.
+      if (s.trackOn && (night > lastNight || sys.features.locked)) {
         lastNight = night;
         track.push({ at: t, v: Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES });
       }
@@ -167,6 +172,10 @@ function stepTo(t1Wanted: number, dtReal: number) {
     const k = Math.round((t1 - sys.firstOpposition) / sys.synodic);
     const conj = sys.firstOpposition + k * sys.synodic;
     if (conj > t1 && conj - t1 < 3 * DAY) s.say({ ...ECHO.transitSoon, id: `transitSoon-${k}` });
+  }
+  if (sys.features.locked && !s.tutorial.active) {
+    s.say(ECHO.lockedSky);
+    if (flareAt(sys, t1)) s.say(ECHO.flare);
   }
   if (s.missionsDone.includes('year') && !s.logs.includes('relay') && !s.tutorial.active) s.say(ECHO.relayHint);
   if (s.identified && !s.names.target && !s.tutorial.active && s.missionsDone.includes('identify')) s.say(ECHO.nameIt);

@@ -1,5 +1,6 @@
 // Convenience wrapper: build the scene for time t and draw the wide sky.
 
+import { flareAt } from '../engine/flares';
 import { blackbodyRGB } from '../engine/sky';
 import type { CatalogStar } from '../engine/sky';
 import type { StarSystem } from '../engine/types';
@@ -32,5 +33,11 @@ export function paintSky(
     eclipticDirs: extra.showEcliptic ? eclipticCircle(scene) : undefined,
     ...extra,
   });
+  // A red-dwarf flare washes the whole sky with red light.
+  const flare = flareAt(sys, t);
+  if (flare) {
+    ctx.fillStyle = `rgba(255,96,64,${0.18 * flare.peak})`;
+    ctx.fillRect(0, 0, cam.w, cam.h);
+  }
   return { scene, P };
 }

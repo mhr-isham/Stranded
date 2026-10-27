@@ -11,6 +11,7 @@ import { Modal, Toggle, toast, useClockState, useGameTime } from './common/widge
 import { useMode } from '../game/modes';
 import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
 import { quantityName, readiness } from '../game/readiness';
+import { flareAt } from '../engine/flares';
 
 export function Hud() {
   const t = useGameTime(6);
@@ -25,17 +26,26 @@ export function Hud() {
   const fuel = sys.fuelDv - s.penaltyDv;
   const sol = localSolarHours(sys, t);
   const night = sol < 5 || sol > 19;
+  const flare = flareAt(sys, t);
 
   return (
     <>
       <div className="hud">
         <div className="panel hud-block hud-time" data-tut="hud-time">
-          <span style={{ fontSize: 20 }}>{night ? '🌙' : '☀️'}</span>
+          <span style={{ fontSize: 20 }}>{flare ? '🔥' : sys.features.locked ? '🌒' : night ? '🌙' : '☀️'}</span>
           <div>
             <div className="day">Day {dayNumber(t)}</div>
-            <div className="clock">
-              {hhmm(sol)}
-              <span className="hide-phone"> local</span>
+            <div className={`clock ${flare ? 'amber' : ''}`}>
+              {flare ? (
+                'FLARE'
+              ) : sys.features.locked ? (
+                'eternal dusk'
+              ) : (
+                <>
+                  {hhmm(sol)}
+                  <span className="hide-phone"> local</span>
+                </>
+              )}
             </div>
           </div>
         </div>

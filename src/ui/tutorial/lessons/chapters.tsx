@@ -346,3 +346,92 @@ export function EllipseLesson() {
     </LessonShell>
   );
 }
+
+/** Chapter 6: tidal locking, and flares as a random process with a steady rate. */
+export function LockedLesson() {
+  const [spin, setSpin] = useState(1); // turns per orbit
+  const [orbit, setOrbit] = useState(0.15); // fraction of an orbit
+  const [seed, setSeed] = useState(1);
+  const cx = 150;
+  const cy = 150;
+  const R = 95;
+  const th = 2 * Math.PI * orbit;
+  const px = cx + R * Math.cos(th);
+  const py = cy - R * Math.sin(th);
+  // The marked face points along this angle (it turns `spin` times per orbit, relative to the stars).
+  const face = 2 * Math.PI * orbit * spin + Math.PI;
+  const facesStar = Math.cos(face - (th + Math.PI)) > 0.95;
+  // Flares: exponential gaps with a mean of 2.5 days, over 60 days.
+  let r = seed * 9301 + 49297;
+  const rnd = () => ((r = (r * 9301 + 49297) % 233280) + 0.5) / 233280;
+  const gaps: number[] = [];
+  for (let t = 0; t < 60; ) {
+    const g = -Math.log(rnd()) * 2.5;
+    t += g;
+    if (t < 60) gaps.push(g);
+  }
+  const bins = Array.from({ length: 8 }, (_, i) => gaps.filter((g) => g >= i && g < i + 1).length);
+  const maxBin = Math.max(1, ...bins);
+  let tt = 0;
+  return (
+    <LessonShell
+      kicker="Chapter 6 · Red Dwarf"
+      title="Tidal locking and flares"
+      demo={
+        <Demo h={380}>
+          <svg viewBox="0 0 600 300" style={{ width: '100%' }}>
+            <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,120,90,0.3)" />
+            <circle cx={cx} cy={cy} r={12} fill="#ff7a52" />
+            <circle cx={px} cy={py} r={14} fill="#33405f" />
+            <path d={`M${px},${py} L${px + 14 * Math.cos(face)},${py - 14 * Math.sin(face)}`} stroke="#ffd36b" strokeWidth={3} />
+            <text x={cx} y={285} fill={spin === 1 ? '#5be3a4' : '#93a2c3'} fontSize={12} textAnchor="middle">
+              {spin === 1 ? 'Locked: the same face always points at the star' : facesStar ? 'Day at the marked spot' : 'The marked spot turns into night'}
+            </text>
+            <text x={320} y={24} fill="#93a2c3" fontSize={12}>
+              Gaps between flares (days), 60 days of watching
+            </text>
+            {bins.map((b, i) => (
+              <g key={i}>
+                <rect x={320 + i * 32} y={210 - (b / maxBin) * 160} width={26} height={(b / maxBin) * 160} fill="rgba(255,122,82,0.7)" />
+                <text x={333 + i * 32} y={226} fill="#5d6a88" fontSize={10} textAnchor="middle">
+                  {i}
+                </text>
+              </g>
+            ))}
+            {gaps.slice(0, 40).map((g, i) => {
+              tt += g;
+              return <line key={i} x1={320 + (tt / 60) * 256} x2={320 + (tt / 60) * 256} y1={245} y2={262} stroke="#ffc46b" />;
+            })}
+            <text x={320} y={280} fill="#93a2c3" fontSize={11}>
+              {gaps.length} flares · mean gap {fmtN(gaps.reduce((a, b) => a + b, 0) / Math.max(1, gaps.length), 1)} d
+            </text>
+          </svg>
+          <Slider label="Spin: turns per orbit" value={spin} min={0.5} max={4} step={0.5} onChange={setSpin} fmt={(v) => fmtN(v, 1)} />
+          <Slider label="Where the planet is on its orbit" value={orbit} min={0} max={1} step={0.01} onChange={setOrbit} fmt={(v) => fmtN(v, 2)} />
+          <button className="btn small" onClick={() => setSeed(seed + 1)}>
+            Watch another 60 days
+          </button>
+          <Note>Short gaps are the most common, and long quiet spells still happen. Each run differs; the average barely moves.</Note>
+        </Demo>
+      }
+      formula={
+        <>
+          locked: rotation period = orbital period,   P₁ = 360° / (sky turn rate)
+          <br />
+          chance of no flare for t days = e^(−t / mean gap)
+        </>
+      }
+      keyIdea="Tides slow a planet close to its star until it turns once per orbit — tidally locked, like our Moon facing Earth. The star then stands still in the sky, so there is no day to measure the year with; but the planet still turns once per orbit relative to the stars, so the starry sky wheels round once a year."
+      tip="Log the sky’s turn every few days and fit the rate, just like the star’s drift elsewhere. Flares come at random: plan with the rate (about one every 2–3 days, lasting hours), not with a schedule."
+      warn="A flare tells you nothing about when the next one comes — the gaps are random. Long gaps are rarer than short ones, but they never become ‘due’."
+    >
+      <P>
+        Most stars in the galaxy are red dwarfs, and many of their planets are probably tidally locked. Their temperate zone is so close in that a year
+        lasts weeks.
+      </P>
+      <P>
+        Flares are counted the way radioactive decays are: a steady average rate, random timing. The gaps between them follow an exponential curve.
+      </P>
+    </LessonShell>
+  );
+}

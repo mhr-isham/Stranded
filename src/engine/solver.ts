@@ -18,7 +18,7 @@ import {
   moonOffset,
   parallaxShift,
   pendulumPeriod,
-  siteEastOf,
+  parallaxSite,
   starLongitude,
   targetLongitude,
   surfaceGravity,
@@ -160,18 +160,22 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
 
   // Two oppositions picked from the middle of the retrograde loops.
   const [o1, o2] = oppositions(sys, 0, sys.lifeSupport);
-  const t1 = o1 + rng.normal(0, skill.oppositionPick);
-  const t2 = o2 + rng.normal(0, skill.oppositionPick);
-  const pickSigma = Math.max(skill.oppositionPick, 0.05 * DAY);
+  // A locked planet has no nights: the tracker logs around the clock, and a quick
+  // synodic period gives a quick loop, so the middle of it can be timed more finely.
+  const pick = sys.features.locked ? skill.oppositionPick * Math.min(1, sys.synodic / (400 * DAY)) : skill.oppositionPick;
+  const t1 = o1 + rng.normal(0, pick);
+  const t2 = o2 + rng.normal(0, pick);
+  const pickSigma = Math.max(pick, 0.05 * DAY);
   p.S2 = { value: t2 - t1, sigma: Math.SQRT2 * pickSigma };
   p.tOpp = { value: t2, sigma: pickSigma };
 
   // Parallax with a rover 3000 km east, measured when planet 2 crosses the midpoint meridian:
   // at opposition, or for an inner planet near greatest elongation (it is lost in the glare at conjunction).
   const B = 3000e3;
-  const rover = siteEastOf(sys, sys.site, B);
-  const mid = siteEastOf(sys, sys.site, B / 2);
-  const tObs = transitNear(sys, mid, sys.features.inner ? o2 + 0.22 * sys.synodic : o2);
+  const rover = parallaxSite(sys, sys.site, B);
+  const mid = parallaxSite(sys, sys.site, B / 2);
+  // A locked planet's sky barely turns, so there is no nightly meridian crossing to wait for: measure at opposition.
+  const tObs = sys.features.locked ? o2 : transitNear(sys, mid, sys.features.inner ? o2 + 0.22 * sys.synodic : o2);
   const baseline = norm(sub(observerPos(sys, tObs, sys.site), observerPos(sys, tObs, rover)));
   const pTrue = parallaxShift(sys, tObs, sys.site, rover);
   p.dPar = { ...summarize(Array.from({ length: n }, () => baseline / (pTrue + rng.normal(0, skill.parallaxReading)))), at: tObs };

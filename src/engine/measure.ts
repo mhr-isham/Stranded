@@ -56,6 +56,14 @@ export function moonOffset(sys: StarSystem, t: number, site: Site) {
   return d;
 }
 
+/**
+ * Where the rover goes for parallax. East normally; on a locked planet the
+ * planet near opposition lies low in the east, almost along an east–west
+ * baseline, so the rover drives south (toward the equator, where the sky is darker).
+ */
+export const parallaxSite = (sys: StarSystem, site: Site, dist: number): Site =>
+  sys.features.locked ? { lat: site.lat - dist / sys.home.radius, lon: site.lon } : siteEastOf(sys, site, dist);
+
 /** Point on the home planet reached by travelling `dist` metres due east. */
 export const siteEastOf = (sys: StarSystem, site: Site, dist: number): Site => ({
   lat: site.lat,

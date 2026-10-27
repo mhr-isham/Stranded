@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-27T07:42:50.038Z with 40 systems per difficulty.
+Generated 2026-10-27T08:19:40.696Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
@@ -199,5 +199,6 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | 3 | success 37/40, flyby 3/40 | 9.946% |
 | 4 | success 36/40, flyby 4/40 | 9.912% |
 | 5 | success 38/40, flyby 2/40 | 9.649% |
+| 6 | success 35/40, flyby 5/40 | 12.596% |
 | 9 | success 39/40, flyby 1/40 | 13.949% |
 

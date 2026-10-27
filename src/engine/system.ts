@@ -55,11 +55,13 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
   const real = !!features.real;
   for (let attempt = 0; attempt < 1000; attempt++) {
     // Star: main-sequence-ish scalings.
-    const mSol = real ? 1 : rng.range(0.72, 1.12);
+    const locked = !!features.locked;
+    // A red dwarf (chapter 6): small, cool and dim, so the temperate zone hugs it.
+    const mSol = real ? 1 : locked ? rng.range(0.38, 0.52) : rng.range(0.72, 1.12);
     const star = {
       mass: mSol * M_SUN,
-      radius: mSol ** 0.85 * R_SUN,
-      temperature: T_SUN * mSol ** 0.5,
+      radius: (locked ? mSol ** 0.95 : mSol ** 0.85) * R_SUN,
+      temperature: locked ? rng.range(3300, 3800) : T_SUN * mSol ** 0.5,
       luminosity: 0,
     };
     star.luminosity = 4 * Math.PI * star.radius ** 2 * SIGMA_SB * star.temperature ** 4;
@@ -68,7 +70,8 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     // Home planet in the temperate zone.
     const a1 = real ? REAL.mars.a : Math.sqrt(star.luminosity / L_SUN) * rng.range(0.92, 1.12) * AU;
     const P1 = TAU * Math.sqrt(a1 ** 3 / mu);
-    if (!real && (P1 < 120 * DAY || P1 > 320 * DAY)) continue;
+    if (!real && !locked && (P1 < 120 * DAY || P1 > 320 * DAY)) continue;
+    if (locked && (P1 < 18 * DAY || P1 > 70 * DAY)) continue;
 
     const ratio = features.inner ? rng.range(0.55, 0.78) : rng.range(1.35, 1.95);
     const a2 = real ? REAL.earth.a : ratio * a1;
@@ -80,7 +83,8 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     const m2 = real ? REAL.earth.mass : rng.range(0.4, 1.4) * M_EARTH;
     const r2 = real ? REAL.earth.radius : radiusFromDensity(m2, rng.range(3800, 5600));
 
-    const moonA = real ? REAL.moon.a : rng.range(18, 55) * r2;
+    // Around a red dwarf everything is quick: a tighter moon, so the planet's distance barely changes during one moon orbit.
+    const moonA = real ? REAL.moon.a : rng.range(18, locked ? 28 : 55) * r2;
     const moonP = TAU * Math.sqrt(moonA ** 3 / (G * m2));
 
     // Phases: the first opposition happens a little after landing.
@@ -175,6 +179,19 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       fuelDv = best.cost + rules.fuelAllowance * (vD + vA);
     }
 
+    // Drawn in the same order as always, so a seed keeps its system (saves, daily challenge).
+    const moonPhase = rng.range(0, TAU);
+    const moonRadius = real ? REAL.moon.radius : r2 * rng.range(0.15, 0.3);
+    const siteLat = real ? REAL.siteLat : rng.range(8, 36) * DEG;
+    if (locked) {
+      // Tidally locked: one turn per orbit, no tilt. Fix the star's hour angle so it
+      // stays 20° below the horizon — the camp is just inside the night side, forever,
+      // with the point opposite the star 20° up in the east.
+      home.siderealDay = P1;
+      home.obliquity = 0;
+      const H = Math.acos(Math.sin(-20 * DEG) / Math.cos(siteLat));
+      home.rotPhase0 = H + home.phase0 + Math.PI;
+    }
     return {
       seed,
       difficulty,
@@ -183,8 +200,8 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       star,
       home,
       target,
-      moon: { a: moonA, period: moonP, phase0: rng.range(0, TAU), radius: real ? REAL.moon.radius : r2 * rng.range(0.15, 0.3) },
-      site: { lat: real ? REAL.siteLat : rng.range(8, 36) * DEG, lon: 0 },
+      moon: { a: moonA, period: moonP, phase0: moonPhase, radius: moonRadius },
+      site: { lat: siteLat, lon: 0 },
       hillHeight: Math.round(rng.range(700, 1500) / 10) * 10,
       synodic,
       firstOpposition,

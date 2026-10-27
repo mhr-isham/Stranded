@@ -28,6 +28,8 @@ import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
 import { OrbitPanel } from './OrbitPanel';
+import { flareAt } from '../../engine/flares';
+import { meridianAngle } from '../../engine/sky';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
 type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'micro' | 'moon';
@@ -463,7 +465,22 @@ export function Observatory() {
           </div>
         )}
 
-        {tab === 'year' && (
+        {tab === 'year' && sys.features.locked && (
+          <YearPanel
+            locked
+            onPoint={() => {}}
+            canLog={!flareAt(sys, clock.t)}
+            reason="A flare is washing out the sky. Wait for it to fade."
+            onLog={() => {
+              // The reference star's hour angle: how far the sky has turned (with a small reading error).
+              const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v }] }));
+              toast('Sky position logged');
+              sfx('log');
+            }}
+          />
+        )}
+        {tab === 'year' && !sys.features.locked && (
           <YearPanel
             onPoint={() => (pointAt('star', 2), flag('scope-star'))}
             canLog={mode === 'scope' && sel?.kind === 'star' && twilight}
@@ -535,7 +552,7 @@ function MicroReadout({ calip }: { calip: React.MutableRefObject<{ x1: number; x
   return <div className="readout">{fmt(Math.abs(calip.current.x2 - calip.current.x1) / ARCSEC, 2)}″</div>;
 }
 
-function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void }) {
+function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void; locked?: boolean }) {
   const obs = useGame((s) => s.starObs);
   const [band, setBand] = useState<[number, number] | null>(null);
   const days = obs.map((o) => o.at / DAY);
@@ -548,15 +565,24 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
   return (
     <div className="panel panel-pad stack">
       <b>Length of the year</b>
-      <div className="muted" style={{ fontSize: 13 }}>
-        At sunrise or sunset, centre the star in the telescope and log its position against the background stars. Come back days or weeks later.
-        The star drifts east by 360° per year.
-      </div>
-      <button className="btn" data-tut="year-point" onClick={onPoint}>
-        Point at the star (solar filter)
-      </button>
+      {locked ? (
+        <div className="muted" style={{ fontSize: 13 }}>
+          The star never moves here — this planet keeps one face to it. But it still turns once per orbit, so the whole starry sky wheels overhead
+          once a year. Log where a reference star stands (its hour angle) now and again over days or weeks: it turns 360° per year.
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 13 }}>
+          At sunrise or sunset, centre the star in the telescope and log its position against the background stars. Come back days or weeks later.
+          The star drifts east by 360° per year.
+        </div>
+      )}
+      {!locked && (
+        <button className="btn" data-tut="year-point" onClick={onPoint}>
+          Point at the star (solar filter)
+        </button>
+      )}
       <button className="btn primary" disabled={!canLog} onClick={onLog} data-tut="year-log">
-        Log star position
+        {locked ? 'Log the sky’s turn' : 'Log star position'}
       </button>
       {!canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
       <div data-tut="year-fit" className="stack">
@@ -567,7 +593,7 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
             ...(fit ? [{ pts: [pts[0], pts[pts.length - 1]].map((p) => ({ x: p.x, y: fit.intercept + fit.slope * p.x })), color: 'rgba(108,196,255,0.8)', kind: 'line' as const }] : []),
           ]}
           xLabel="day"
-          yLabel="star longitude (°)"
+          yLabel={locked ? 'sky turned (°)' : 'star longitude (°)'}
           band={band}
           onBand={setBand}
           brushMode="band"
@@ -579,18 +605,18 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
       )}
       {fit && !hasChallenge(useGame.getState(), 'handFit') && (
         <dl className="kv">
-          <dt>Drift</dt>
+          <dt>{locked ? 'Turn rate' : 'Drift'}</dt>
           <dd>{fmt(fit.slope, 4)} °/day</dd>
           <dt>Baseline</dt>
           <dd>{fmt(used[used.length - 1].x - used[0].x, 1)} days</dd>
-          <dt>Year P₁ = 360° / drift</dt>
+          <dt>Year P₁ = 360° / {locked ? 'turn rate' : 'drift'}</dt>
           <dd className="blue">{P1 ? `${fmt(P1, 2)} days` : '—'}</dd>
         </dl>
       )}
-      <Formula>P₁ = 360° / (daily drift)</Formula>
+      <Formula>{locked ? 'P₁ = 360° / (sky turn rate)' : 'P₁ = 360° / (daily drift)'}</Formula>
       {P1 && !hasChallenge(useGame.getState(), 'handFit') && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
       </div>
-      {pts.length >= 2 && <StarPrediction pts={pts} fit={fit} />}
+      {pts.length >= 2 && !locked && <StarPrediction pts={pts} fit={fit} />}
     </div>
   );
 }
@@ -678,7 +704,7 @@ function TrackerPanel() {
             {s.trackOn ? 'Auto-log: ON (nightly)' : 'Turn on nightly auto-log'}
           </button>
           <div className="muted" style={{ fontSize: 13 }}>
-            {obs.ok ? 'Tracking now: target visible.' : obs.cloudy ? 'Clouded out tonight.' : obs.sunAlt > -12 * DEG ? 'Waiting for a dark sky.' : 'Target below 12° altitude.'} Warp time to
+            {obs.ok ? 'Tracking now: target visible.' : obs.flare ? 'A flare is washing out the sky — the tracker waits it out.' : obs.cloudy ? 'Clouded out tonight.' : obs.sunAlt > -12 * DEG ? 'Waiting for a dark sky.' : 'Target below 12° altitude.'} Warp time to
             collect weeks of data.
           </div>
         </>

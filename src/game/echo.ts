@@ -98,6 +98,14 @@ export const ECHO: Record<string, EchoLine> = {
     id: 'relayHint',
     text: 'One more thing from the night sky: just after dusk I keep catching a faint light that moves while the stars stand still. If you see it in the Sky view, tap it.',
   },
+  flare: {
+    id: 'flare',
+    text: 'Flare. The star just brightened several times over — the sky is washed out and the instruments are blind until it fades, an hour or a few. Red dwarfs do this. They come at random: I can tell you the rate, never the next one.',
+  },
+  lockedSky: {
+    id: 'lockedSky',
+    text: 'The star never moves here. This planet keeps one face to it — one turn per orbit — so the sky above us turns once a year. We live in the twilight band: permanent dusk, the star just below the western horizon.',
+  },
   transitSoon: {
     id: 'transitSoon',
     coach: true,

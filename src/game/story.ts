@@ -177,6 +177,37 @@ export const LOGS: Record<string, StoryLog> = {
       { who: 'mira', text: 'Kepler took six years to give up the circle. I don’t have six years. Nobody out here does. Check the shape before you trust the size.' },
     ],
   },
+  brief6: {
+    title: 'Red Dwarf',
+    chapter: 6,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'A small red star, and a planet that never turns its face away from it. We came down in the twilight band, where the light never finishes going.' },
+      { who: 'vale', text: '…Is it morning?' },
+      { who: 'echo', text: 'It will never be morning here, Commander. Rest.' },
+      { who: 'echo', text: 'The Halcyon log has a warning in it, Navigator: flares. Mira counted them. If her numbers are right, they come about every two or three days, at random. You can’t plan around the next one — only around the rate.' },
+      { who: 'note', text: 'Optional: the Flight School module “Tidal locking and flares” is in the Codex.' },
+    ],
+  },
+  cache6: {
+    title: 'Mira’s flare count',
+    chapter: 6,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Orbit confirmed. The cache sits on the twilight band below us, in the shadow of a ridge — out of the flares’ line of sight.' },
+      { who: 'echo', text: 'Inside: Mira’s tally of every flare she saw, with the gaps between them. I checked them against ours. Same rate, same scatter: the gaps follow the curve of pure chance.' },
+      { who: 'note', text: 'Vale wakes only long enough to ask whether everyone is still aboard. ECHO says yes. She sleeps again.' },
+    ],
+  },
+  mira6: {
+    title: 'Halcyon journal · Day 455',
+    chapter: 6,
+    kind: 'journal',
+    lines: [
+      { who: 'mira', text: 'The star flared four times today. I keep wanting it to have a pattern. It doesn’t. The gaps are random, the average is steady, and that is all the comfort the universe offers.' },
+      { who: 'mira', text: 'Funny: it’s easier to be brave about a rate than about a reason.' },
+    ],
+  },
   brief5: {
     title: 'Inward',
     chapter: 5,

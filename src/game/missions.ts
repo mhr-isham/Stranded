@@ -239,11 +239,32 @@ const CH4: Mission[] = [
   byId('plan'),
 ];
 
+/** Chapter 6: a tidally locked planet around a red dwarf — no day, no night, and flares. */
+const CH6: Mission[] = [
+  ...['gravity', 'radius', 'mass', 'identify'].map(byId),
+  {
+    ...byId('year'),
+    goal: 'The star never moves here, but the whole sky turns once a year. In the observatory’s Year tab, log the sky’s turn every few days for a few weeks, then fit the rate.',
+    why: 'A locked planet turns once per orbit, so the stars circle overhead once a year: P₁ = 360° / (turn rate).',
+  },
+  {
+    ...byId('track'),
+    goal: 'Turn on the tracker. With no daylight it logs around the clock — except during flares, when the sky is washed out.',
+  },
+  {
+    ...byId('parallax'),
+    goal: 'Near opposition the planet hangs low in the east, almost along an east–west line, so drive the rover SOUTH this time, and image the planet from both sites at once.',
+    why: 'A parallax baseline has to run across the line of sight. Along it, the two views barely differ.',
+  },
+  ...['opposition', 'disk', 'moon', 'synodic', 'plan'].map(byId),
+];
+
 /** The missions of the current chapter. */
 export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 2) return CH2;
   if (s.chapter === 3) return CH3;
   if (s.chapter === 4) return CH4;
   if (s.chapter === 5) return CH5;
+  if (s.chapter === 6) return CH6;
   return MISSIONS;
 }

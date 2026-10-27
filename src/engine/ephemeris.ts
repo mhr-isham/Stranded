@@ -77,7 +77,7 @@ export function moonPos(sys: StarSystem, t: number): Vec3 {
 
 /** Local solar day of the home planet (s): noon to noon. */
 export const solarDay = (sys: StarSystem) =>
-  1 / (1 / sys.home.siderealDay - 1 / sys.home.period);
+  sys.home.siderealDay === sys.home.period ? Infinity : 1 / (1 / sys.home.siderealDay - 1 / sys.home.period);
 
 /** Heliocentric longitude of planet 2 minus planet 1, wrapped to [0, 2pi). */
 export function leadAngle(sys: StarSystem, t: number) {

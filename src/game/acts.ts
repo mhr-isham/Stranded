@@ -117,6 +117,21 @@ export function actsFor(chapter: number): Act[] {
           ? { ...a, learned: ['On an ellipse, launch windows come unevenly too: the planner searches the real cost, date by date.'] }
           : a,
     );
+  if (chapter === 6)
+    return ACTS.map((a) =>
+      a.n === 2
+        ? {
+            ...a,
+            learned: [
+              'A tidally locked planet turns once per orbit: one face always day, one always night, and a twilight band between.',
+              'The star stands still in our sky, but the stars wheel overhead once a year — 360° ÷ the turn rate is the year.',
+              'The tracker works around the clock here, except when a flare washes out the sky.',
+            ],
+          }
+        : a.n === 3
+          ? { ...a, learned: ['Near opposition the planet is low in the east, so the parallax baseline runs north–south.', ...a.learned.slice(1)] }
+          : a,
+    );
   if (chapter === 5)
     return ACTS.map((a) =>
       a.n === 3

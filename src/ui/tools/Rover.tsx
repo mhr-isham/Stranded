@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
-import { siteEastOf } from '../../engine/measure';
+import { parallaxSite } from '../../engine/measure';
 import { localFrame, observerPos, toHorizontal, topocentric } from '../../engine/sky';
 import { norm, sub, unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
@@ -38,8 +38,8 @@ export function Rover() {
   const [fovAs, setFovAs] = useState(150);
 
   const driving = s.rover.arriveAt > t;
-  const roverSite = siteEastOf(sys, sys.site, s.rover.dist);
-  const midSite = siteEastOf(sys, sys.site, s.rover.dist / 2);
+  const roverSite = parallaxSite(sys, sys.site, s.rover.dist);
+  const midSite = parallaxSite(sys, sys.site, s.rover.dist / 2);
 
   const siteInfo = (site: typeof sys.site) => {
     const f = localFrame(sys, t, site);

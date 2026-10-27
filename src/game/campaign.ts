@@ -72,7 +72,16 @@ export const CHAPTERS: ChapterSpec[] = [
     successLogs: ['cache5', 'mira5'],
     ready: true,
   },
-  { n: 6, title: 'Red Dwarf', idea: 'Tidal locking, a dim star and flares.', twist: 'No normal day and night.', lessons: [], briefing: null, successLogs: [], ready: false },
+  {
+    n: 6,
+    title: 'Red Dwarf',
+    idea: 'A tidally locked planet around a dim red star: the sky turns once a year, and flares come at random.',
+    twist: 'No day and no night — the star never moves, so the year has to come from the turning sky.',
+    lessons: ['locked'],
+    briefing: 'brief6',
+    successLogs: ['cache6', 'mira6'],
+    ready: true,
+  },
   { n: 7, title: 'Slingshot', idea: 'Gravity assist from a third planet.', twist: 'The target is too far for the fuel.', lessons: [], briefing: null, successLogs: [], ready: false },
   { n: 8, title: 'Lost Among Stars', idea: 'Stellar parallax: finding where we are.', twist: 'The question is no longer where the planet is, but where we are.', lessons: [], briefing: null, successLogs: [], ready: false },
   {
