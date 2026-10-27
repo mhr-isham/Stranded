@@ -6,6 +6,7 @@ import type { Estimate, PrimaryKey } from '../engine/chain';
 import type { LaunchPlan, LaunchResult } from '../engine/launch';
 import type { Difficulty } from '../engine/types';
 import { clock } from './clock';
+import { modeOf } from './modes';
 
 export type Screen =
   | 'hub'
@@ -56,6 +57,8 @@ export interface SurvivalState {
 export interface EchoLine {
   id: string;
   text: string;
+  /** Coaching (next steps, discoveries pointed out); silent in modes where ECHO doesn't coach. */
+  coach?: boolean;
   mood?: 'calm' | 'alert' | 'happy';
 }
 
@@ -104,6 +107,12 @@ export interface GameState {
   outcome: Outcome | null;
   lastNightLog: number;
   tutorial: TutorialState;
+  /** Identifies this run, so checkpoints from an older run are ignored. */
+  runId: number;
+  checkpointsUsed: number;
+  rewindsUsed: number;
+  /** The player has seen the true values; no more rewinds. */
+  debriefSeen: boolean;
 
   set: (p: Partial<GameState>) => void;
   go: (screen: Screen) => void;
@@ -158,6 +167,10 @@ const initial = {
   outcome: null,
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
+  runId: 0,
+  checkpointsUsed: 0,
+  rewindsUsed: 0,
+  debriefSeen: false,
 };
 
 let nextId = Date.now();
@@ -176,6 +189,7 @@ export const useGame = create<GameState>()(
         set({
           ...initial,
           phase: 'intro',
+          runId: Date.now(),
           seed,
           settings,
           codex: get().codex,
@@ -195,7 +209,8 @@ export const useGame = create<GameState>()(
           return { sheet };
         }),
       say: (line) =>
-        set((s) => (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
+        set((s) =>
+          line.coach && !modeOf(s.settings.difficulty).coaching ? s : (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
       dismissEcho: () => set((s) => ({ echo: s.echo.slice(1) })),
       unlock: (kind, id) => set((s) => (s[kind].includes(id) ? s : { [kind]: [...s[kind], id] } as Partial<GameState>)),
     }),

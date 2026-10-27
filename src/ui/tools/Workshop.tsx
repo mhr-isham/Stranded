@@ -5,6 +5,7 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
+import { useMode } from '../../game/modes';
 import { UPGRADES, inStorm, o2Rate, salvage } from '../../game/survival';
 import { ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
@@ -14,8 +15,14 @@ export function Workshop() {
   const t = useGameTime(3);
   const sv = s.survival;
   const [busy, setBusy] = useState(false);
+  const mode = useMode();
   if (!s.settings.survival) return null;
-  const storm = inStorm(s.seed, Math.floor(t / DAY));
+  const today = Math.floor(t / DAY);
+  const storm = inStorm(s.seed, today);
+  // Easier modes get a storm forecast; the hard modes don't.
+  let stormIn = 0;
+  for (let d = 1; d <= mode.stormForecast && !stormIn; d++) if (inStorm(s.seed, today + d)) stormIn = d;
+  const forecast = mode.stormForecast > 0 ? (stormIn ? `storm in ${stormIn} day${stormIn > 1 ? 's' : ''}` : `clear for ${mode.stormForecast} day${mode.stormForecast > 1 ? 's' : ''}`) : null;
 
   const doSalvage = () => {
     setBusy(true);
@@ -81,6 +88,12 @@ export function Workshop() {
               <dd>{fmt(o2Rate(sv), 2)} days/day</dd>
               <dt>Weather</dt>
               <dd>{storm ? 'dust storm' : 'clear-ish'}</dd>
+              {forecast && (
+                <>
+                  <dt>Forecast</dt>
+                  <dd className={stormIn ? 'amber' : ''}>{forecast}</dd>
+                </>
+              )}
               <dt>Spare parts</dt>
               <dd>{sv.parts}</dd>
               <dt>Wreck salvage left</dt>

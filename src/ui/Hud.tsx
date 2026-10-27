@@ -7,12 +7,15 @@ import { lifeSupportEnd } from '../game/survival';
 import { dayNumber, hhmm, localSolarHours } from '../game/time';
 import { fmt } from '../game/format';
 import { flag } from '../game/tutorial';
-import { Modal, Toggle, useClockState, useGameTime } from './common/widgets';
+import { Modal, Toggle, toast, useClockState, useGameTime } from './common/widgets';
+import { useMode } from '../game/modes';
+import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
 
 export function Hud() {
   const t = useGameTime(6);
   useClockState();
   const s = useGame();
+  const mode = useMode();
   const { system: sys } = currentWorld();
   const [menu, setMenu] = useState(false);
   const end = lifeSupportEnd(s, sys);
@@ -85,14 +88,20 @@ export function Hud() {
           <dl className="kv" style={{ margin: '8px 0 12px' }}>
             <dt>System seed</dt>
             <dd>{s.seed}</dd>
-            <dt>Difficulty</dt>
-            <dd style={{ textTransform: 'capitalize' }}>{s.settings.difficulty}</dd>
+            <dt>Mode</dt>
+            <dd>{mode.name}</dd>
             <dt>Survival mode</dt>
             <dd>{s.settings.survival ? 'on' : 'off'}</dd>
             <dt>Fuel budget</dt>
             <dd>{fmt(fuel / 1000, 2)} km/s</dd>
           </dl>
-          <Toggle on={s.settings.formulas} onChange={(v) => s.set({ settings: { ...s.settings, formulas: v } })} label="Formula sheet" sub="Shown in tools and on the progress sheet." />
+          <Toggle
+            on={s.settings.formulas}
+            onChange={(v) => !mode.formulasLocked && s.set({ settings: { ...s.settings, formulas: v } })}
+            label="Formula sheet"
+            sub={mode.formulasLocked ? `Not available in ${mode.name}.` : 'Shown in tools and on the progress sheet.'}
+          />
+          {!s.tutorial.active && <CheckpointPanel onDone={() => setMenu(false)} />}
           <Toggle on={s.settings.sound} onChange={(v) => s.set({ settings: { ...s.settings, sound: v } })} label="Sound" />
           <div className="row" style={{ justifyContent: 'space-between', marginTop: 16 }}>
             <button
@@ -111,5 +120,63 @@ export function Hud() {
         </Modal>
       )}
     </>
+  );
+}
+
+/** Manual checkpoints: three slots, limited per run in some modes, none in the one-shot modes. */
+function CheckpointPanel({ onDone }: { onDone: () => void }) {
+  const mode = useMode();
+  const used = useGame((s) => s.checkpointsUsed);
+  const [slots, setSlots] = useState(listSlots);
+  if (mode.checkpoints <= 0) {
+    return (
+      <div className="faint" style={{ fontSize: 12, padding: '10px 0' }}>
+        {mode.name} is one shot: no checkpoints or rewinds. The game still autosaves so you can quit and continue.
+      </div>
+    );
+  }
+  const left = mode.checkpoints - used;
+  const finite = Number.isFinite(mode.checkpoints);
+  return (
+    <div className="stack" style={{ padding: '10px 0', gap: 8 }}>
+      <div className="row between">
+        <b style={{ fontSize: 14 }}>Checkpoints</b>
+        <span className="faint" style={{ fontSize: 12 }}>{finite ? `${left} save${left === 1 ? '' : 's'} left this run` : 'save any time'}</span>
+      </div>
+      {Array.from({ length: SLOTS }, (_, i) => {
+        const snap = slots[i];
+        return (
+          <div key={i} className="row between" style={{ gap: 8 }}>
+            <span className="muted" style={{ fontSize: 13, flex: 1 }}>
+              Slot {i + 1}: {snap ? `day ${fmt(snap.t / DAY, 1)}` : 'empty'}
+            </span>
+            <button
+              className="btn small"
+              disabled={finite && left <= 0}
+              onClick={() => {
+                if (saveSlot(i)) {
+                  setSlots(listSlots());
+                  toast(`Checkpoint saved in slot ${i + 1}`);
+                } else toast('Could not save — browser storage is full or blocked.');
+              }}
+            >
+              Save
+            </button>
+            <button
+              className="btn small"
+              disabled={!snap}
+              onClick={() => {
+                if (loadSlot(i)) {
+                  toast(`Back to day ${fmt(snap!.t / DAY, 1)}`);
+                  onDone();
+                }
+              }}
+            >
+              Load
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { DAY, DEG } from '../engine/constants';
 import { generateSystem } from '../engine/system';
 import { starCatalog } from '../engine/sky';
-import type { Difficulty } from '../engine/types';
+import { MODES, MODE_ORDER } from '../game/modes';
 import { paintSky } from '../render/paint';
 import { makeLandscape } from '../render/terrain';
 import { useGame, type Settings } from '../game/store';
@@ -10,47 +10,6 @@ import { dailySeed, randomSeed } from '../game/world';
 import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
-
-// What each mode promises. Margins are measured from the generator (see DIFFICULTY in
-// engine/system.ts and docs/DESIGN-V2.md §3); update both together.
-const DIFFS: { id: Difficulty; name: string; tag: string; forWho: string; expect: string[]; formulas: boolean }[] = [
-  {
-    id: 'cadet',
-    name: 'Cadet',
-    tag: 'Forgiving',
-    forWho: 'Your first expeditions after Flight School.',
-    expect: [
-      'Plenty of spare fuel (about 20–40% over the ideal flight) to absorb measurement mistakes.',
-      'Lots of spare air: roughly 3–13 months after the first launch window you can reach.',
-      'Formula sheet on. Small errors still get you there.',
-    ],
-    formulas: true,
-  },
-  {
-    id: 'navigator',
-    name: 'Navigator',
-    tag: 'Standard',
-    forWho: 'Once you are comfortable with every tool.',
-    expect: [
-      'Spare fuel about 10–20%: careful work succeeds, sloppy work does not.',
-      'Spare air roughly 2–8 months — you can miss a window, but not many.',
-      'Formula sheet on (turn it off for a purer run).',
-    ],
-    formulas: true,
-  },
-  {
-    id: 'astronomer',
-    name: 'Astronomer',
-    tag: 'Expert',
-    forWho: 'After a Navigator success.',
-    expect: [
-      'Thin spare fuel, about 6–13%: every error bar matters.',
-      'Spare air roughly 1–5 months — often only one launch window.',
-      'Formula sheet off by default.',
-    ],
-    formulas: false,
-  },
-];
 
 export function Title() {
   const s = useGame();
@@ -109,39 +68,68 @@ export function Title() {
         <Modal onClose={() => setSetup(false)}>
           <h2>New expedition</h2>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
-            The physics is the same in every mode — only the spare fuel, spare air and help change.
+            Pick a mode. The physics is the same in all of them — only the spare fuel, spare air and help change.
           </p>
-          <div className="diff-grid" style={{ margin: '10px 0' }}>
-            {DIFFS.map((d) => (
+          <div className="mode-pick" role="radiogroup" aria-label="Mode">
+            {MODE_ORDER.map((id, i) => (
               <button
-                key={d.id}
-                className={`diff ${settings.difficulty === d.id ? 'on' : ''}`}
-                aria-pressed={settings.difficulty === d.id}
-                onClick={() => setSettings({ ...settings, difficulty: d.id, formulas: d.formulas })}
+                key={id}
+                role="radio"
+                aria-checked={settings.difficulty === id}
+                className={`mode-chip ${settings.difficulty === id ? 'on' : ''}`}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    difficulty: id,
+                    formulas: MODES[id].formulas,
+                    survival: MODES[id].survivalForced ? true : MODES[settings.difficulty].survivalForced ? false : settings.survival,
+                  })
+                }
               >
-                <b>
-                  {d.name} <em>{d.tag}</em>
-                </b>
-                <span className="diff-for">{d.forWho}</span>
-                <ul>
-                  {d.expect.map((e) => (
-                    <li key={e}>{e}</li>
+                <span className="mode-pips" aria-hidden>
+                  {MODE_ORDER.map((_, k) => (
+                    <i key={k} className={k <= i ? 'on' : ''} />
                   ))}
-                </ul>
+                </span>
+                {MODES[id].name}
               </button>
             ))}
           </div>
+          {(() => {
+            const m = MODES[settings.difficulty];
+            return (
+              <div className="mode-detail">
+                <b>
+                  {m.name} <em>{m.tag}</em>
+                </b>
+                <span className="diff-for">{m.forWho}</span>
+                <ul>
+                  {m.expect.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
           <Toggle
             on={settings.survival}
-            onChange={(v) => setSettings({ ...settings, survival: v })}
+            onChange={(v) => !MODES[settings.difficulty].survivalForced && setSettings({ ...settings, survival: v })}
             label="Survival mode"
-            sub="Manage oxygen, food and power. Weather can cloud the sky. Salvage the wreck to upgrade your tools."
+            sub={
+              MODES[settings.difficulty].survivalForced
+                ? 'Always on in Legend.'
+                : 'Manage oxygen, food and power. Weather can cloud the sky. Salvage the wreck to upgrade your tools.'
+            }
           />
           <Toggle
             on={settings.formulas}
-            onChange={(v) => setSettings({ ...settings, formulas: v })}
+            onChange={(v) => !MODES[settings.difficulty].formulasLocked && setSettings({ ...settings, formulas: v })}
             label="Formula sheet"
-            sub="Show the formula behind every step. Each mode picks a default; you can change it here or during play."
+            sub={
+              MODES[settings.difficulty].formulasLocked
+                ? 'Not available in Legend.'
+                : 'Show the formula behind every step. Each mode picks a default; you can change it here or during play.'
+            }
           />
           <Toggle on={settings.sound} onChange={(v) => setSettings({ ...settings, sound: v })} label="Sound" />
           <div className="field" style={{ marginTop: 12 }}>

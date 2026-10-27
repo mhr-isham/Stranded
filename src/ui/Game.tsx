@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { checkMissions } from '../game/sim';
 import { ECHO } from '../game/echo';
+import { modeOf } from '../game/modes';
 import { useGame, type Screen } from '../game/store';
 import { Echo } from './Echo';
 import { Hub } from './Hub';
@@ -29,7 +30,8 @@ export function Game() {
   const tutorial = useGame((s) => s.tutorial.active);
 
   useEffect(() => {
-    useGame.getState().say(ECHO.welcome);
+    const g = useGame.getState();
+    g.say(modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
     checkMissions();
   }, []);
 

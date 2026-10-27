@@ -7,6 +7,7 @@ import { checkMissions, currentWorld } from '../../game/sim';
 import { readingStats, useGame, type Screen } from '../../game/store';
 import { HINTS, NODE_INFO } from './nodeInfo';
 import { flag } from '../../game/tutorial';
+import { countText, useMode } from '../../game/modes';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -136,6 +137,9 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   const e = isPrimary ? s.sheet[k as PrimaryKey] : derivedEst[k as keyof typeof derivedEst];
   const [hintLevel, setHintLevel] = useState(0);
   const [verdict, setVerdict] = useState<string | null>(null);
+  const mode = useMode();
+  const maxHints = Math.min(HINTS[k].length, mode.hints);
+  const verifiesLeft = mode.verifies - s.checksUsed;
   const stats = isPrimary ? readingStats(s.readings, k as PrimaryKey) : null;
 
   const edit = (field: 'value' | 'sigma', text: string) => {
@@ -149,7 +153,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   };
 
   const check = () => {
-    if (!e) return;
+    if (!e || verifiesLeft <= 0) return;
     const truth = truthValues(sys, s.sheet)[k];
     const sc = scoreQuantity(e.value, e.sigma, truth);
     s.set({ penaltyDv: s.penaltyDv + 40, checksUsed: s.checksUsed + 1 });
@@ -204,29 +208,35 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
 
       <hr className="sep" />
       <div data-tut="sheet-hints" className="stack">
-      <div className="row between">
-        <b style={{ fontSize: 13 }}>Hints</b>
-        <span className="faint" style={{ fontSize: 12 }}>each costs score</span>
-      </div>
-      {HINTS[k].slice(0, hintLevel).map((h, i) => (
-        <div key={i} className="hint">{h}</div>
-      ))}
-      {hintLevel < HINTS[k].length && (
-        <button
-          className="btn small"
-          onClick={() => {
-            setHintLevel(hintLevel + 1);
-            s.set({ hintsUsed: s.hintsUsed + 1 });
-          }}
-        >
-          {['Nudge me', 'How is it measured?', 'Show me the first step'][hintLevel]}
-        </button>
+      {maxHints > 0 ? (
+        <>
+          <div className="row between">
+            <b style={{ fontSize: 13 }}>Hints</b>
+            <span className="faint" style={{ fontSize: 12 }}>{mode.hintsCost ? 'each costs score' : 'free in this mode'}</span>
+          </div>
+          {HINTS[k].slice(0, hintLevel).map((h, i) => (
+            <div key={i} className="hint">{h}</div>
+          ))}
+          {hintLevel < maxHints && (
+            <button
+              className="btn small"
+              onClick={() => {
+                setHintLevel(hintLevel + 1);
+                if (mode.hintsCost) s.set({ hintsUsed: s.hintsUsed + 1 });
+              }}
+            >
+              {['Nudge me', 'How is it measured?', 'Show me the first step'][hintLevel]}
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="faint" style={{ fontSize: 12 }}>No hints in {mode.name} mode. The lessons in the Codex are always open.</div>
       )}
-      {e && (
+      {e && mode.verifies > 0 && (
         <>
           <hr className="sep" />
-          <button className="btn small amber" onClick={check}>
-            Ask ECHO to verify (costs 40 m/s of fuel)
+          <button className="btn small amber" onClick={check} disabled={verifiesLeft <= 0}>
+            Ask ECHO to verify (costs 40 m/s of fuel · {countText(verifiesLeft)} left)
           </button>
           {verdict && <div className="hint">{verdict}</div>}
         </>

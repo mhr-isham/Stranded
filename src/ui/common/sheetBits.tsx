@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
 import { fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions } from '../../game/sim';
+import { currentMode, useMode } from '../../game/modes';
 import { readingStats, useGame } from '../../game/store';
 import { toast } from './widgets';
 
@@ -53,6 +54,7 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
   const current = useGame((s) => s.sheet[k]);
   const setSheet = useGame((s) => s.setSheet);
   const [err, setErr] = useState('');
+  const mode = useMode();
   if (value === null || !Number.isFinite(value)) return null;
   const errNum = Number(err);
   const ok = err !== '' && errNum > 0;
@@ -70,7 +72,7 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
           <input className="input" inputMode="decimal" placeholder={info.unit} value={err} onChange={(e) => setErr(e.target.value.replace(/[^0-9.]/g, ''))} />
         </div>
       </div>
-      {spread !== undefined && Number.isFinite(spread) && spread > 0 && (
+      {mode.sanity && spread !== undefined && Number.isFinite(spread) && spread > 0 && (
         <div className="muted" style={{ fontSize: 12 }}>
           Standard error from the scatter of your readings: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Systematic errors are not included — that part is up to you.
         </div>
@@ -130,7 +132,7 @@ export function Formula({ children }: { children: string }) {
 
 /** Compare a new reading with the kept ones; returns a warning when it looks off. */
 export function outlierNote(value: number, others: number[], tolerance: number) {
-  if (others.length < 1) return null;
+  if (others.length < 1 || !currentMode().sanity) return null;
   const sorted = [...others].sort((a, b) => a - b);
   const med = sorted[Math.floor(sorted.length / 2)];
   const off = Math.abs(value / med - 1);
@@ -138,8 +140,9 @@ export function outlierNote(value: number, others: number[], tolerance: number) 
 }
 
 export function SanityWarning({ msgs }: { msgs: (string | null | false | undefined)[] }) {
+  const mode = useMode();
   const list = msgs.filter(Boolean) as string[];
-  if (!list.length) return null;
+  if (!list.length || !mode.sanity) return null;
   return (
     <div className="callout warn" style={{ margin: 0 }}>
       <b>⚠ Suspicious reading</b>

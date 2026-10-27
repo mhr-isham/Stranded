@@ -11,17 +11,100 @@ import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
 import { evaluateAchievements, ACHIEVEMENTS } from '../../game/achievements';
 import { toast } from '../common/widgets';
+import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
+import { countText, modeOf } from '../../game/modes';
 
-const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string }> = {
-  success: { title: 'Safe in orbit', text: 'You reached the blue planet with your own numbers.', cls: 'green' },
-  flyby: { title: 'Flyby', text: 'You reached the blue planet but could not brake into orbit.', cls: 'amber' },
-  lost: { title: 'Lost in space', text: 'Course corrections ate the fuel before arrival.', cls: 'red' },
-  'no-escape': { title: 'Could not escape', text: 'The burn was not enough to leave the planet.', cls: 'red' },
-  expired: { title: 'Life support exhausted', text: 'The air ran out before launch.', cls: 'red' },
+const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
+  success: {
+    title: 'Safe in orbit',
+    text: 'You reached the blue planet with your own numbers.',
+    cls: 'green',
+    echo: 'Orbit confirmed. The beacon is directly below us. Whoever set it up, they were waiting a long time for someone to measure their way here.',
+  },
+  flyby: {
+    title: 'Flyby',
+    text: 'You reached the blue planet but could not brake into orbit.',
+    cls: 'amber',
+    echo: 'We passed close enough to see the clouds. Then we kept going.',
+  },
+  lost: {
+    title: 'Lost in space',
+    text: 'Course corrections ate the fuel before arrival.',
+    cls: 'red',
+    echo: 'Tanks dry. The blue planet is ahead of us and getting no closer. I’ll keep the beacon logged. Someone always finds the beacon.',
+  },
+  'no-escape': {
+    title: 'Could not escape',
+    text: 'The burn was not enough to leave the planet.',
+    cls: 'red',
+    echo: 'We climbed, and the planet pulled harder than our numbers said it would. We’re coming back down.',
+  },
+  expired: {
+    title: 'Life support exhausted',
+    text: 'The air ran out before launch.',
+    cls: 'red',
+    echo: 'Moving everyone to deep cryo on the last of the power. Someone will find the beacon. Someone always finds the beacon.',
+  },
 };
 
+function EchoQuote({ text }: { text: string }) {
+  return (
+    <div className="muted" style={{ fontStyle: 'italic', fontSize: 14, margin: '10px auto 0', maxWidth: 560 }}>
+      <span className="mono blue" style={{ fontStyle: 'normal', fontSize: 11, letterSpacing: '0.14em', marginRight: 6 }}>
+        ECHO
+      </span>
+      “{text}”
+    </div>
+  );
+}
+
+/**
+ * After a failed flight, modes with rewinds offer one before the debrief: the
+ * debrief shows the true values, so seeing it ends the chance to rewind.
+ */
 export function Results() {
   const s = useGame();
+  const mode = modeOf(s.settings.difficulty);
+  const kind = s.outcome?.result.outcome ?? 'expired';
+  const canRewind = !s.tutorial.active && kind !== 'success' && kind !== 'expired' && !s.debriefSeen && s.rewindsUsed < mode.rewinds && hasPrelaunch();
+  if (!canRewind) return <Debrief />;
+  const info = OUTCOME_TEXT[kind];
+  const left = mode.rewinds - s.rewindsUsed;
+  return (
+    <div className="screen scroll" style={{ background: 'radial-gradient(ellipse at 50% 0%, #10204a 0%, #05070f 65%)' }}>
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: 'calc(48px + var(--safe-top)) 14px 40px' }} className="stack">
+        <div className="panel panel-pad stack" style={{ textAlign: 'center' }}>
+          <div className="meter-label">Flight failed · system #{s.seed}</div>
+          <h1 className={info.cls} style={{ fontSize: 'clamp(28px, 6vw, 42px)', margin: '4px 0' }}>
+            {info.title}
+          </h1>
+          <div className="muted">{info.text}</div>
+          <EchoQuote text={info.echo} />
+          <p style={{ margin: '8px 0 0', fontSize: 14 }}>
+            ECHO kept the ship’s state from just before launch. You can go back to the launch planner, re-check your numbers and take more
+            measurements — the clock goes back too.
+          </p>
+          <button className="btn primary big" onClick={() => rewindToLaunch()}>
+            ⟲ Rewind to the launch planner
+          </button>
+          <div className="faint" style={{ fontSize: 12 }}>
+            {countText(left)} rewind{left === 1 ? '' : 's'} left in {mode.name}
+            {mode.rewindPenalty ? ` · costs ${mode.rewindPenalty} points` : ' · no score cost'}
+          </div>
+          <hr className="sep" />
+          <button className="btn" onClick={() => useGame.setState({ debriefSeen: true })}>
+            See the full debrief
+          </button>
+          <div className="faint" style={{ fontSize: 12 }}>The debrief shows the true values, so it ends this run — no rewinds after it.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Debrief() {
+  const s = useGame();
+  const mode = modeOf(s.settings.difficulty);
   const { system: sys } = currentWorld();
   const outcome = s.outcome;
   const kind = outcome?.result.outcome ?? 'expired';
@@ -37,7 +120,7 @@ export function Results() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success' });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty });
   const [copied, setCopied] = useState(false);
 
   // Error budget: how much correction fuel each measurement cost, found by
@@ -61,6 +144,7 @@ export function Results() {
 
   const earned = useMemo(() => evaluateAchievements(s, sys, kind, rows), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (!s.debriefSeen) useGame.setState({ debriefSeen: true });
     earned.forEach((a) => useGame.getState().unlock('achievements', a));
     sfx(kind === 'success' ? 'unlock' : 'bad');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -70,7 +154,7 @@ export function Results() {
       .filter((r) => r.sc)
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
-    const text = `STRANDED · system #${s.seed} (${s.settings.difficulty}${s.settings.survival ? ', survival' : ''})\n${info.title} · grade ${grade.letter} · ${grade.total} pts\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
+    const text = `STRANDED · system #${s.seed} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · grade ${grade.letter} · ${grade.total} pts\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
     void navigator.clipboard?.writeText(text).then(() => setCopied(true));
     toast('Result copied — share it!');
   };
@@ -84,6 +168,7 @@ export function Results() {
             {info.title}
           </h1>
           <div className="muted">{info.text}</div>
+          {!s.tutorial.active && <EchoQuote text={info.echo} />}
           <div className="row" style={{ justifyContent: 'center', gap: 28, marginTop: 14 }}>
             <div>
               <div style={{ fontFamily: 'var(--display)', fontSize: 64, fontWeight: 700, lineHeight: 1 }} className={grade.letter === 'F' ? 'red' : 'blue'}>
@@ -102,6 +187,12 @@ export function Results() {
               <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
               <dt>Hints used</dt>
               <dd>{s.hintsUsed}</dd>
+              {s.rewindsUsed > 0 && (
+                <>
+                  <dt>Rewinds used</dt>
+                  <dd>{s.rewindsUsed}</dd>
+                </>
+              )}
             </dl>
           </div>
           <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>

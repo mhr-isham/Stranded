@@ -1,6 +1,6 @@
 // Core data types for a generated star system. All values SI unless noted.
 
-export type Difficulty = 'cadet' | 'navigator' | 'astronomer';
+export type Difficulty = 'stargazer' | 'cadet' | 'navigator' | 'astronomer' | 'legend';
 
 export interface Star {
   mass: number;

@@ -53,7 +53,7 @@ out();
 // 2. Competent noisy solver, per difficulty.
 out('## 2. Noisy solver (competent player skill)');
 out();
-for (const diff of ['cadet', 'navigator', 'astronomer'] as Difficulty[]) {
+for (const diff of ['stargazer', 'cadet', 'navigator', 'astronomer', 'legend'] as Difficulty[]) {
   const rel: Record<string, number[]> = {};
   const z: Record<string, number[]> = {};
   const outcomes: Record<string, number> = {};

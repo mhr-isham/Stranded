@@ -24,6 +24,7 @@ import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
+import { savePrelaunch } from '../../game/checkpoints';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
@@ -139,6 +140,7 @@ export function Launch() {
     if (!p) return toast('No transfer found for this date.');
     const result = simulateLaunch({ ...sys, fuelDv: budget }, p.plan);
     sfx('launch');
+    if (!s.tutorial.active) savePrelaunch();
     useGame.setState({ outcome: { plan: p.plan, result, sheet: s.sheet }, phase: 'flight' });
   };
 

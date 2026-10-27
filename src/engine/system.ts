@@ -24,9 +24,11 @@ export interface DifficultyRules {
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyRules> = {
+  stargazer: { fuelAllowance: 1.0, lifeSlack: [0.6, 0.85] },
   cadet: { fuelAllowance: 0.6, lifeSlack: [0.35, 0.5] },
   navigator: { fuelAllowance: 0.35, lifeSlack: [0.2, 0.3] },
   astronomer: { fuelAllowance: 0.2, lifeSlack: [0.1, 0.18] },
+  legend: { fuelAllowance: 0.15, lifeSlack: [0.08, 0.14] },
 };
 
 const radiusFromDensity = (mass: number, rho: number) => Math.cbrt((3 * mass) / (4 * Math.PI * rho));

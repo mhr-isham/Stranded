@@ -6,6 +6,8 @@ import type { GameState } from './store';
 export interface Mission {
   id: string;
   title: string;
+  /** Goal only, without the method (for modes that don't coach). */
+  short: string;
   goal: string;
   why: string;
   screen?: GameState['screen'];
@@ -18,6 +20,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'gravity',
     title: 'Feel the pull',
+    short: 'Measure the surface gravity g.',
     goal: 'Time the pendulum and keep at least 3 gravity readings.',
     why: 'Surface gravity g tells us how hard the engines must push. Together with the radius it gives the planet’s mass.',
     screen: 'pendulum',
@@ -26,6 +29,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'radius',
     title: 'Measure the world',
+    short: 'Measure the planet’s radius R₁.',
     goal: 'Climb the hill and keep at least 3 horizon-dip readings.',
     why: 'The higher you stand, the further the horizon dips below level. The dip reveals how curved, and so how big, this planet is.',
     screen: 'hill',
@@ -34,6 +38,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'mass',
     title: 'Weigh the planet',
+    short: 'Put g and R₁ on the progress sheet.',
     goal: 'Enter g and R₁ on the progress sheet to unlock the planet’s mass.',
     why: 'M = gR²/G. The mass sets the escape speed — the biggest part of the fuel bill.',
     screen: 'sheet',
@@ -42,6 +47,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'identify',
     title: 'Find the blue planet',
+    short: 'Identify the blue planet in the night sky.',
     goal: 'At night, find the steady light that does not twinkle and identify it in the telescope.',
     why: 'Stars twinkle because they are points; planets shine steadily because they are tiny disks.',
     screen: 'observatory',
@@ -50,6 +56,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'year',
     title: 'How long is a year?',
+    short: 'Measure the length of the year P₁.',
     goal: 'At dusk or dawn, log the star’s position against the background stars over several weeks, then fit the drift.',
     why: 'The star creeps eastward against the stars as we orbit it. 360° divided by the daily drift is the year length P₁.',
     screen: 'observatory',
@@ -58,6 +65,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'track',
     title: 'Watch it wander',
+    short: 'Start following the blue planet’s path.',
     goal: 'Turn on the tracker’s nightly auto-log for the blue planet.',
     why: 'Its path against the stars will loop backwards (retrograde) when we overtake it — that loop marks opposition.',
     screen: 'observatory',
@@ -66,6 +74,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'opposition',
     title: 'Opposition',
+    short: 'Find the time of opposition.',
     goal: 'Mark the middle of the retrograde loop: the moment of opposition.',
     why: 'At opposition the blue planet is closest and directly opposite the star — the best time to measure it.',
     screen: 'observatory',
@@ -74,6 +83,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'parallax',
     title: 'The distance scale',
+    short: 'Measure the distance to the blue planet.',
     goal: 'Drive the rover far east and image the blue planet from both sites at once. Measure the shift.',
     why: 'Parallax gives the first absolute distance in the system. Everything else — orbit sizes, star mass — is scaled from it.',
     screen: 'rover',
@@ -82,6 +92,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'disk',
     title: 'Size the target',
+    short: 'Measure the blue planet’s angular size.',
     goal: 'Measure the angular diameter of the blue planet with the telescope micrometer.',
     why: 'Angle × distance = size. You will aim for an orbit just above its surface.',
     screen: 'observatory',
@@ -90,6 +101,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'moon',
     title: 'Weigh it with its moon',
+    short: 'Measure the moon’s orbit (θₘ and Pₘ).',
     goal: 'Track the moon’s swing around the blue planet; fit its greatest elongation and period.',
     why: 'Kepler’s third law around the blue planet: M₂ = 4π²a³/(GP²). You need M₂ to brake into orbit.',
     screen: 'observatory',
@@ -98,6 +110,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'synodic',
     title: 'Full circle',
+    short: 'Measure the synodic period S.',
     goal: 'Mark the next opposition too. The time between them is the synodic period S.',
     why: 'From S and our year P₁ we get the blue planet’s year, and from Kepler’s third law, its orbit size.',
     screen: 'observatory',
@@ -106,6 +119,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'plan',
     title: 'Plot the course',
+    short: 'Plan the transfer.',
     goal: 'Open the launch planner with a complete progress sheet and pick a departure date.',
     why: 'A Hohmann transfer is cheapest, but only when the blue planet leads us by just the right angle.',
     screen: 'launch',

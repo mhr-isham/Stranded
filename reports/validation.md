@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-26T17:13:57.535Z with 40 systems per difficulty.
+Generated 2026-10-27T05:51:47.680Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
@@ -28,6 +28,31 @@ approximations (e.g. measuring near, not exactly at, opposition; topocentric off
 | Blue planet mass (M₂) | 0.105% |
 
 ## 2. Noisy solver (competent player skill)
+
+### stargazer
+
+Outcomes: success 40/40. Median fuel left: 27.328% of budget.
+
+| Quantity | Median rel. error | Within stated 1σ | Within 2σ |
+|---|---|---|---|
+| R₁ | 0.278% | 62.500% | 92.500% |
+| g | 0.135% | 72.500% | 95.000% |
+| P₁ | 0.025% | 75.000% | 97.500% |
+| S | 0.233% | 77.500% | 97.500% |
+| t₀ | 0.253% | 75.000% | 97.500% |
+| d | 1.021% | 55.000% | 90.000% |
+| α₂ | 0.239% | 87.500% | 100.000% |
+| θₘ | 0.087% | 75.000% | 92.500% |
+| Pₘ | 0.068% | 72.500% | 97.500% |
+| M₁ | 0.575% | 65.000% | 97.500% |
+| P₂ | 0.201% | 80.000% | 97.500% |
+| a₂/a₁ | 0.127% | 77.500% | 97.500% |
+| a₁ | 0.743% | 62.500% | 87.500% |
+| a₂ | 1.025% | 62.500% | 87.500% |
+| M★ | 2.276% | 62.500% | 90.000% |
+| R₂ | 1.034% | 60.000% | 90.000% |
+| aₘ | 0.966% | 62.500% | 92.500% |
+| M₂ | 2.664% | 62.500% | 92.500% |
 
 ### cadet
 
@@ -82,6 +107,31 @@ Outcomes: success 38/40, flyby 2/40. Median fuel left: 9.686% of budget.
 ### astronomer
 
 Outcomes: success 33/40, flyby 7/40. Median fuel left: 4.870% of budget.
+
+| Quantity | Median rel. error | Within stated 1σ | Within 2σ |
+|---|---|---|---|
+| R₁ | 0.278% | 62.500% | 92.500% |
+| g | 0.135% | 72.500% | 95.000% |
+| P₁ | 0.025% | 75.000% | 97.500% |
+| S | 0.233% | 77.500% | 97.500% |
+| t₀ | 0.253% | 75.000% | 97.500% |
+| d | 1.021% | 55.000% | 90.000% |
+| α₂ | 0.239% | 87.500% | 100.000% |
+| θₘ | 0.087% | 75.000% | 92.500% |
+| Pₘ | 0.068% | 72.500% | 97.500% |
+| M₁ | 0.575% | 65.000% | 97.500% |
+| P₂ | 0.201% | 80.000% | 97.500% |
+| a₂/a₁ | 0.127% | 77.500% | 97.500% |
+| a₁ | 0.743% | 62.500% | 87.500% |
+| a₂ | 1.025% | 62.500% | 87.500% |
+| M★ | 2.276% | 62.500% | 90.000% |
+| R₂ | 1.034% | 60.000% | 90.000% |
+| aₘ | 0.966% | 62.500% | 92.500% |
+| M₂ | 2.664% | 62.500% | 92.500% |
+
+### legend
+
+Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 
 | Quantity | Median rel. error | Within stated 1σ | Within 2σ |
 |---|---|---|---|

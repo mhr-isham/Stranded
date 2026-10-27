@@ -5,7 +5,7 @@ This document turns the review comments on [`ENGAGEMENT.md`](ENGAGEMENT.md) and 
 Contents:
 1. Ground rules
 2. How the game is organised
-3. The three modes: what each one is for
+3. The five modes: what each one is for
 4. Which feature goes in which mode (the master table)
 5. Beginners first: how Cadet avoids overwhelming people
 6. Predictions that are estimates, not guesses
@@ -41,40 +41,48 @@ Contents:
 
 ## 2. How the game is organised
 
-The title screen offers **four ways to play**. A **mode** (Cadet, Navigator or Astronomer) is chosen when starting an expedition or a chapter.
+The title screen offers **four ways to play**. A **mode** (Stargazer, Cadet, Navigator, Astronomer or Legend; §3) is chosen when starting an expedition or a chapter.
 
 | Menu item | What it is | Modes | Scored? |
 |---|---|---|---|
 | **🎓 Flight School** | *Basic Training* (today's tutorial, start to launch) plus **one short training module per chapter**. A module unlocks when you reach its chapter (§7.2) | Its own fixed, fully guided setting | No (badges only) |
 | **📖 Campaign** | The story: a prologue and 9 chapters (§7), each a new star system that teaches one new idea | Choose for each chapter; you can change between chapters | Yes, separate boards per mode |
 | **🚀 Expedition** | A single system: random, daily or from a seed. You pick any twist from the chapters you have finished | Choose | Yes |
-| **🔭 Free Roam** | No deadline, no score. All tools you have learned, the ship, the rover, the sky. Fly, explore, draw constellations and take photos. Covers "Stargazer mode" from the deep-dive document | None | No |
+| **🔭 Free Roam** | No deadline, no score. All tools you have learned, the ship, the rover, the sky. Fly, explore, draw constellations and take photos. This is the no-pressure sandbox from the deep-dive document. (The **Stargazer** *mode* is different: a real, scored expedition with very generous margins.) | None | No |
 
 Why chapters live in the campaign while their *lessons* live in Flight School: this answers your concern about a long tutorial. Basic Training stays the length it is now. Each chapter adds a **5–10 minute module** taught just before you need it, so nobody sits through a two-hour tutorial and forgets the start.
 
+**Teaching is never mandatory** (your decision). Basic Training and every chapter module are **offered, not required**:
+- When a chapter opens, ECHO offers its module: *"New idea here. Want the 6-minute version first?"* with **Train first** and **Jump in** buttons.
+- Skipping is remembered: the module stays in Flight School and the lesson stays in the Codex.
+- In Stargazer and Cadet, if the player gets stuck on the new idea (no progress on it for a while), ECHO offers the module once more. It never forces it.
+
 ---
 
-## 3. The three modes
+## 3. The five modes
+
+You suggested one or two more modes to spread the difficulty. There are now **five**, shipped in the game with this update:
+- **Stargazer** sits below Cadet, for people who want to learn without pressure.
+- **Legend** sits above Astronomer, for the very best.
 
 ### What each mode promises
 
-| | **Cadet** | **Navigator** | **Astronomer** |
-|---|---|---|---|
-| **For** | Your first real expeditions, right after Flight School | The intended challenge | Experts who have succeeded on Navigator |
-| **Feeling** | "I'm learning and it's working" | "I have to be careful" | "Every error bar is a decision" |
-| **ECHO** | A coach: plans with you, warns you, explains everything | A colleague: points things out when asked or when something looks wrong | An instrument: does the arithmetic and stays quiet |
-| **Spare fuel** *(current generator)* | about **18–38%** above the ideal transfer | about **10–22%** | about **6–13%** |
-| **Spare air** after the first realistic launch window | about **3–13 months** | about **2–8 months** | about **1–5 months** (often only one window) |
-| **Mistakes** | Small errors still get you there; one rewind if a launch fails | Average work succeeds, sloppy work does not | One shot |
+| | **Stargazer** | **Cadet** | **Navigator** | **Astronomer** | **Legend** |
+|---|---|---|---|---|---|
+| **For** | Learning at your own pace; younger or casual players | First full expeditions | The standard challenge | After a Navigator success | After an Astronomer success |
+| **Feeling** | "I can't really fail" | "I'm learning and it's working" | "I have to be careful" | "Every error bar is a decision" | "Nothing is free" |
+| **ECHO** | Coach, very patient | Coach | Colleague | Instrument: arithmetic only | Instrument; no warnings at all |
+| **Spare fuel** | about **30–63%** | about **18–38%** | about **10–22%** | about **6–13%** | about **5–9%** |
+| **Spare air** after the first realistic window | about **6 months – 2 years** | about **3–13 months** | about **2–8 months** | about **1–5 months** | about **1–4 months** |
+| **Competent player succeeds** *(validation bot, 40 systems)* | 40/40 | 40/40 | 38/40 | 33/40 | 28/40 |
+| **Mistakes** | Rewind as often as you like | One free rewind | One rewind (−150 points) | One shot | One shot |
 
-The fuel and air numbers come from 30 generated systems per mode, using the current `DIFFICULTY` rules in `src/engine/system.ts`. **The in-game descriptions now say this** (see the Title screen change shipped with this document).
+The fuel and air numbers come from 30 generated systems per mode, using the `DIFFICULTY` rules in `src/engine/system.ts`. The success column comes from `npm run validate` (`reports/validation.md`). **The in-game descriptions say exactly this.**
 
-### Why only three modes
-More modes would split players and leaderboards. Two extra layers handle the edges instead of new modes:
-- **Survival** stays a toggle in every mode, with its own intensity by mode (§4).
-- **Astronomer Challenges** (§4.3) are optional add-ons for experts, replacing the 20-rank ladder.
-
----
+### Why five and not more
+Five gives a clear ladder with real steps between each rung (the success rates above fall steadily). More would split players and leaderboards. Two other layers handle the rest:
+- **Survival** is a toggle in every mode except Legend (always on), with its intensity set by the mode (§4.5).
+- **Astronomer Challenges** (§4.3) are optional add-ons for experts.
 
 ## 4. The master table: which feature goes in which mode
 
@@ -84,42 +92,44 @@ Key:
 - ○ off
 - 🔒 unlocked later by a chapter
 
+Columns: **SG** = Stargazer, **Ca** = Cadet, **Na** = Navigator, **As** = Astronomer, **Le** = Legend. ✅ = **already in the game** with this update.
+
 ### 4.1 Measuring and reasoning
 
-| Feature | Flight School | Cadet | Navigator | Astronomer | Free Roam |
+| Feature | Flight School | SG | Ca | Na | As | Le | Free Roam |
+|---|---|---|---|---|---|---|---|
+| Formula sheet ✅ | ● | ● | ● | ● | ○ default (can turn on) | ○ locked | ● |
+| Mission list ✅ | step by step | done + now + next, with "why" | done + now + next, with "why" | all goals, no method | ○ (you plan) | ○ | ○ |
+| ECHO's warnings on suspicious readings, and the scatter-based error guide ✅ | ● | ● | ● | ● | ● | ○ | ● |
+| ECHO's coaching lines (next steps, discoveries pointed out) ✅ | ● | ● | ● | ● | ○ quiet | ○ quiet | ● |
+| Hints on the sheet ✅ | 3 levels | 3 levels, **free** | 3 levels | 1 level | ○ (Codex lessons) | ○ | ● |
+| "Ask ECHO to verify" (costs fuel, hints at the truth) ✅ | ● | unlimited | 5 per run | 2 per run | ○ | ○ | ● |
+| **Readiness meter** (from your own error bars) | ● | ● with "improve this next" | ● with "improve this next" | ● weakest value | number only | number only | ● |
+| **Predictions** (§6) | guided practice | ● with helper, gentle | ● with helper | ● | ● strict scoring | ● strict | ◐ |
+| **Several methods per quantity** | 🔒 module per method | 1 method | 1 method | choose 1 of 2 | all, cross-check bonus | all | all learned |
+| **Observing-time planner** | ○ | ○ | ○ (ECHO schedules) | ◐ optional | ● | ● | ○ |
+| **Real anomalies** (§12.2) | ○ | ○ corrected | ○ corrected, with a note | ◐ pointed out in the debrief | ● unannounced | ● unannounced, more often | ◐ |
+| **Competing hypotheses** (§12.3) | ○ | ○ | ○ ECHO picks | ● | ● | ● | ● |
+
+### 4.2 Time and waiting
+
+| Feature | SG | Ca | Na | As | Le |
 |---|---|---|---|---|---|
-| Formula sheet | ● | ● (can turn off) | ● (can turn off) | ○ by default (can turn on) | ● |
-| Mission list (what to do next) | step by step | next 2 steps | goals only | ○ (you plan) | ○ |
-| ECHO's sanity warnings on readings | ● | ● with reasons | ● short | ○ | ● |
-| **Readiness meter** (from your own error bars) | ● | ● with "improve this next" | ● with your weakest value | number only | ● |
-| **Predictions** (§6) | guided practice | ● with an estimate helper | ● | ● scored more strictly | ◐ |
-| Explanation after a prediction is revealed | ● | ● | ● short, "more" link | lesson link only | ● |
-| **Several methods per quantity** (deep dive §3.1) | 🔒 module per method | **1 method** (the standard one) | **choose 1 of 2** | **all methods**, cross-check bonus | all you have learned |
-| **Observing-time planner** (deep dive §3.3) | ○ | ○ (ECHO schedules) | ◐ optional | ● | ○ |
-| **Real anomalies** (§12.2) | ○ | ○ (corrected for you, with a note) | ◐ occasional, ECHO points them out in the debrief | ● unannounced, "Sharp Eye" bonus | ◐ |
-| **Competing hypotheses** (§12.3) | ○ | ○ (ECHO chooses for you and says so) | ● | ● | ● |
-| Hints | many | 3 levels | 1 level | Codex lessons only | ● |
+| "Skip to next event" | ● ECHO picks | ● ECHO picks | ● from **your** predictions | warp to times you choose; events only from your model | same as As |
+| Things to do while warping (constellations, rover trips, camp jobs) | ● | ● | ● | ● | ● |
+| Auto-pause at events | ● | ● | ● | ◐ alarms you set | ◐ alarms you set |
 
-### 4.2 Time and waiting (engagement doc §4)
+### 4.3 Progress and replay
 
-| Feature | Cadet | Navigator | Astronomer |
-|---|---|---|---|
-| "Skip to next event" | ● ECHO picks the next useful event | ● list of events **you** predicted | ● warp to times you choose; events come only from *your* model, so a wrong model gives wrong times |
-| Things to do while warping (constellations, rover trips, camp jobs) | ● | ● | ● |
-| Auto-pause at an event | ● | ● | ◐ (you set alarms) |
+| Feature | SG | Ca | Na | As | Le |
+|---|---|---|---|---|---|
+| Score and grade ✅ | ● | ● | ● | ● | ● |
+| Leaderboard (later, with servers) | own board | own board | own board | own board | own board, top ranked |
+| Atlas card for every run, even failed ones | ● | ● | ● | ● | ● |
+| Calibration profile (§12.1) | ● | ● | ● | ● | ● |
+| **Astronomer Challenges** | ○ | ○ | ○ | ● after one success | ● (several built in) |
 
-### 4.3 Progress and replay (engagement doc §5)
-
-| Feature | Cadet | Navigator | Astronomer |
-|---|---|---|---|
-| Score and grade | ● | ● | ● |
-| Leaderboard | its own board | its own board | its own board, the "ranked" one |
-| Atlas card for every run, even failed ones | ● | ● | ● |
-| Calibration profile (§12.1) | ● | ● | ● |
-| Achievements | ● | ● | ● (plus mode-only ones) |
-| **Astronomer Challenges** | ○ | ○ | ● after one Astronomer success |
-
-**Astronomer Challenges** replace the 20-rank ladder, which you were only partly in favour of. There are **eight optional realistic modifiers**, each shown as a badge on your result:
+**Astronomer Challenges** replace the 20-rank ladder. There are **eight optional realistic modifiers**, each shown as a badge on your result:
 - worn stopwatch;
 - bad-seeing season;
 - half rover range;
@@ -129,33 +139,42 @@ Key:
 - no ECHO sanity checks;
 - one save.
 
-They can be combined. A small number keeps it a mastery goal without grinding.
+They can be combined. Legend already includes three of them (no formula sheet, survival on, no sanity checks).
 
 ### 4.4 Flight and landing (§9)
 
-| Feature | Flight School | Cadet | Navigator | Astronomer | Free Roam |
+| Feature | Flight School | SG | Ca | Na | As | Le | Free Roam |
+|---|---|---|---|---|---|---|---|
+| Prologue landing | assisted, can't crash | assisted, can't crash | assisted, can't crash | assisted, can't crash | manual; ECHO saves you before a crash | manual; ECHO saves you, with damage | n/a |
+| Launch ascent | ECHO flies | ECHO; ◐ take over | ECHO; ◐ take over with a guide line | manual or ECHO | manual or ECHO | manual | manual |
+| Transfer burns | ECHO | ECHO | ECHO flies your plan | ECHO flies your plan; ◐ you fly it | ◐ you fly it | you fly it | manual |
+| Mid-course correction | ECHO | ECHO, shown live | ECHO, shown live | you take a sighting; ECHO computes the burn | sighting + burn | sighting + burn | manual |
+| Predicted path on screen | true path | true path | true path | **from your own model** | from your model | from your model | true path (sandbox) |
+| Entry and landing at the target | assisted | assisted, wide corridor | assisted | attitude hold only | manual, heating limits | manual, heating limits | manual |
+| Parachute | auto | auto-suggest | suggested | manual | manual, can tear | manual, can tear | manual |
+
+### 4.5 Survival by mode
+
+| | SG | Ca | Na | As | Le |
 |---|---|---|---|---|---|
-| Prologue landing (on the planet where you are stranded) | assisted, can't crash | assisted, can't crash | assisted, can't crash | manual, but ECHO saves you before a crash | n/a |
-| Launch ascent | ECHO flies, you watch | ECHO flies; ◐ take over with a guide line | manual or ECHO | manual or ECHO | manual |
-| Transfer burns | ECHO | ECHO flies your plan | ECHO flies your plan; ◐ you fly it | ◐ you can fly it | manual |
-| Mid-course correction | ECHO | ECHO, shown live | **you take a navigation sighting**, ECHO computes the burn | you take the sighting and do the burn | manual |
-| Predicted path on screen | true path | true path | **from your own model** | from your own model | true path (sandbox) |
-| Entry and landing at the blue planet | assisted, markers | assisted (attitude hold, suggested landing zone) | attitude hold only | fully manual, heating limits | manual |
-| Parachute | auto-suggest | suggested | manual | manual, can tear if opened too fast | manual |
+| Survival | toggle | toggle | toggle | toggle | **always on** ✅ |
+| Storm forecast ✅ | 3 days | 2 days | 1 day | none | none |
+| Oxygen leaks | rare, warned | rare, warned | normal | normal | normal |
+| Fuel from ice (§10.3) | ● fast | ● fast | ● | ● | ◐ slower |
 
-### 4.5 Survival toggle by mode
+### 4.6 Saving (§11)
 
-| | Cadet | Navigator | Astronomer |
-|---|---|---|---|
-| Storms | forecast 2 days ahead | forecast 1 day ahead | no forecast; read the barometer |
-| Oxygen leaks | rare, with a warning | normal | normal |
-| Fuel from ice (§10.3) | ● faster | ● | ◐ slower, limited |
+| | SG | Ca | Na | As | Le |
+|---|---|---|---|---|---|
+| Autosave (quit and continue) ✅ | ● | ● | ● | ● | ● |
+| Manual checkpoints (3 slots) ✅ | any time | any time | 3 saves per run | ○ | ○ |
+| Rewind to the launch planner after a failed flight ✅ | unlimited | 1, free | 1, −150 points | ○ | ○ |
 
 ---
 
-## 5. Beginners first: how Cadet avoids overwhelming people
+## 5. Beginners first: how Stargazer and Cadet avoid overwhelming people
 
-Your point that putting every feature in beginner mode is overwhelming is right. **Cadet's job is to feel simple even though the world is real.** Six rules:
+Your point that putting every feature in beginner mode is overwhelming is right. **The job of Stargazer and Cadet is to feel simple even though the world is real.** The rules below apply to both; Stargazer adds free hints, unlimited rewinds and bigger margins.
 
 1. **Progressive disclosure.** The HUD in Cadet starts with **four elements**: the time, life support, ECHO and the sheet button. The warp menu, the readings table and the launch planner appear the first time you need them, with a one-line introduction.
 2. **One method per quantity** in Cadet, the standard one that Flight School teaches. Other methods show up as "ECHO knows another way, ask me later" after the first success.
@@ -164,7 +183,7 @@ Your point that putting every feature in beginner mode is overwhelming is right.
 5. **Two next steps at most** in the mission list, never a wall of tasks.
 6. **A gentle failure.** A failed Cadet launch ends in a short, dignified story moment, then *"Rewind to the launch planner"*, which you can do once (§11).
 
-**The test for any new Cadet feature:** a new player who just finished Flight School must be able to use it without reading anything extra. If they can't, it goes to Navigator.
+**The test for any new Stargazer or Cadet feature:** a new player who just finished Flight School must be able to use it without reading anything extra. If they can't, it goes to Navigator.
 
 ---
 
@@ -247,15 +266,16 @@ Every chapter keeps the core loop: **measure → model → predict → launch �
 
 ### 7.4 Mode differences inside chapters (general rule)
 
-- **Cadet:** the new idea is the *only* new thing. ECHO does any other unusual work, using the standard methods.
+- **Stargazer and Cadet:** the new idea is the *only* new thing. ECHO does any other unusual work, using the standard methods. Stargazer adds a wider margin for the new idea's measurement.
 - **Navigator:** the new idea plus one choice (two methods, or a risk dial like the flyby distance).
 - **Astronomer:** the new idea plus real complications (anomalies, the planner, the challenges).
+- **Legend:** as Astronomer, with no warnings and the complications more frequent.
 
 ---
 
 ## 8. The story (your comment on 2.4 and 4.4)
 
-You asked for a story that runs across the whole game. Here is a proposed outline. It needs a dedicated **story bible** (characters, script, every line of ECHO) as a separate task. The rules for the story:
+You asked for a story that runs across the whole game. This is the short outline; the full **story bible** is now [`STORY.md`](STORY.md). It covers the characters, plot per chapter, ECHO's tone guide, script samples and failure endings, and it adds two ideas: the measurements are the fold drive's calibration, and ECHO is secretly the Halcyon's AI. The rules for the story:
 - every clue is a physical measurement;
 - the story never interrupts a measurement;
 - the story never gives away numbers.
@@ -361,40 +381,53 @@ The readiness meter shows the risk of each one *from your own error bars*. It is
 - Long drives are also how the **Eratosthenes route** (chapter 3) and **two-site parallax** work, so exploring and measuring share one system.
 
 ### 10.2 Moving the whole camp
-Your idea was to move the camp with thrusters. A counter-argument based on physics: a **ballistic hop** costs a lot of fuel. Up and down again, a 5 km hop needs roughly 0.4–0.5 km/s, about a tenth of a typical Cadet spare. A 100 km hop costs about 2 km/s, which is more than the whole spare in many Navigator systems. I suggest **two ways to move**, both realistic:
+A ballistic hop really is expensive: going up and coming down again, a 5 km hop needs roughly 0.4–0.5 km/s and a 100 km hop about 2 km/s. You decided hops should be **fun without worrying in the easier modes**, and that **rover towing stays** too. So there are two ways to move, and hops get their own fuel logic:
 
 | Way | Cost | When it's worth it |
 |---|---|---|
-| **Tow the habitat with the rover** | Time (days of slow driving) | Moving to a better observing site or to ice |
-| **Hop the ship** with thrusters | **Launch fuel**, shown in km/s before you confirm | Rarely: an emergency, or a very valuable site |
+| **Tow the habitat with the rover** | Time (days of slow driving); no fuel | Any move; the relaxed way to reach a better site or ice |
+| **Hop the ship** with thrusters | The **hop tank** (see below), or launch fuel in the hard modes | Fast moves: a far-away observing site, ice, a story find |
 
-This turns your idea into a real decision. A hop is exciting and possible, but every hop is fuel you won't have for the trip to the blue planet. In Cadet, ECHO warns clearly: *"This hop costs 0.6 km/s — a fifth of our spare fuel."*
+**The hop tank.** The Kestrel's landing thrusters have their own small tank, separate from the launch fuel. Landers really are built this way (descent stages and thruster tanks are separate). It holds enough for about one long hop and refills from the camp's water electrolyser, which runs on solar power.
+
+| | SG | Ca | Na | As | Le |
+|---|---|---|---|---|---|
+| Hops use | hop tank | hop tank | hop tank | hop tank, then launch fuel | **launch fuel only** |
+| Hop tank refills | every night, automatically | every night, automatically | over 3 days, or faster with ice | only from ice | — |
+| Life support during a hop | not counted | not counted | counted (minutes) | counted | counted |
+
+In Stargazer and Cadet, hopping is pure fun: fly the ship to a new spot, land it yourself, set up camp, no fuel worry. In Legend it is the real thing: every hop is fuel you won't have for the flight to the target, and ECHO shows the cost before you commit: *"This hop costs 0.6 km/s — a fifth of our spare fuel."*
+
+⚪ The nightly refill in the easy modes is a small, labelled allowance (the electrolyser would really need water and time). It doesn't touch the measurement chain, so learning is unaffected.
 
 ### 10.3 Making fuel from "minerals" (in-situ resource use)
 Fuel from minerals is realistic if it means **water ice**:
 - Split the ice with electricity into hydrogen and oxygen, which is real rocket propellant.
 - Some planets have CO₂ air, which can be turned into methane fuel. NASA plans exactly this for Mars.
 
-A design caution: making fuel freely would destroy the core tension (fixed fuel means careful measurement). So:
-- It is **slow and power-limited**: it costs days, and life support runs down while you wait.
-- There is **a cap** of about +10–20% of your spare fuel per system.
-- It needs **finding ice** with the rover and **an upgrade** from salvage.
-- In Astronomer it is slower still.
+You asked that it **not be very hard**. So:
+- **Finding ice is easy.** The rover's scanner shows ice fields on the map from the start, and there is always one within a day's drive of the landing area.
+- **The processor comes with the ship.** No upgrade is needed; an upgrade only makes it faster.
+- **One load of ice takes a few days to process.** Life support keeps running, which is the only real cost.
+- **There is a cap per system**, so measuring well still matters most.
 
-The result is a real **time-versus-fuel trade-off** instead of free fuel. It is clearly marked ✅ realistic.
+| | SG | Ca | Na | As | Le |
+|---|---|---|---|---|---|
+| Extra launch fuel you can make (share of the mode's spare fuel) | up to +40% | up to +40% | up to +25% | up to +15% | up to +10% |
+| Days per load | 1 | 2 | 3 | 4 | 5 |
+
+The result is a real **time-versus-fuel trade-off**, generous in the easy modes and tight in the hard ones. ✅ realistic.
 
 ---
 
 ## 11. Checkpoints and saving (your comment on 7)
 
-| | Cadet | Navigator | Astronomer |
-|---|---|---|---|
-| Auto-save | ● always | ● always | ● always (save and quit) |
-| Manual checkpoints | ● any time, 3 slots | ● 3 checkpoints per run, at any time | ○ |
-| Rewind after a failed launch | ● once, to the launch planner | ● once, costs a score penalty | ○ one shot |
-| Restart a chapter | ● | ● | ● |
+The rules are in the table in §4.6, and **they are in the game now**:
+- **Manual checkpoints:** three slots in the ☰ menu. Any time in Stargazer and Cadet; 3 saves per run in Navigator; none in Astronomer and Legend.
+- **Rewind:** after a failed flight, the game offers to go back to the launch planner *before* showing the debrief. The debrief shows the true values, so opening it ends the chance to rewind. Unlimited in Stargazer, once and free in Cadet, once for −150 points in Navigator.
+- **Astronomer and Legend are one shot** (you agreed): the game autosaves only so you can quit and continue. A checkpoint before launch would turn "my measurements must be right" into trial and error.
 
-**Counter-argument for Astronomer:** a checkpoint just before launch lets a player try launch after launch until one works. That turns "my measurements must be right" into trial and error, which is exactly what this mode exists to test. So Astronomer saves only to let you quit and continue, not to retry. If you'd like a middle ground: allow one checkpoint, but mark the result "Checkpoint used" and keep it off the ranked board.
+The run's counters (checkpoints used, rewinds used) are never rolled back by loading a checkpoint, and nor is anything you unlocked (Codex entries, achievements, lessons).
 
 ---
 
@@ -419,9 +452,10 @@ It works in every mode and only uses finished runs, so it never gives away anyth
 
 ### 12.2 Real anomalies, in detail (deep dive 3.6)
 These are **real physical effects** that bend measurements in a consistent direction (systematic errors), not random noise. Each one can be noticed and corrected by a careful player. They belong to the harder modes, as you suggested:
-- **Cadet:** corrected automatically, with a note.
+- **Stargazer and Cadet:** corrected automatically, with a note.
 - **Navigator:** occasional, and ECHO points them out in the debrief.
 - **Astronomer:** unannounced.
+- **Legend:** unannounced and more frequent.
 
 | Anomaly | What really happens | How it shows up in the game | How a careful player catches it |
 |---|---|---|---|
@@ -496,12 +530,22 @@ The real risks:
 | **Energy timers** ("wait 4 hours or pay") | Artificial waiting built only to sell | Waiting in Stranded is always **real** (orbits take time) and you can always warp |
 | **Fear of missing out** (items you can only get this weekend, forever) | Pressure and anxiety | Events come back every year, like the real sky. Event rewards stay earnable later |
 | **Streaks that punish** ("you lost your 30-day streak!") | Guilt; people stop entirely once a streak breaks. Duolingo itself adds streak freezes for this reason ([Duolingo](https://blog.duolingo.com/how-duolingo-streak-builds-habit)) | Streaks are optional, with free "cloudy night" freezes and no loss messages |
-| **Guilt notifications** ("ECHO misses you…") | Emotional manipulation, especially through a character players like | Notifications are opt-in and only about **real things in your save** ("Opposition tomorrow") |
-| **Endless play with no stopping point** | Hurts sleep and school | Chapters and acts end at **natural stopping points**, with a summary and "see you next time" |
+| **Pleading notifications** ("ECHO misses you 😢") | You decided reminders in ECHO's voice are fine. The risk is only tone: childish or pleading lines put adults off | Reminders in ECHO's **adult, in-character** voice about real things in your save: *"Opposition in 2 days. The blue planet will be as close as it gets."* Opt-in, at most one a day. Tone guide in [`STORY.md`](STORY.md) §6 |
 | **Fake or misleading progress** | Breaks trust | Scores and meters only ever use real data |
 | **Collecting personal data** | Laws protect children's data (e.g. COPPA in the US for under-13s, the UK Children's Code) | No accounts needed; telemetry is local and opt-in (§12.8); leaderboards use nicknames picked from a list |
 
+**Removed (your decision): "endless play with no stopping point."** Device parental controls handle children's screen time, and many players are adults. Instead of stopping points we design for **long sessions that stay fresh** (§12.9).
+
 **The test for any engagement feature:** *Would we be comfortable explaining exactly how it works to a parent, a teacher and the player?* If not, don't build it.
+
+### 12.9 Long sessions that stay fresh
+You want players to keep playing because it stays interesting, not because of tricks. Boredom in long sessions comes from **sameness** and **waiting**, so:
+1. **Alternate the kind of activity.** Each act mixes careful measuring (focus) with something physical (driving, hopping, flying) and something calm (drawing constellations, reading a journal entry). No act is all one kind.
+2. **Acts end on a hook, not a stop sign.** The end-of-act card is a save point with an open question (*"The blue planet is slowing down…"*) and a **Continue** button that goes straight on. The summary is one tap away for those who want it.
+3. **Waiting is always optional.** While time warps, there is always something useful to do: rover trips to finds and ice, camp hops, constellations, Mira's journal, lessons. Waiting is never forced (deep dive §4).
+4. **Something new every 10–15 minutes.** A new tool, a new place, a discovery (retrograde, the moon, a Halcyon find), or a story beat. Pacing is checked in playtests (§12.8).
+5. **Long-term goals in view.** The Atlas, the calibration profile, chapter progress and Astronomer Challenges are always one tap away.
+6. **Variety across runs.** Chapter twists, alternative methods, random systems and the daily system make the 10th run different from the 1st.
 
 ### 12.8 The measurement plan, in more detail (deep dive 8)
 **Why measure?** Because "players seem to like it" is the same mistake as a measurement without an error bar. We want evidence that a feature makes people **stay** *and* **learn**.
@@ -551,10 +595,10 @@ The real risks:
 5. **Fuel from ice** is realistic but threatens the fixed-fuel tension. Hence the cap and the time cost (§10.3).
 6. **A long campaign** (9 chapters) is a lot of work. Chapters 2, 3 and 5 are the cheapest and most valuable; build them first.
 7. **The prologue landing replaces the current five story cards**, so new players reach the controls in under a minute. The first night sky (deep dive §2) comes right after touchdown.
-8. **The "Short expedition" idea** from the deep dive (some values already known) is **dropped**. Acts with save points and stopping summaries keep sessions short without removing the learning (see below).
+8. **The "Short expedition" idea** from the deep dive (some values already known) is **dropped** (you agreed). Acts with save points let players stop whenever they like, without removing any learning (see below).
 9. **Story writing** needs its own task: a story bible, script and ECHO lines. Want me to draft it next?
 
-**Pacing a first session (you asked to think more about this).** Chapter 1 splits into **five acts**. Each act ends with a save, a summary card of what you learned, and a hook for the next.
+**Pacing a first session (you asked to think more about this).** Chapter 1 splits into **five acts**. Each act ends with a save, a hook for the next act and a **Continue** button; the summary of what you learned is one tap away.
 
 | Act | Contents | Cadet length | Hook at the end |
 |---|---|---|---|
@@ -564,7 +608,7 @@ The real risks:
 | IV · The moon | Moon orbit, mass | ~10 min | "Everything's on the sheet. Ready to plan the flight?" |
 | V · Flight | Plan, launch, transfer, landing | ~15 min | The ending and the Atlas card |
 
-The first session (20–40 min) then naturally ends after Act II or III, at a high point and with an open question.
+Players who need to stop can stop at any act boundary with nothing lost; players who keep going roll straight into the next act. Either way, the act boundary lands on a high point and an open question, which is what brings people back.
 
 ---
 
@@ -572,18 +616,21 @@ The first session (20–40 min) then naturally ends after Act II or III, at a hi
 
 | Order | Work | Size |
 |---|---|---|
-| 1 | Mode descriptions say what to expect, and each mode sets the formula-sheet default ✅ **done with this document** | S |
-| 2 | Mode feature gating (the master table §4), starting with sanity warnings, the mission list and hints | M |
-| 3 | Predictions with the estimate helper + the "Making a good estimate" module (§6) | M |
-| 4 | Readiness meter (from your own error bars) | S |
-| 5 | Prologue: tumble, control returns, entry, descent, site choice, parachute, camp (§9.1) | L |
-| 6 | Acts and checkpoints (§11, §13) | M |
-| 7 | Atlas cards, calibration profile, naming (private) | M |
-| 8 | Story bible and ECHO script (§8) | M (writing) |
-| 9 | Chapters 2, 3 and 5 with their Flight School modules | L each |
-| 10 | Manual flight phases: ascent, corrections with optical navigation, arrival choice, landing (§9.2) | L |
-| 11 | Rover free driving, camp towing, ice-to-fuel (§10) | L |
-| 12 | Free Roam | M |
-| 13 | Chapters 4, 6, 7, 8, 9; Astronomer Challenges; anomalies; competing hypotheses | L |
+| ✅ | Mode descriptions say what to expect; each mode sets the formula-sheet default | S |
+| ✅ | **Five modes** (Stargazer and Legend added) with margins validated by the solver bot | S |
+| ✅ | **Mode rules in the game:** mission list, ECHO coaching, sanity warnings, hints, verify limits, formula lock, survival lock, storm forecast (§4) | M |
+| ✅ | **Checkpoints** (3 slots) and the **rewind** offer before the debrief (§11) | M |
+| ✅ | **Story bible** ([`STORY.md`](STORY.md)); the new opening ship log; ECHO lines on every ending | M |
+| 1 | Predictions with the estimate helper + the "Making a good estimate" module (§6) | M |
+| 2 | Readiness meter in the HUD (from your own error bars; the launch planner already has a version) | S |
+| 3 | Prologue: tumble, control returns, entry, descent, site choice, parachute, camp (§9.1) | L |
+| 4 | Acts with hooks (§12.9, §13) | M |
+| 5 | Atlas cards, calibration profile, naming (private) | M |
+| 6 | Story: full prologue script, Mira's journal entries, Vale's wake-ups ([`STORY.md`](STORY.md) §7) | M (writing) |
+| 7 | Chapters 2, 3 and 5 with their optional Flight School modules | L each |
+| 8 | Manual flight phases: ascent, corrections with optical navigation, arrival choice, landing (§9.2) | L |
+| 9 | Rover free driving, camp towing, the hop tank, ice-to-fuel (§10) | L |
+| 10 | Free Roam | M |
+| 11 | Chapters 4, 6, 7, 8, 9; Astronomer Challenges; anomalies; competing hypotheses | L |
 | Later | Social features, co-op, real-sky events, the connection layer: after we have servers (your decision) | — |
 | Dropped | Earth missions with phone sensors (your decision); "Short expedition" with known values (§13.8) | — |
