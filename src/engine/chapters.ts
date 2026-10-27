@@ -9,21 +9,24 @@ export interface SystemFeatures {
   refraction: number;
   /** The blue planet orbits inside ours (chapter 5). */
   inner: boolean;
+  /** Eccentricity range of the blue planet's orbit (chapter 4); absent = circular. */
+  ellipse?: [number, number];
   /** The real Solar System: Mars to Earth (chapter 9). */
   real?: boolean;
 }
 
 /** Which version of the solve chain a system needs. */
-export type ChainVariant = 'standard' | 'probe' | 'inner';
+export type ChainVariant = 'standard' | 'probe' | 'inner' | 'ellipse';
 
 export const CHAPTER_FEATURES: Record<number, SystemFeatures> = {
   1: { moon: true, refraction: 0, inner: false },
   2: { moon: false, refraction: 0, inner: false },
   3: { moon: true, refraction: 0.55, inner: false },
+  4: { moon: true, refraction: 0, inner: false, ellipse: [0.17, 0.26] },
   5: { moon: true, refraction: 0, inner: true },
   9: { moon: true, refraction: 0, inner: true, real: true },
 };
 
 export const featuresOf = (chapter: number): SystemFeatures => CHAPTER_FEATURES[chapter] ?? CHAPTER_FEATURES[1];
 
-export const variantOf = (f: SystemFeatures): ChainVariant => (f.inner ? 'inner' : !f.moon ? 'probe' : 'standard');
+export const variantOf = (f: SystemFeatures): ChainVariant => (f.inner ? 'inner' : !f.moon ? 'probe' : f.ellipse ? 'ellipse' : 'standard');

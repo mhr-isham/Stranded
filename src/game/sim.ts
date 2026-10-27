@@ -2,6 +2,7 @@
 // tracker's nightly logs, the rover's drive, survival upkeep and the
 // life-support deadline.
 
+import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { moonOffset, targetLongitude } from '../engine/measure';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
@@ -178,9 +179,7 @@ function stepTo(t1Wanted: number, dtReal: number) {
 }
 
 function nearestOpposition(t: number) {
-  const { system: sys } = currentWorld();
-  const k = Math.round((t - sys.firstOpposition) / sys.synodic);
-  return sys.firstOpposition + k * sys.synodic;
+  return nearestOpp(currentWorld().system, t);
 }
 
 /** Mark finished missions and introduce the next one. */

@@ -61,17 +61,21 @@ export function Flight() {
           }
           const cx = w / 2;
           const cy = h / 2;
-          const S = (Math.min(w, h) * 0.42) / (sys.target.a * 1.15);
+          const S = (Math.min(w, h) * 0.42) / (Math.max(sys.home.a, sys.target.a * (1 + (sys.target.e ?? 0))) * 1.15);
           const X = (v: Vec3) => cx + v[0] * S;
           const Y = (v: Vec3) => cy - v[1] * S;
-          for (const [a, c] of [
-            [sys.home.a, 'rgba(255,190,120,0.3)'],
-            [sys.target.a, 'rgba(108,196,255,0.3)'],
+          for (const [pl, c] of [
+            [sys.home, 'rgba(255,190,120,0.3)'],
+            [sys.target, 'rgba(108,196,255,0.3)'],
           ] as const) {
             ctx.strokeStyle = c;
             ctx.lineWidth = dpr;
             ctx.beginPath();
-            ctx.arc(cx, cy, a * S, 0, Math.PI * 2);
+            for (let i = 0; i <= 120; i++) {
+              const v = planetPos(pl, (pl.period * i) / 120);
+              if (i) ctx.lineTo(X(v), Y(v));
+              else ctx.moveTo(X(v), Y(v));
+            }
             ctx.stroke();
           }
           const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 30 * dpr);

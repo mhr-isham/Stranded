@@ -2,13 +2,13 @@
 // other quantity follows from them, and how errors propagate along the way.
 
 import { DAY, G } from './constants';
-import { oppositions, planetPos } from './ephemeris';
+import { keplerState, meanLonForTrue, nearestOpposition, orbitAngle, planetPos } from './ephemeris';
 import { surfaceGravity } from './measure';
 import type { StarSystem } from './types';
 import { norm, sub } from './vec';
 
 /** Every primary any chapter uses. Each chain variant measures a subset (keysFor). */
-export const PRIMARY_KEYS = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'vInf', 'vPeak', 'rPeri'] as const;
+export const PRIMARY_KEYS = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'vInf', 'vPeak', 'rPeri', 'Porb', 'ecc', 'wPeri'] as const;
 export const DERIVED_KEYS = ['M1', 'P2', 'ratio', 'a1', 'a2', 'Mstar', 'R2', 'aM', 'M2'] as const;
 export type PrimaryKey = (typeof PRIMARY_KEYS)[number];
 export type DerivedKey = (typeof DERIVED_KEYS)[number];
@@ -29,7 +29,11 @@ import type { ChainVariant } from './chapters';
 const STANDARD_KEYS: PrimaryKey[] = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm'];
 /** The primaries a launch needs in each version of the chain. */
 export const keysFor = (variant: ChainVariant = 'standard'): PrimaryKey[] =>
-  variant === 'probe' ? ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'vInf', 'vPeak', 'rPeri'] : STANDARD_KEYS;
+  variant === 'probe'
+    ? ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'vInf', 'vPeak', 'rPeri']
+    : variant === 'ellipse'
+      ? ['R1', 'g', 'P1', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'Porb', 'ecc', 'wPeri']
+      : STANDARD_KEYS;
 
 type V = Record<PrimaryKey, number>;
 type At = Partial<Record<PrimaryKey, number>>;
@@ -53,20 +57,37 @@ const distFactorFor = (inner: boolean) => (v: V, t: number) => {
   return Math.sqrt(1 + r * r - 2 * r * Math.cos(psi));
 };
 
-const ORBIT: PrimaryKey[] = ['P1', 'S2', 'tOpp', 'dPar'];
+/**
+ * Chapter 4: the blue planet on an ellipse (period Porb, eccentricity ecc,
+ * perihelion direction wPeri measured from the opposition direction). Positions
+ * in units of a1, with our planet at angle 0 at the opposition tOpp.
+ */
+export function ellipsePositions(v: { P1: number; Porb: number; ecc: number; wPeri: number; tOpp: number }, t: number) {
+  const L1 = (2 * Math.PI * (t - v.tOpp)) / v.P1;
+  const ratio = (v.Porb / v.P1) ** (2 / 3);
+  const m0 = meanLonForTrue(v.ecc, v.wPeri, 0);
+  const [r2] = keplerState(ratio, v.Porb, v.ecc, v.wPeri, m0 + (2 * Math.PI * (t - v.tOpp)) / v.Porb);
+  return { home: [Math.cos(L1), Math.sin(L1), 0] as [number, number, number], target: r2 };
+}
+const ellipseDist = (v: V, t: number) => norm(sub(ellipsePositions(v, t).target, ellipsePositions(v, t).home));
+
+const ORBIT_C: PrimaryKey[] = ['P1', 'S2', 'tOpp', 'dPar'];
+const ORBIT_E: PrimaryKey[] = ['P1', 'Porb', 'ecc', 'wPeri', 'tOpp', 'dPar'];
 
 function buildDerived(variant: ChainVariant): Partial<Record<DerivedKey, DerivedDef>> {
   const inner = variant === 'inner';
-  const P2of = P2for(inner);
-  const ratioOf = ratioFor(inner);
-  const distFactor = distFactorFor(inner);
+  const ell = variant === 'ellipse';
+  const P2of = ell ? (v: V) => v.Porb : P2for(inner);
+  const ratioOf = ell ? (v: V) => (v.Porb / v.P1) ** (2 / 3) : ratioFor(inner);
+  const distFactor = ell ? ellipseDist : distFactorFor(inner);
+  const ORBIT = ell ? ORBIT_E : ORBIT_C;
   const a1of = (v: V, at: At) => v.dPar / distFactor(v, at.dPar ?? v.tOpp);
   const distAt = (v: V, at: At, t: number) => a1of(v, at) * distFactor(v, t);
   const aMof = (v: V, at: At) => distAt(v, at, at.thetaM ?? v.tOpp) * Math.tan(v.thetaM);
   const base: Partial<Record<DerivedKey, DerivedDef>> = {
     M1: { inputs: ['g', 'R1'], f: (v) => (v.g * v.R1 ** 2) / G },
-    P2: { inputs: ['P1', 'S2'], f: P2of },
-    ratio: { inputs: ['P1', 'S2'], f: ratioOf },
+    P2: { inputs: ell ? ['Porb'] : ['P1', 'S2'], f: P2of },
+    ratio: { inputs: ell ? ['P1', 'Porb'] : ['P1', 'S2'], f: ratioOf },
     a1: { inputs: ORBIT, f: a1of },
     a2: { inputs: ORBIT, f: (v, at) => ratioOf(v) * a1of(v, at) },
     Mstar: { inputs: ORBIT, f: (v, at) => (4 * Math.PI ** 2 * a1of(v, at) ** 3) / (G * v.P1 ** 2) },
@@ -106,6 +127,7 @@ export const EDGES: Record<DerivedKey, QuantityKey[]> = {
 };
 
 export function edgesFor(variant: ChainVariant = 'standard'): Partial<Record<DerivedKey, QuantityKey[]>> {
+  if (variant === 'ellipse') return { ...EDGES, P2: ['Porb'], a1: ['dPar', 'ratio', 'tOpp', 'ecc', 'wPeri'] };
   if (variant !== 'probe') return EDGES;
   const { aM: _aM, ...rest } = EDGES;
   return { ...rest, M2: ['vInf', 'vPeak', 'rPeri'] };
@@ -144,10 +166,12 @@ export function deriveAll(p: Primaries, variant: ChainVariant = 'standard'): Par
 export function truthValues(sys: StarSystem, p: Primaries = {}, extra: Partial<Record<QuantityKey, number>> = {}): Record<QuantityKey, number> {
   let tOpp = sys.firstOpposition;
   const guess = p.tOpp?.value;
-  if (guess !== undefined) {
-    const near = oppositions(sys, guess - sys.synodic, guess + sys.synodic);
-    tOpp = near.reduce((best, t) => (Math.abs(t - guess) < Math.abs(best - guess) ? t : best), near[0] ?? tOpp);
-  }
+  if (guess !== undefined) tOpp = nearestOpposition(sys, guess);
+  // Perihelion direction measured from our planet's direction at that opposition,
+  // on the branch nearest the player's own value.
+  let wPeri = (sys.target.peri ?? 0) - orbitAngle(sys.home, tOpp);
+  const wRef = p.wPeri?.value ?? 0;
+  wPeri = wRef + Math.atan2(Math.sin(wPeri - wRef), Math.cos(wPeri - wRef));
   const dist = (t: number) => norm(sub(planetPos(sys.target, t), planetPos(sys.home, t)));
   const dAt = (k: PrimaryKey) => dist(p[k]?.at ?? tOpp);
   return {
@@ -173,6 +197,9 @@ export function truthValues(sys: StarSystem, p: Primaries = {}, extra: Partial<R
     vInf: NaN,
     vPeak: NaN,
     rPeri: NaN,
+    Porb: sys.target.period,
+    ecc: sys.target.e ?? 0,
+    wPeri,
     ...extra,
   };
 }
@@ -199,6 +226,9 @@ export const QUANTITY_INFO: Record<QuantityKey, { label: string; symbol: string;
   vInf: { label: 'Probe speed far from the planet', symbol: 'v∞', unit: 'km/s', scale: 1e3, digits: 3 },
   vPeak: { label: 'Probe speed at closest approach', symbol: 'vₚ', unit: 'km/s', scale: 1e3, digits: 3 },
   rPeri: { label: 'Probe closest approach (from centre)', symbol: 'rₚ', unit: 'km', scale: 1e3, digits: 0 },
+  Porb: { label: 'Blue planet year (orbit fit)', symbol: 'P₂', unit: 'days', scale: DAY, digits: 2 },
+  ecc: { label: 'Orbit eccentricity', symbol: 'e', unit: '', scale: 1, digits: 3 },
+  wPeri: { label: 'Perihelion direction (from opposition)', symbol: 'ϖ', unit: '°', scale: Math.PI / 180, digits: 1 },
 };
 
 /** Labels that change with the chain variant (an inner planet has transits, not oppositions). */

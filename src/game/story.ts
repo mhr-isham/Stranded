@@ -146,6 +146,37 @@ export const LOGS: Record<string, StoryLog> = {
     kind: 'journal',
     lines: [{ who: 'mira', text: 'The air lies about the horizon. Twice I got a planet twice its real size. Use the sun instead — a stick, a shadow, a long walk north. Eratosthenes would laugh at me.' }],
   },
+  brief4: {
+    title: 'The Long Ellipse',
+    chapter: 4,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Commander Vale’s pod is losing pressure faster than I can patch it. I have woken Dr Okoye.' },
+      { who: 'note', text: 'Ada Okoye, the medic, climbs out of her pod stiff and frost-browed, and goes straight to Vale’s.' },
+      { who: 'echo', text: 'Ada? She’ll hold. I can buy her time, not forever. How long have we got?' },
+      { who: 'echo', text: 'That depends on the planet, Doctor. The Halcyon beacon sits on a world whose orbit is not a circle. Its oppositions will come unevenly, and a transfer aimed at a circle will miss it.' },
+      { who: 'note', text: 'Optional: the Flight School module “Kepler’s laws: ellipses” is in the Codex.' },
+    ],
+  },
+  cache4: {
+    title: 'The star map',
+    chapter: 4,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Orbit confirmed. The cache is a recorder and a star chart, scratched onto a metal plate.' },
+      { who: 'echo', text: 'The chart is good — but a few nearby stars are slightly out of place. Stars drift across the sky, very slowly. From how far they have moved, that chart is about forty years old.' },
+      { who: 'note', text: 'Ada comes back from Vale’s pod: “Stable. For now.” She looks at the plate for a long time before she says anything else.' },
+    ],
+  },
+  mira4e: {
+    title: 'Halcyon journal · Day 388',
+    chapter: 4,
+    kind: 'journal',
+    lines: [
+      { who: 'mira', text: 'Lost Okafor today. The orbit was an ellipse and I fitted a circle, and the window I promised him came too late.' },
+      { who: 'mira', text: 'Kepler took six years to give up the circle. I don’t have six years. Nobody out here does. Check the shape before you trust the size.' },
+    ],
+  },
   brief5: {
     title: 'Inward',
     chapter: 5,

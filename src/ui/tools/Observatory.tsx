@@ -27,15 +27,17 @@ import { currentMode, useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
+import { OrbitPanel } from './OrbitPanel';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
-type Tab = 'sky' | 'year' | 'track' | 'transit' | 'micro' | 'moon';
+type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'sky', label: 'Sky' },
   { id: 'year', label: 'Year' },
   { id: 'track', label: 'Tracker' },
   { id: 'transit', label: 'Transit' },
+  { id: 'orbit', label: 'Orbit' },
   { id: 'micro', label: 'Micrometer' },
   { id: 'moon', label: 'Moon' },
 ];
@@ -408,7 +410,7 @@ export function Observatory() {
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
-            {TABS.filter((tb) => tb.id !== 'transit' || sys.features.inner).map((tb) => (
+            {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e)).map((tb) => (
               <button
                 key={tb.id}
                 data-tut={`obs-tab-${tb.id}`}
@@ -513,6 +515,7 @@ export function Observatory() {
           </div>
         )}
 
+        {tab === 'orbit' && <OrbitPanel />}
         {tab === 'moon' && <MoonPanel />}
       </div>
     </div>

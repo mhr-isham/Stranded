@@ -24,6 +24,9 @@ export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; to
   vInf: { what: 'The probe’s speed relative to the blue planet while still far away, before it starts to fall in.', tool: 'probe', toolName: 'the probe tracker' },
   vPeak: { what: 'The probe’s speed at closest approach — the fastest it goes, having fallen into the planet’s gravity.', tool: 'probe', toolName: 'the probe tracker' },
   rPeri: { what: 'How close the probe passed: its distance from the planet’s centre at closest approach.', tool: 'probe', toolName: 'the probe tracker' },
+  Porb: { what: 'How long the blue planet takes to go once round its ellipse, from fitting Kepler’s laws to its path across our sky.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
+  ecc: { what: 'How stretched the blue planet’s orbit is: 0 is a circle; the closest and farthest points are a(1 − e) and a(1 + e) from the star.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
+  wPeri: { what: 'Which way the orbit’s closest point (perihelion) lies, measured from the direction of the blue planet at opposition.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
 };
 
 export const HINTS: Record<QuantityKey, string[]> = {
@@ -48,6 +51,9 @@ export const HINTS: Record<QuantityKey, string[]> = {
   vInf: ['How fast is the probe going before the planet pulls on it?', 'Read the flat part of the Doppler curve, far from closest approach.', 'Average the speed over the first and last hours of the chart.'],
   vPeak: ['Things speed up as they fall.', 'Read the top of the Doppler curve — the moment of closest approach.', 'Zoom into the peak; its height is vₚ.'],
   rPeri: ['How close did it pass?', 'The probe’s radar altimeter reports its height above the cloud tops at closest approach; add the planet’s radius.', 'rₚ = R₂ + altitude.'],
+  Porb: ['The planet repeats its path once per orbit.', 'Log the blue planet’s position on as many nights as you can, over most of an orbit.', 'Then run the orbit fit in the observatory and send P₂ to the sheet.'],
+  ecc: ['An oval orbit makes the planet speed up near the star and slow down far from it.', 'The orbit fit finds the ellipse that matches every night’s position.', 'More nights, spread over more of the orbit, give a tighter e.'],
+  wPeri: ['Where on its orbit is the planet closest to the star?', 'The orbit fit draws the ellipse; its closest point is the perihelion.', 'Send ϖ from the orbit fit.'],
 };
 
 /** Node text for a chain variant: an inner planet has transits; chapter 2 weighs the planet with a probe. */

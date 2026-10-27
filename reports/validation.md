@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-27T07:26:00.524Z with 40 systems per difficulty.
+Generated 2026-10-27T07:42:50.038Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
@@ -20,6 +20,9 @@ approximations (e.g. measuring near, not exactly at, opposition; topocentric off
 | Probe speed far from the planet (v∞) | NaN% |
 | Probe speed at closest approach (vₚ) | NaN% |
 | Probe closest approach (from centre) (rₚ) | NaN% |
+| Blue planet year (orbit fit) (P₂) | NaN% |
+| Orbit eccentricity (e) | NaN% |
+| Perihelion direction (from opposition) (ϖ) | NaN% |
 | Home planet mass (M₁) | 0.061% |
 | Blue planet year (P₂) | 0.016% |
 | Orbit ratio a₂/a₁ (a₂/a₁) | 0.006% |
@@ -50,6 +53,9 @@ Outcomes: success 40/40. Median fuel left: 27.328% of budget.
 | v∞ | NaN% | NaN% | NaN% |
 | vₚ | NaN% | NaN% | NaN% |
 | rₚ | NaN% | NaN% | NaN% |
+| P₂ | NaN% | NaN% | NaN% |
+| e | NaN% | NaN% | NaN% |
+| ϖ | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -78,6 +84,9 @@ Outcomes: success 40/40. Median fuel left: 17.040% of budget.
 | v∞ | NaN% | NaN% | NaN% |
 | vₚ | NaN% | NaN% | NaN% |
 | rₚ | NaN% | NaN% | NaN% |
+| P₂ | NaN% | NaN% | NaN% |
+| e | NaN% | NaN% | NaN% |
+| ϖ | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -106,6 +115,9 @@ Outcomes: success 38/40, flyby 2/40. Median fuel left: 9.686% of budget.
 | v∞ | NaN% | NaN% | NaN% |
 | vₚ | NaN% | NaN% | NaN% |
 | rₚ | NaN% | NaN% | NaN% |
+| P₂ | NaN% | NaN% | NaN% |
+| e | NaN% | NaN% | NaN% |
+| ϖ | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -134,6 +146,9 @@ Outcomes: success 33/40, flyby 7/40. Median fuel left: 4.870% of budget.
 | v∞ | NaN% | NaN% | NaN% |
 | vₚ | NaN% | NaN% | NaN% |
 | rₚ | NaN% | NaN% | NaN% |
+| P₂ | NaN% | NaN% | NaN% |
+| e | NaN% | NaN% | NaN% |
+| ϖ | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -162,6 +177,9 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | v∞ | NaN% | NaN% | NaN% |
 | vₚ | NaN% | NaN% | NaN% |
 | rₚ | NaN% | NaN% | NaN% |
+| P₂ | NaN% | NaN% | NaN% |
+| e | NaN% | NaN% | NaN% |
+| ϖ | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -179,6 +197,7 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | 1 | success 38/40, flyby 2/40 | 9.686% |
 | 2 | success 40/40 | 10.216% |
 | 3 | success 37/40, flyby 3/40 | 9.946% |
+| 4 | success 36/40, flyby 4/40 | 9.912% |
 | 5 | success 38/40, flyby 2/40 | 9.649% |
 | 9 | success 39/40, flyby 1/40 | 13.949% |
 

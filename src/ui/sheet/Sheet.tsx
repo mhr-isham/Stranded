@@ -27,6 +27,10 @@ const POS: Record<QuantityKey | 'launch', [number, number]> = {
   vInf: [0, 7.9],
   vPeak: [0, 8.9],
   rPeri: [1.2, 9.2],
+  // Chapter 4 fits the blue planet's ellipse instead of timing a synodic period.
+  Porb: [0, 3.7],
+  ecc: [0.9, 4.1],
+  wPeri: [1.5, 4.7],
   M1: [1.3, 1],
   P2: [1.1, 3.2],
   ratio: [2.1, 3.6],

@@ -9,6 +9,8 @@ import { captureCost, departCost, hohmannTof, hohmannVInfArrive, hohmannVInfDepa
 import type { Rng } from './rng';
 import type { StarSystem } from './types';
 import { dot, norm, sub, type Vec3 } from './vec';
+import { keplerState, meanLonForTrue } from './ephemeris';
+import { cheapestAt, costMinima } from './windows';
 
 /** The player's picture of the system, built from the progress sheet. */
 export interface PlayerModel {
@@ -25,6 +27,9 @@ export interface PlayerModel {
   R2: number;
   /** The target orbits inside ours. */
   inner: boolean;
+  /** Chapter 4: the target's eccentricity and perihelion direction (model frame: our planet at angle 0 at tOpp). */
+  ecc?: number;
+  peri?: number;
 }
 
 export const LAUNCH_KEYS: PrimaryKey[] = keysFor('standard');
@@ -35,7 +40,8 @@ export function modelFromPrimaries(p: Primaries, variant: ChainVariant = 'standa
   return {
     P1: p.P1!.value,
     P2: d.P2.value,
-    S2: p.S2!.value,
+    // An ellipse has no fixed synodic period; use the mean one.
+    S2: p.S2?.value ?? 1 / Math.abs(1 / p.P1!.value - 1 / d.P2.value),
     a1: d.a1.value,
     a2: d.a2.value,
     Mstar: d.Mstar.value,
@@ -45,7 +51,15 @@ export function modelFromPrimaries(p: Primaries, variant: ChainVariant = 'standa
     M2: d.M2.value,
     R2: d.R2.value,
     inner: variant === 'inner',
+    ...(variant === 'ellipse' && p.ecc && p.wPeri ? { ecc: p.ecc.value, peri: p.wPeri.value } : {}),
   };
+}
+
+/** The target's position and velocity in the player's model (an ellipse when the model has one). */
+export function targetState(m: PlayerModel, t: number): [Vec3, Vec3] {
+  if (!m.ecc) return [posAt(m.a2, m.P2, m, t), velAt(m.a2, m.P2, m, t)];
+  const m0 = meanLonForTrue(m.ecc, m.peri ?? 0, 0);
+  return keplerState(m.a2, m.P2, m.ecc, m.peri ?? 0, m0 + (TAU * (t - m.tOpp)) / m.P2);
 }
 
 export const posAt = (a: number, P: number, m: PlayerModel, t: number): Vec3 => {
@@ -72,8 +86,7 @@ export function planTransfer(m: PlayerModel, departTime: number, tof: number): P
   const mu = G * m.Mstar;
   const r1 = posAt(m.a1, m.P1, m, departTime);
   const v1 = velAt(m.a1, m.P1, m, departTime);
-  const r2 = posAt(m.a2, m.P2, m, departTime + tof);
-  const v2 = velAt(m.a2, m.P2, m, departTime + tof);
+  const [r2, v2] = targetState(m, departTime + tof);
   const sol = lambert(r1, r2, tof, mu);
   if (!sol) return null;
   const vInf = sub(sol[0], v1);
@@ -109,8 +122,29 @@ export function hohmannFor(m: PlayerModel) {
   };
 }
 
+const ellipseCache = new Map<string, number[]>();
+
+/**
+ * Uneven windows: the dips of the transfer cost in the player's own ellipse.
+ * Searched once per model over the whole expedition (it is the slow part), then cached.
+ */
+function ellipseWindows(m: PlayerModel): number[] {
+  const key = [m.P1, m.P2, m.a1, m.a2, m.Mstar, m.tOpp, m.M1, m.R1, m.M2, m.R2, m.ecc, m.peri].join(',');
+  let w = ellipseCache.get(key);
+  if (w) return w;
+  const tof = hohmannFor(m).tof;
+  const H = { pos: (t: number) => posAt(m.a1, m.P1, m, t), vel: (t: number) => velAt(m.a1, m.P1, m, t) };
+  const T = { pos: (t: number) => targetState(m, t)[0], vel: (t: number) => targetState(m, t)[1] };
+  const cost = (t: number) => cheapestAt(H, T, G * m.Mstar, m.M1, m.R1, m.M2, 1.3 * m.R2, t, 0.55 * tof, 1.5 * tof).cost;
+  w = costMinima(cost, Math.max(0, m.tOpp - 2 * m.S2), m.tOpp + 4 * m.S2, m.S2 / 40);
+  if (ellipseCache.size > 200) ellipseCache.clear();
+  ellipseCache.set(key, w);
+  return w;
+}
+
 /** Hohmann windows predicted by the player's model between t0 and t1. */
 export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
+  if (m.ecc) return ellipseWindows(m).filter((t) => t >= t0 && t <= t1);
   const { lead } = hohmannFor(m);
   const out: number[] = [];
   // Outer target: the lead shrinks with time; inner target: it grows.
@@ -161,7 +195,9 @@ export function systemFromModel(m: PlayerModel, template: StarSystem): StarSyste
     ...template,
     star: { ...template.star, mass: m.Mstar },
     home: { ...template.home, a: m.a1, period: m.P1, phase0: phaseHome, mass: m.M1, radius: m.R1 },
-    target: { a: m.a2, period: m.P2, phase0: -(TAU * m.tOpp) / m.P2, mass: m.M2, radius: m.R2 },
+    target: m.ecc
+      ? { a: m.a2, period: m.P2, phase0: meanLonForTrue(m.ecc, m.peri ?? 0, 0) - (TAU * m.tOpp) / m.P2, mass: m.M2, radius: m.R2, e: m.ecc, peri: m.peri ?? 0 }
+      : { a: m.a2, period: m.P2, phase0: -(TAU * m.tOpp) / m.P2, mass: m.M2, radius: m.R2 },
     parkingRadius: 1.3 * m.R2,
   };
 }

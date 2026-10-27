@@ -5,7 +5,13 @@
 
 import { ARCSEC, DAY, DEG, HOUR } from './constants';
 import type { Estimate, Primaries } from './chain';
-import { oppositions } from './ephemeris';
+import { leadAngle, oppositions } from './ephemeris';
+import { fitOrbit, type OrbitObs } from './orbitfit';
+
+const leadAngleSigned = (sys: StarSystem, t: number) => {
+  const d = leadAngle(sys, t);
+  return d > Math.PI ? d - 2 * Math.PI : d;
+};
 import { simulateLaunch, type LaunchResult } from './launch';
 import {
   horizonDip,
@@ -14,6 +20,7 @@ import {
   pendulumPeriod,
   siteEastOf,
   starLongitude,
+  targetLongitude,
   surfaceGravity,
   targetAngularDiameter,
 } from './measure';
@@ -192,6 +199,23 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
     p.rPeri = summarize(Array.from({ length: n }, () => fb.rPeri * (1 + rng.normal(0, skill.dopplerRel * 0.75))));
     delete p.thetaM;
     delete p.Pm;
+  }
+
+  // Chapter 4: the blue planet's ellipse, fitted to its nightly positions (Kepler's method).
+  if (sys.target.e) {
+    const res = 0.01 * DEG;
+    const obs: OrbitObs[] = [];
+    for (let d = 3 * DAY; d < o2 + 20 * DAY; d += 3 * DAY) {
+      if (Math.abs(leadAngleSigned(sys, d)) > 2.4) continue; // lost near conjunction
+      const lon = targetLongitude(sys, d, sys.site) + rng.normal(0, skill.lonReading * 0.3);
+      obs.push({ t: d, lon: Math.round(lon / res) * res });
+    }
+    const fit = fitOrbit(obs, p.P1.value, p.tOpp.value, (1 / (1 / p.P1.value - 1 / p.S2.value)));
+    if (fit) {
+      p.Porb = { value: fit.P2, sigma: fit.sigmaP2 };
+      p.ecc = { value: fit.e, sigma: fit.sigmaE };
+      p.wPeri = { value: fit.wPeri, sigma: fit.sigmaW };
+    }
   }
 
   return { primaries: p, readyAt: o2 + 5 * DAY };

@@ -55,12 +55,12 @@ export const CHAPTERS: ChapterSpec[] = [
   {
     n: 4,
     title: 'The Long Ellipse',
-    idea: 'Elliptical orbits: Kepler’s first and second laws.',
-    twist: 'The target’s orbit is clearly oval — oppositions are uneven.',
-    lessons: [],
-    briefing: null,
-    successLogs: [],
-    ready: false,
+    idea: 'Elliptical orbits: Kepler’s first and second laws, and Kepler’s own method for finding an orbit.',
+    twist: 'The target’s orbit is clearly oval — oppositions are uneven, and a circle will miss it.',
+    lessons: ['ellipse'],
+    briefing: 'brief4',
+    successLogs: ['cache4', 'mira4e'],
+    ready: true,
   },
   {
     n: 5,

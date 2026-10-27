@@ -215,10 +215,35 @@ const CH5: Mission[] = [
   byId('plan'),
 ];
 
+/** Chapter 4: an oval orbit — uneven oppositions, and Kepler's method to find the ellipse. */
+const CH4: Mission[] = [
+  ...['gravity', 'radius', 'mass', 'identify', 'year', 'track', 'opposition', 'parallax', 'disk', 'moon'].map(byId),
+  {
+    id: 'uneven',
+    title: 'Uneven seasons',
+    short: 'Mark a second opposition.',
+    goal: 'Keep the tracker running and mark the next opposition too. Compare the gap with what a circular orbit would give.',
+    why: 'On an ellipse the planet moves faster near the star, so the gaps between oppositions change from one to the next.',
+    screen: 'observatory',
+    done: (s) => s.oppPicks.length >= 2,
+  },
+  {
+    id: 'ellipse',
+    title: 'Kepler’s method',
+    short: 'Fit the blue planet’s ellipse.',
+    goal: 'In the observatory’s Orbit tab, fit an ellipse to the tracker’s nightly positions and send P₂, e and ϖ to the sheet.',
+    why: 'To meet the planet you must know where it will be on its ellipse when you arrive — not where a circle says it would be.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.Porb && !!s.sheet.ecc && !!s.sheet.wPeri,
+  },
+  byId('plan'),
+];
+
 /** The missions of the current chapter. */
 export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 2) return CH2;
   if (s.chapter === 3) return CH3;
+  if (s.chapter === 4) return CH4;
   if (s.chapter === 5) return CH5;
   return MISSIONS;
 }

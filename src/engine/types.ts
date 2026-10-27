@@ -15,9 +15,13 @@ export interface Star {
 export interface Planet {
   a: number; // orbit radius (m)
   period: number; // orbital period (s)
-  phase0: number; // heliocentric longitude at t = 0 (rad)
+  phase0: number; // mean heliocentric longitude at t = 0 (rad); the true longitude for a circular orbit
   mass: number;
   radius: number;
+  /** Eccentricity (chapter 4); absent or 0 = circular, `a` is then the radius. */
+  e?: number;
+  /** Longitude of perihelion (rad), for an eccentric orbit. */
+  peri?: number;
 }
 
 export interface HomePlanet extends Planet {

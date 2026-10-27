@@ -100,6 +100,23 @@ export function actsFor(chapter: number): Act[] {
           }
         : a,
     );
+  if (chapter === 4)
+    return ACTS.map((a) =>
+      a.n === 4
+        ? {
+            ...a,
+            name: 'The ellipse',
+            missions: ['moon', 'uneven', 'ellipse'],
+            learned: [
+              'Kepler’s first law: planets move on ellipses with the star at one focus.',
+              'Kepler’s second law: a planet sweeps equal areas in equal times — fast near the star, slow far away — so oppositions come unevenly.',
+              'Directions alone, seen from our known orbit, pin down the ellipse: Kepler’s method.',
+            ],
+          }
+        : a.n === 5
+          ? { ...a, learned: ['On an ellipse, launch windows come unevenly too: the planner searches the real cost, date by date.'] }
+          : a,
+    );
   if (chapter === 5)
     return ACTS.map((a) =>
       a.n === 3

@@ -55,6 +55,9 @@ export const TOOL_OF: Record<PrimaryKey, string> = {
   vInf: 'Probe (Doppler)',
   vPeak: 'Probe (Doppler)',
   rPeri: 'Probe (altimeter)',
+  Porb: 'Orbit fit',
+  ecc: 'Orbit fit',
+  wPeri: 'Orbit fit',
 };
 
 export interface Calibration {

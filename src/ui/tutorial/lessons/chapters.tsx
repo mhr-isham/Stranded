@@ -256,3 +256,93 @@ export function InnerLesson() {
   );
 }
 
+
+/** Chapter 4: Kepler's first and second laws on an ellipse. */
+export function EllipseLesson() {
+  const [e, setE] = useState(0.4);
+  const [phase, setPhase] = useState(0.15);
+  const a = 120;
+  const b = a * Math.sqrt(1 - e * e);
+  const cx = 200;
+  const cy = 150;
+  // Star at the right-hand focus; perihelion on the right.
+  const fx = cx + a * e;
+  const pos = (f: number) => {
+    const M = 2 * Math.PI * f;
+    let E = M;
+    for (let i = 0; i < 30; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    return [cx + a * Math.cos(E), cy - b * Math.sin(E)];
+  };
+  // Two wedges swept in the same time: one where the planet is now, one half an orbit later.
+  const wedge = (f0: number) => {
+    const pts = Array.from({ length: 13 }, (_, i) => pos(f0 + (0.08 * i) / 12));
+    return `M${fx},${cy} ` + pts.map((p) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z';
+  };
+  const p = pos(phase);
+  const r = Math.hypot(p[0] - fx, p[1] - cy) / a;
+  const speed = Math.sqrt(2 / r - 1); // vis-viva, in units of the circular speed at a
+  return (
+    <LessonShell
+      kicker="Chapter 4 · The Long Ellipse"
+      title="Kepler’s laws: ellipses and equal areas"
+      demo={
+        <Demo h={360}>
+          <svg viewBox="0 0 600 300" style={{ width: '100%' }}>
+            <ellipse cx={cx} cy={cy} rx={a} ry={b} fill="none" stroke="rgba(108,196,255,0.45)" />
+            <path d={wedge(phase)} fill="rgba(108,196,255,0.25)" stroke="rgba(108,196,255,0.6)" />
+            <path d={wedge(phase + 0.5)} fill="rgba(255,196,107,0.22)" stroke="rgba(255,196,107,0.6)" />
+            <circle cx={fx} cy={cy} r={9} fill="#ffd36b" />
+            <circle cx={cx - a * e} cy={cy} r={2.5} fill="#5d6a88" />
+            <text x={cx - a * e} y={cy + 16} fill="#5d6a88" fontSize={10} textAnchor="middle">
+              empty focus
+            </text>
+            <circle cx={p[0]} cy={p[1]} r={6} fill="#6cc4ff" />
+            <text x={cx + a + 6} y={cy - 6} fill="#93a2c3" fontSize={10}>
+              perihelion
+            </text>
+            <text x={cx - a - 6} y={cy - 6} fill="#93a2c3" fontSize={10} textAnchor="end">
+              aphelion
+            </text>
+            <text x={430} y={70} fill="#93a2c3" fontSize={12}>
+              Same time, same area:
+            </text>
+            <text x={430} y={90} fill="#6cc4ff" fontSize={12}>
+              blue wedge = gold wedge
+            </text>
+            <text x={430} y={130} fill="#93a2c3" fontSize={12}>
+              distance r = {fmtN(r, 2)} a
+            </text>
+            <text x={430} y={150} fill={speed > 1 ? '#5be3a4' : '#ffc46b'} fontSize={12}>
+              speed = {fmtN(speed, 2)} × average
+            </text>
+            <text x={430} y={190} fill="#93a2c3" fontSize={11}>
+              closest {fmtN(1 - e, 2)} a · farthest {fmtN(1 + e, 2)} a
+            </text>
+          </svg>
+          <Slider label="Eccentricity e" value={e} min={0} max={0.8} step={0.01} onChange={setE} fmt={(v) => fmtN(v, 2)} />
+          <Slider label="Where the planet is (fraction of its year)" value={phase} min={0} max={1} step={0.005} onChange={setPhase} fmt={(v) => fmtN(v, 3)} />
+          <Note>Both wedges are swept in the same time. Near the star the wedge is short and wide; far away it is long and thin — the areas match.</Note>
+        </Demo>
+      }
+      formula={
+        <>
+          r = a(1 − e²) / (1 + e cos θ),   v² = GM(2/r − 1/a)
+          <br />
+          P² = 4π²a³/(GM) — the period depends only on a, not on e
+        </>
+      }
+      keyIdea="Planets move on ellipses with the star at one focus (first law), sweeping equal areas in equal times (second law): fast near the star, slow far away. So oppositions come unevenly, the planet’s distance at opposition changes, and a transfer aimed at the circle you assumed will miss."
+      tip="Log the blue planet every clear night for most of its orbit. In the Orbit tab, the fit finds the one ellipse that matches every sight line — Kepler’s own method — and gives P₂, e and the direction of perihelion ϖ."
+      warn="The period still follows Kepler’s third law with a = the semi-major axis (half the long axis), so P₂ still gives a₂. What changes is where on the ellipse the planet is, and how fast it moves there."
+    >
+      <P>
+        Kepler spent six years on Tycho Brahe’s observations of Mars. A circle missed them by 8 arcminutes — small, but Tycho never erred that much. So
+        Kepler threw out the circle, and found the ellipse.
+      </P>
+      <P>
+        His trick: Mars returns to the same point of its orbit every 687 days, while Earth is somewhere else each time. Two sight lines to the same
+        point from two known places fix where that point is. Do that again and again, and the orbit draws itself.
+      </P>
+    </LessonShell>
+  );
+}

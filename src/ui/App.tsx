@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { clock } from '../game/clock';
-import { advance, currentWorld } from '../game/sim';
+import { advance, currentWorld, fastForward } from '../game/sim';
 import { botMeasure, COMPETENT } from '../engine/solver';
 import { makeRng } from '../engine/rng';
 import { startAmbient } from '../game/audio';
@@ -22,6 +22,7 @@ if (import.meta.env.DEV) {
     __game: useGame,
     __clock: clock,
     __tut: { tutorial: () => import('../game/tutorial'), steps: () => import('./tutorial/steps') },
+    __ff: (t: number) => fastForward(t),
     __botFill: () => {
       const { system } = currentWorld();
       const { primaries } = botMeasure(system, COMPETENT, makeRng(7));

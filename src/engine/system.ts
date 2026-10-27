@@ -3,7 +3,10 @@
 // time to observe two oppositions of the blue planet.
 
 import { AU, DAY, DEG, G, HOUR, L_SUN, M_EARTH, M_SUN, R_SUN, T_SUN, TAU } from './constants';
-import { orbitAngle } from './ephemeris';
+import { meanLonForTrue, oppositions, orbitAngle, planetPos, planetVel, trueLongitude } from './ephemeris';
+import { cheapestAt, costMinima } from './windows';
+import { lambert } from './orbits';
+import { norm, sub } from './vec';
 import {
   captureCost,
   departCost,
@@ -93,8 +96,15 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       obliquity: real ? REAL.mars.obliquity : rng.range(6, 26) * DEG,
     };
     // At t = firstOpposition both planets share a heliocentric longitude.
-    const phase2 = orbitAngle(home, firstOpposition) - (TAU * firstOpposition) / P2;
-    const target = { a: a2, period: P2, phase0: phase2, mass: m2, radius: r2 };
+    let phase2 = orbitAngle(home, firstOpposition) - (TAU * firstOpposition) / P2;
+    const target: StarSystem['target'] = { a: a2, period: P2, phase0: phase2, mass: m2, radius: r2 };
+    if (features.ellipse) {
+      // An eccentric orbit: place the planet so its TRUE longitude matches ours at the first opposition.
+      const e = rng.range(...features.ellipse);
+      const peri = rng.range(0, TAU);
+      phase2 = meanLonForTrue(e, peri, orbitAngle(home, firstOpposition)) - (TAU * firstOpposition) / P2;
+      Object.assign(target, { e, peri, phase0: phase2 });
+    }
 
     const tof = hohmannTof(a1, a2, mu);
     // Angle the target must lead us by at departure, in (-pi, pi].
@@ -119,16 +129,51 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       features.inner
         ? firstOpposition + k * synodic + ((((lead / TAU) % 1) + 1) % 1) * synodic
         : firstOpposition + k * synodic - (lead / TAU) * synodic;
-    const secondOpposition = firstOpposition + synodic;
-    let k = 0;
-    while (windowAt(k) < secondOpposition + 10 * DAY) k++;
-    const measuredWindow = windowAt(k);
-    const lifeSupport = measuredWindow + rng.range(...rules.lifeSlack) * synodic;
-    const windows: number[] = [];
-    for (let j = 0; windowAt(j) <= lifeSupport; j++) if (windowAt(j) > 0) windows.push(windowAt(j));
-
-    const fuelDv =
-      hohmann.departCost + hohmann.captureCost + rules.fuelAllowance * (vInfDepart + vInfArrive);
+    let windows: number[] = [];
+    let lifeSupport: number;
+    let fuelDv: number;
+    if (!target.e) {
+      const secondOpposition = firstOpposition + synodic;
+      let k = 0;
+      while (windowAt(k) < secondOpposition + 10 * DAY) k++;
+      const measuredWindow = windowAt(k);
+      lifeSupport = measuredWindow + rng.range(...rules.lifeSlack) * synodic;
+      for (let j = 0; windowAt(j) <= lifeSupport; j++) if (windowAt(j) > 0) windows.push(windowAt(j));
+      fuelDv = hohmann.departCost + hohmann.captureCost + rules.fuelAllowance * (vInfDepart + vInfArrive);
+    } else {
+      // Eccentric target: windows are uneven, so find them as the dips in the real transfer cost.
+      const H = { pos: (t: number) => planetPos(home, t), vel: (t: number) => planetVel(home, t) };
+      const T = { pos: (t: number) => planetPos(target, t), vel: (t: number) => planetVel(target, t) };
+      const tmp = { home, target, synodic, firstOpposition, lifeSupport: 3 * synodic } as unknown as StarSystem;
+      const secondOpposition = oppositions(tmp, firstOpposition + 0.5 * synodic, firstOpposition + 1.6 * synodic)[0];
+      if (secondOpposition === undefined) continue;
+      const lo = 0.55 * tof;
+      const hi = 1.5 * tof;
+      const cost = (t: number) => cheapestAt(H, T, mu, m1, r1, m2, parkingRadius, t, lo, hi).cost;
+      const minima = costMinima(cost, DAY, secondOpposition + 2.5 * synodic, synodic / 40);
+      // The window we expect the player to use: the cheapest within a synodic period after the second opposition.
+      const after = minima.filter((t) => t > secondOpposition + 10 * DAY && t < secondOpposition + 10 * DAY + 1.2 * synodic);
+      const measuredWindow = after.length ? after.reduce((b, t) => (cost(t) < cost(b) ? t : b)) : undefined;
+      if (measuredWindow === undefined) continue;
+      lifeSupport = measuredWindow + rng.range(...rules.lifeSlack) * synodic;
+      windows = minima.filter((t) => t <= lifeSupport);
+      // The real cheapest transfer at the window we expect the player to use.
+      const best = cheapestAt(H, T, mu, m1, r1, m2, parkingRadius, measuredWindow, lo, hi, 80);
+      const sol = lambert(H.pos(measuredWindow), T.pos(measuredWindow + best.tof), best.tof, mu)!;
+      const vD = norm(sub(sol[0], H.vel(measuredWindow)));
+      const vA = norm(sub(sol[1], T.vel(measuredWindow + best.tof)));
+      let lead2 = trueLongitude(target, measuredWindow) - orbitAngle(home, measuredWindow);
+      lead2 = Math.atan2(Math.sin(lead2), Math.cos(lead2));
+      Object.assign(hohmann, {
+        tof: best.tof,
+        leadAngle: lead2,
+        vInfDepart: vD,
+        vInfArrive: vA,
+        departCost: departCost(vD, G * m1, r1),
+        captureCost: captureCost(vA, G * m2, parkingRadius),
+      });
+      fuelDv = best.cost + rules.fuelAllowance * (vD + vA);
+    }
 
     return {
       seed,

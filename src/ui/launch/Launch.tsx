@@ -10,6 +10,7 @@ import {
   modelFromPrimaries,
   planTransfer,
   posAt,
+  targetState,
   predictedWindows,
   sampleModel,
   systemFromModel,
@@ -217,15 +218,24 @@ export function Launch() {
             </>
           )}
           {pork && <div data-tut="launch-porkchop"><Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} /></div>}
-          <Formula>t = π√((a₁+a₂)³ / 8GM★),  φ = 180° − 360°·t/P₂</Formula>
-          <dl className="kv">
-            <dt>Hohmann flight time</dt>
-            <dd>{fmt(hoh.tof / DAY, 1)} days</dd>
-            <dt>Required lead angle φ</dt>
-            <dd>{fmt(hoh.lead / DEG, 1)}°</dd>
-            <dt>Lead angle now</dt>
-            <dd>{fmt(leadNow, 1)}°</dd>
-          </dl>
+          {model.ecc ? (
+            <div className="muted" style={{ fontSize: 13 }}>
+              On an ellipse there is no single lead angle: the planet speeds up near perihelion, so windows come unevenly. The cost map above searches your own
+              ellipse date by date — the cheap bands are the windows. Rough flight time ≈ {fmt(hoh.tof / DAY, 0)} days.
+            </div>
+          ) : (
+            <>
+              <Formula>t = π√((a₁+a₂)³ / 8GM★),  φ = 180° − 360°·t/P₂</Formula>
+              <dl className="kv">
+                <dt>Hohmann flight time</dt>
+                <dd>{fmt(hoh.tof / DAY, 1)} days</dd>
+                <dt>Required lead angle φ</dt>
+                <dd>{fmt(hoh.lead / DEG, 1)}°</dd>
+                <dt>Lead angle now</dt>
+                <dd>{fmt(leadNow, 1)}°</dd>
+              </dl>
+            </>
+          )}
         </div>
 
         {plan && (
@@ -386,7 +396,7 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
         ctx.fillRect(0, 0, w, h);
         const cx = w / 2;
         const cy = h * 0.47;
-        const S = (Math.min(w, h) * 0.42) / (model.a2 * 1.12);
+        const S = (Math.min(w, h) * 0.42) / (model.a2 * (1 + (model.ecc ?? 0)) * 1.12);
         const X = (v: Vec3) => cx + v[0] * S;
         const Y = (v: Vec3) => cy - v[1] * S;
         // Orbits.
@@ -397,7 +407,14 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
           ctx.strokeStyle = c;
           ctx.lineWidth = dpr;
           ctx.beginPath();
-          ctx.arc(cx, cy, a * S, 0, Math.PI * 2);
+          if (a === model.a2 && model.ecc) {
+            // The blue planet's ellipse, sampled over one orbit.
+            for (let i = 0; i <= 120; i++) {
+              const v = targetState(model, model.tOpp + (model.P2 * i) / 120)[0];
+              if (i) ctx.lineTo(X(v), Y(v));
+              else ctx.moveTo(X(v), Y(v));
+            }
+          } else ctx.arc(cx, cy, a * S, 0, Math.PI * 2);
           ctx.stroke();
         }
         // Star.
@@ -438,7 +455,7 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
             ctx.fill();
           }
           // Planet 2 at arrival (ghost).
-          const r2a = posAt(model.a2, model.P2, model, td + plan.plan.tof);
+          const r2a = targetState(model, td + plan.plan.tof)[0];
           ctx.strokeStyle = 'rgba(108,196,255,0.8)';
           ctx.beginPath();
           ctx.arc(X(r2a), Y(r2a), 8 * dpr, 0, Math.PI * 2);
@@ -458,10 +475,10 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
           ctx.fillText(label, X(v) + 9 * dpr, Y(v) - 6 * dpr);
         };
         planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, 'home @ departure');
-        planet(posAt(model.a2, model.P2, model, td), '#6cc4ff', 6, 'blue @ departure');
+        planet(targetState(model, td)[0], '#6cc4ff', 6, 'blue @ departure');
         ctx.globalAlpha = 0.45;
         planet(posAt(model.a1, model.P1, model, t), '#ffb26b', 4, 'now');
-        planet(posAt(model.a2, model.P2, model, t), '#6cc4ff', 4, '');
+        planet(targetState(model, t)[0], '#6cc4ff', 4, '');
         ctx.globalAlpha = 1;
       }}
     />
