@@ -22,7 +22,8 @@ import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
 import { PredictCard } from '../common/Predict';
-import { useMode } from '../../game/modes';
+import { hasChallenge, seeingFactor } from '../../game/challenges';
+import { currentMode, useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
@@ -325,7 +326,7 @@ export function Observatory() {
                   moonDir: sys.features.moon ? unit(moonV) : null,
                   moonRadius: Math.asin(sys.moon.radius / Math.hypot(...moonV)),
                   skyBrightness: Math.max(0, Math.min(1, (sunAlt + 10) / 14)),
-                  seeing: SEEING,
+                  seeing: SEEING * seeingFactor(useGame.getState(), tt),
                   realTime: now,
                   filter,
                   targetInFront: sys.features.inner && Math.hypot(...tgtV) < Math.hypot(...sunV),
@@ -503,6 +504,9 @@ export function Observatory() {
               Log diameter
             </button>
             <div className="hint">The disk looks biggest — and is easiest to measure — near opposition, when the blue planet is closest.</div>
+            {currentMode().coaching && seeingFactor(s, clock.t) > 1.5 && (
+              <div className="amber" style={{ fontSize: 13 }}>The air is rough tonight — the image swims. Readings will scatter more; another night may be better.</div>
+            )}
             <Formula>R₂ = d · tan(α₂ / 2)</Formula>
             <ReadingsTable k="alpha2" render={(v) => `${fmt(v / ARCSEC, 2)}″`} />
             <SendReadings k="alpha2" tut="micro-send" />
@@ -567,7 +571,10 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
         />
       )}
       {pts.length > 0 && <div className="faint" style={{ fontSize: 12 }}>Drag across the chart to choose which logs to fit. Double-tap to use all.</div>}
-      {fit && (
+      {fit && hasChallenge(useGame.getState(), 'handFit') && (
+        <div className="hint">Fit by hand: read the drift per day off your chart (rise over run), work out P₁ = 360° / drift, and type it on the progress sheet.</div>
+      )}
+      {fit && !hasChallenge(useGame.getState(), 'handFit') && (
         <dl className="kv">
           <dt>Drift</dt>
           <dd>{fmt(fit.slope, 4)} °/day</dd>
@@ -578,7 +585,7 @@ function YearPanel({ canLog, reason, onLog, onPoint }: { canLog: boolean; reason
         </dl>
       )}
       <Formula>P₁ = 360° / (daily drift)</Formula>
-      {P1 && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
+      {P1 && !hasChallenge(useGame.getState(), 'handFit') && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
       </div>
       {pts.length >= 2 && <StarPrediction pts={pts} fit={fit} />}
     </div>
@@ -792,6 +799,9 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
 
 function MoonPanel() {
   const s = useGame();
+  const [band, setBand] = useState<[number, number] | null>(null);
+  const [pickB, setPickB] = useState(false);
+  const t = useGameTime(2);
   if (!currentWorld().system.features.moon)
     return (
       <div className="panel panel-pad stack">
@@ -802,7 +812,6 @@ function MoonPanel() {
         </div>
       </div>
     );
-  const [band, setBand] = useState<[number, number] | null>(null);
   const pts = s.moonTrack.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
   const used = pts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
   const span = used.length ? used[used.length - 1].x - used[0].x : 0;
@@ -810,10 +819,30 @@ function MoonPanel() {
   const tooLong = span > 50;
   const fit = used.length >= 8 && !tooLong ? sineFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60) : null;
   const mid = used.length ? (used[0].x + used[used.length - 1].x) / 2 : 0;
+  // Two hypotheses (period aliasing): draw both, extended a few days ahead, so a new night can decide.
+  const alt = fit?.alternative && !hasChallenge(s, 'handFit') ? fit.alternative : null;
+  const nowDay = t / DAY;
+  const x1 = alt ? Math.max(used[used.length - 1]?.x ?? 0, nowDay) + Math.max(2, 1.2 * Math.max(fit!.period, alt.period)) : used[used.length - 1]?.x ?? 0;
   const curve = fit && used.length ? Array.from({ length: 300 }, (_, i) => {
-    const x = used[0].x + ((used[used.length - 1].x - used[0].x) * i) / 299;
+    const x = used[0].x + ((x1 - used[0].x) * i) / 299;
     return { x, y: fit.model(x) };
   }) : [];
+  const curveB = alt && used.length ? Array.from({ length: 300 }, (_, i) => {
+    const x = used[0].x + ((x1 - used[0].x) * i) / 299;
+    return { x, y: alt.model(x) };
+  }) : [];
+  // Where the two models disagree most in the coming days.
+  let decide: number | null = null;
+  if (alt && fit) {
+    let best = 0;
+    for (let x = nowDay; x < nowDay + 5; x += 0.05) {
+      const d = Math.abs(fit.model(x) - alt.model(x));
+      if (d > best) [best, decide] = [d, x];
+    }
+  }
+  const mode = currentMode();
+  const useB = !!alt && pickB;
+  const chosen = useB && alt ? { amplitude: alt.amplitude, period: alt.period } : fit;
   return (
     <div className="panel panel-pad stack">
       <b>The moon of the blue planet</b>
@@ -828,24 +857,65 @@ function MoonPanel() {
         The tracker measures how far the moon sits east (+) or west (−) of the planet. Its swing is the moon’s orbit seen edge-on.
       </div>
       <div data-tut="moon-chart" className="stack">
-      {pts.length > 1 && <Chart series={[{ pts, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) }, ...(curve.length ? [{ pts: curve, color: '#6cc4ff', kind: 'line' as const }] : [])]} xLabel="day" yLabel="moon offset (″)" band={band} onBand={setBand} brushMode="band" yFmt={(y) => y.toFixed(0)} />}
+      {pts.length > 1 && (
+        <Chart
+          series={[
+            { pts, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
+            ...(curve.length && !hasChallenge(useGame.getState(), 'handFit') ? [{ pts: curve, color: '#6cc4ff', kind: 'line' as const }] : []),
+            ...(curveB.length ? [{ pts: curveB, color: '#b59cff', kind: 'line' as const }] : []),
+          ]}
+          markers={decide !== null && mode.missions !== 'off' ? [{ x: decide, color: '#ffc46b', label: 'decides' }] : []}
+          xLabel="day"
+          yLabel="moon offset (″)"
+          band={band}
+          onBand={setBand}
+          brushMode="band"
+          yFmt={(y) => y.toFixed(0)}
+        />
+      )}
+      {alt && fit && (
+        <div className="callout key" style={{ margin: 0 }}>
+          <b>Two models fit your data</b>
+          <div style={{ fontSize: 13 }}>
+            <span className="blue">A: Pₘ = {fmt(fit.period, 3)} d</span> · <span className="violet">B: Pₘ = {fmt(alt.period, 3)} d</span> (B fits {fmt((alt.rssRatio - 1) * 100, 0)}% worse).
+            Gaps in the data let both swing through the same points. A new observation where they differ will rule one out.
+          </div>
+          {decide !== null && mode.missions !== 'off' && (
+            <div style={{ fontSize: 13, marginTop: 4 }}>
+              They disagree most around <b>day {fmt(decide, 1)}</b> — keep logging through then.
+            </div>
+          )}
+          {mode.coaching && mode.missions === 'coach' && <div className="hint" style={{ marginTop: 4 }}>ECHO: A fits a little better, so I’d lean that way — but one more night will settle it.</div>}
+          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            <button className={`btn small ${!pickB ? 'primary' : ''}`} onClick={() => setPickB(false)}>
+              Use model A
+            </button>
+            <button className={`btn small ${pickB ? 'primary' : ''}`} onClick={() => setPickB(true)}>
+              Use model B
+            </button>
+          </div>
+        </div>
+      )}
       {pts.length > 1 && <div className="faint" style={{ fontSize: 12 }}>Drag to choose the stretch of data to fit — near opposition is best, when the planet is closest.</div>}
       {tooLong && <div className="amber" style={{ fontSize: 13 }}>Choose a stretch of at most ~50 days (drag across the chart): the swing looks smaller when the planet is further away.</div>}
-      {fit && (
+      {fit && hasChallenge(useGame.getState(), 'handFit') && (
+        <div className="hint">Fit by hand: read the swing’s half-height (θₘ) and the time from peak to peak (Pₘ) off your chart and type them on the progress sheet.</div>
+      )}
+      {fit && !hasChallenge(useGame.getState(), 'handFit') && (
         <>
           <dl className="kv">
             <dt>Greatest elongation θₘ</dt>
-            <dd className="blue">{fmt(fit.amplitude, 2)}″</dd>
+            <dd className="blue">{fmt(chosen!.amplitude, 2)}″</dd>
             <dt>Period Pₘ</dt>
-            <dd className="blue">{fmt(fit.period, 3)} days</dd>
+            <dd className="blue">{fmt(chosen!.period, 3)} days</dd>
             <dt>Centre of data</dt>
             <dd>day {fmt(mid, 1)}</dd>
           </dl>
           <Formula>aₘ = d · tan θₘ,   M₂ = 4π² aₘ³ / (G Pₘ²)</Formula>
           <b>θₘ</b>
-          <SendToSheet k="thetaM" value={fit.amplitude * ARCSEC} at={mid * DAY} spread={fit.sigmaAmplitude * ARCSEC} />
+          <SendToSheet k="thetaM" value={chosen!.amplitude * ARCSEC} at={mid * DAY} spread={fit.sigmaAmplitude * ARCSEC} />
           <b>Pₘ</b>
-          <SendToSheet k="Pm" value={fit.period * DAY} spread={fit.sigmaPeriod * DAY} />
+          <SendToSheet k="Pm" value={chosen!.period * DAY} spread={fit.sigmaPeriod * DAY} />
         </>
       )}
       </div>

@@ -49,7 +49,9 @@ export const foodRate = () => 1;
 export function lifeSupportEnd(s: GameState, sys: StarSystem) {
   // Free Roam: the air never runs out; a horizon that moves with time keeps planning finite.
   if (s.settings.freeRoam) return clock.t + 3 * sys.synodic;
-  if (!s.settings.survival) return sys.lifeSupport;
+  // Short supplies challenge: a quarter less of the slack after the second opposition.
+  const short = s.settings.challenges?.includes('shortAir') ? 0.25 * Math.max(0, sys.lifeSupport - (sys.firstOpposition + sys.synodic)) : 0;
+  if (!s.settings.survival) return sys.lifeSupport - short;
   const sv = s.survival;
   const days = Math.min(sv.o2 / o2Rate(sv), sv.food / foodRate());
   return clock.t + Math.max(0, days) * DAY;

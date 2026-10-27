@@ -29,13 +29,13 @@ export interface RunGrade {
   total: number;
 }
 
-export function gradeRun(opts: { measurementPoints: number; fuelLeftFraction: number; daysLeftFraction: number; hintsUsed: number; success: boolean; penalty?: number; predictionPoints?: number }): RunGrade {
-  const total = Math.round(
+export function gradeRun(opts: { measurementPoints: number; fuelLeftFraction: number; daysLeftFraction: number; hintsUsed: number; success: boolean; penalty?: number; predictionPoints?: number; multiplier?: number }): RunGrade {
+  const total = Math.round((opts.multiplier ?? 1) * (
     opts.measurementPoints * 0.6 +
       0.5 * (opts.predictionPoints ?? 0) +
       (opts.success ? 200 + 400 * Math.max(0, opts.fuelLeftFraction) + 100 * Math.max(0, opts.daysLeftFraction) : 0) -
       25 * opts.hintsUsed -
-      (opts.penalty ?? 0),
+      (opts.penalty ?? 0)),
   );
   const letter = !opts.success ? 'F' : total > 1100 ? 'S' : total > 900 ? 'A' : total > 700 ? 'B' : total > 450 ? 'C' : 'D';
   return { letter, total };

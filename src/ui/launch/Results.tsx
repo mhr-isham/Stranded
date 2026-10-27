@@ -18,6 +18,7 @@ import { predictionPoints } from '../../game/predictions';
 import { nameOf, type AtlasCard } from '../../game/atlas';
 import { unlockLog } from '../../game/story';
 import { chapterOf } from '../../game/campaign';
+import { CHALLENGES, challengeBonus } from '../../game/challenges';
 import { probeTruth } from '../../game/probeState';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
@@ -127,7 +128,7 @@ function Debrief() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival), predictionPoints: predictionPoints(s) });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
 
   // Error budget: how much correction fuel each measurement cost, found by
@@ -248,6 +249,12 @@ function Debrief() {
                   <dd>
                     {s.arrival.landing === 'clean' ? 'clean (+60)' : s.arrival.landing === 'rough' ? 'hard (+20)' : 'ECHO took over'}
                   </dd>
+                </>
+              )}
+              {(s.settings.challenges?.length ?? 0) > 0 && (
+                <>
+                  <dt>Challenges (+{(s.settings.challenges!.length * 5).toFixed(0)}%)</dt>
+                  <dd title={s.settings.challenges!.map((c) => CHALLENGES[c].name).join(', ')}>{s.settings.challenges!.map((c) => CHALLENGES[c].icon).join(' ')}</dd>
                 </>
               )}
               {s.rewindsUsed > 0 && (

@@ -10,6 +10,7 @@ import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { isCloudy } from '../../game/survival';
+import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { hhmm, localSolarHours } from '../../game/time';
 import { drawScope } from '../../render/telescope';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
@@ -28,7 +29,7 @@ export function Rover() {
   const { system: sys } = currentWorld();
   const s = useGame();
   const t = useGameTime(5);
-  const speed = (s.settings.survival && s.survival.upgrades.includes('rover') ? 700 : 400) * 1000; // m per day
+  const speed = (s.settings.survival && s.survival.upgrades.includes('rover') ? 700 : 400) * 1000 * (hasChallenge(s, 'rover') ? 0.5 : 1); // m per day
   const [target, setTarget] = useState(Math.max(1000, Math.round(s.rover.target / 1e5) * 100 || 3000));
   const [cap, setCap] = useState<Capture | null>(null);
   const [frame, setFrame] = useState<'A' | 'B'>('A');
@@ -116,7 +117,7 @@ export function Rover() {
                   moonDir: null,
                   moonRadius: 0,
                   skyBrightness: 0,
-                  seeing: 1.2 * ARCSEC,
+                  seeing: 1.2 * ARCSEC * seeingFactor(useGame.getState(), cap.at),
                   realTime: 0,
                   filter: false,
                 },

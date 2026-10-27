@@ -26,6 +26,7 @@ import {
   type Find,
 } from '../../game/surface';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
+import { hasChallenge } from '../../game/challenges';
 import { ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 
@@ -48,6 +49,7 @@ export function SurfaceMap() {
   const sf = s.surface;
   const campX = s.camp?.x ?? 0;
   const roverX = sf.roverX ?? campX;
+  const kmh = ROVER_KMH * (hasChallenge(s, 'rover') ? 0.5 : 1);
   const busy = !!sf.task && sf.task.done > t;
   const g = surfaceGravity(sys);
   const hopTank = sf.hopTank < 0 ? rules.hopTank : sf.hopTank;
@@ -65,8 +67,8 @@ export function SurfaceMap() {
     const dist = Math.abs(target - roverX);
     const backHome = Math.abs(target - campX);
     if (dist + backHome > sf.roverBattery && Math.abs(target - campX) > 200) return toast('Not enough charge to get there and back. Recharge at camp first.');
-    startTask('drive', dist / 1000 / ROVER_KMH, target);
-    toast(`Rover driving ${fmt(dist / 1000, 1)} km (${fmt(dist / 1000 / ROVER_KMH, 1)} h)`);
+    startTask('drive', dist / 1000 / kmh, target);
+    toast(`Rover driving ${fmt(dist / 1000, 1)} km (${fmt(dist / 1000 / kmh, 1)} h)`);
   };
 
   const tow = () => {
@@ -225,7 +227,7 @@ export function SurfaceMap() {
             <div className="stack" style={{ gap: 6 }}>
               <b style={{ fontSize: 13 }}>Chosen spot: {fmt((target - campX) / 1000, 1)} km from camp</b>
               <button className="btn" disabled={busy} onClick={drive}>
-                🚙 Drive the rover there ({fmt(Math.abs(target - roverX) / 1000 / ROVER_KMH, 1)} h)
+                🚙 Drive the rover there ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
               </button>
               <button className="btn" disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
                 🚀 Hop the ship there ({fmt(hopCost(g, Math.abs(target - campX)), 0)} m/s{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
@@ -238,7 +240,7 @@ export function SurfaceMap() {
             </button>
           )}
           {sf.roverX !== null && !busy && (
-            <button className="btn ghost" onClick={() => startTask('drive', Math.abs(roverX - campX) / 1000 / ROVER_KMH, campX)}>
+            <button className="btn ghost" onClick={() => startTask('drive', Math.abs(roverX - campX) / 1000 / kmh, campX)}>
               Bring the rover home
             </button>
           )}
@@ -268,8 +270,8 @@ export function SurfaceMap() {
             <dd>{nearIce ? 'camp is at the ice' : sf.iceLoads}</dd>
           </dl>
           {!nearIce && (
-            <button className="btn" disabled={busy || sf.roverX !== null} onClick={() => startTask('haul', (2 * (s.camp?.iceKm ?? 0)) / ROVER_KMH + 2)}>
-              Haul a load of ice with the rover ({fmt((2 * (s.camp?.iceKm ?? 0)) / ROVER_KMH + 2, 1)} h)
+            <button className="btn" disabled={busy || sf.roverX !== null} onClick={() => startTask('haul', (2 * (s.camp?.iceKm ?? 0)) / kmh + 2)}>
+              Haul a load of ice with the rover ({fmt((2 * (s.camp?.iceKm ?? 0)) / kmh + 2, 1)} h)
             </button>
           )}
           <button className="btn primary" disabled={busy || sf.fuelMade >= iceCap || (!nearIce && sf.iceLoads < 1)} onClick={() => startTask('process', rules.isruDays * 24)}>

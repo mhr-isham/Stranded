@@ -8,6 +8,7 @@ import type { Difficulty } from '../engine/types';
 import { clock } from './clock';
 import { modeOf } from './modes';
 import type { Prediction } from './predictions';
+import type { ChallengeId } from './challenges';
 import type { ProbeState } from './probeState';
 import type { AtlasCard, SystemNames } from './atlas';
 
@@ -49,6 +50,8 @@ export interface Settings {
   freeRoam?: boolean;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
+  /** Astronomer Challenges chosen for this run. */
+  challenges?: ChallengeId[];
 }
 
 export interface SurvivalState {

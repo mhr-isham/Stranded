@@ -14,6 +14,7 @@ import { Modal } from '../common/widgets';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { explain, makePrediction, resolveNow } from '../../game/predictions';
+import { hasChallenge } from '../../game/challenges';
 import { useMode } from '../../game/modes';
 import { pendulumPeriod } from '../../engine/measure';
 import { PredictCard } from '../common/Predict';
@@ -62,15 +63,17 @@ export function Pendulum() {
   }, [running]);
 
   const toggleWatch = () => {
+    // Worn stopwatch challenge: the button registers up to 0.2 s late.
+    const lag = hasChallenge(useGame.getState(), 'stopwatch') ? Math.random() * 200 : 0;
     if (!watch.current.running) {
-      watch.current = { start: performance.now(), running: true };
+      watch.current = { start: performance.now() + lag, running: true };
       setTaps(0);
       setElapsed(0);
       setRunning(true);
       setResult(null);
       sfx('click');
     } else {
-      const time = (performance.now() - watch.current.start) / 1000;
+      const time = (performance.now() + lag - watch.current.start) / 1000;
       watch.current.running = false;
       setRunning(false);
       setElapsed(time);

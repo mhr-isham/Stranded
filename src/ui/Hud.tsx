@@ -99,7 +99,7 @@ export function Hud() {
           </dl>
           <Toggle
             on={s.settings.formulas}
-            onChange={(v) => !mode.formulasLocked && s.set({ settings: { ...s.settings, formulas: v } })}
+            onChange={(v) => !mode.formulasLocked && !s.settings.challenges?.includes('noFormula') && s.set({ settings: { ...s.settings, formulas: v } })}
             label="Formula sheet"
             sub={mode.formulasLocked ? `Not available in ${mode.name}.` : 'Shown in tools and on the progress sheet.'}
           />

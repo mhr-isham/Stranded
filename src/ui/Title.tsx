@@ -11,6 +11,7 @@ import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
 import { AtlasGrid, CalibrationPanel } from './Atlas';
+import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId } from '../game/challenges';
 import { CHAPTERS, chapterOf, chapterUnlocked } from '../game/campaign';
 import { LESSONS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
@@ -149,6 +150,19 @@ export function Title() {
 
 /** Mode picker plus the survival, formula and sound toggles (shared by New expedition and Campaign). */
 function ModeSettings({ settings, setSettings }: { settings: Settings; setSettings: (s: Settings) => void }) {
+  const atlas = useGame((g) => g.atlas);
+  const hard = settings.difficulty === 'astronomer' || settings.difficulty === 'legend';
+  const chosen = settings.challenges ?? [];
+  const toggleChallenge = (id: ChallengeId) => {
+    const on = !chosen.includes(id);
+    const next = on ? [...chosen, id] : chosen.filter((c) => c !== id);
+    setSettings({
+      ...settings,
+      challenges: next,
+      formulas: next.includes('noFormula') ? false : settings.formulas,
+      survival: next.includes('survival') ? true : settings.survival,
+    });
+  };
   return (
     <>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
@@ -165,6 +179,7 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
                   setSettings({
                     ...settings,
                     difficulty: id,
+                    challenges: id === 'astronomer' || id === 'legend' ? settings.challenges : [],
                     formulas: MODES[id].formulas,
                     survival: MODES[id].survivalForced ? true : MODES[settings.difficulty].survivalForced ? false : settings.survival,
                   })
@@ -195,9 +210,24 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
               </div>
             );
           })()}
+          {hard && challengesUnlocked({ atlas }) && (
+            <div className="callout key" style={{ margin: '0 0 8px' }}>
+              <b>Astronomer Challenges · +5% score each</b>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                {CHALLENGE_IDS.map((id) => (
+                  <button key={id} className={`btn small ${chosen.includes(id) ? 'primary' : ''}`} title={CHALLENGES[id].text} onClick={() => toggleChallenge(id)}>
+                    {CHALLENGES[id].icon} {CHALLENGES[id].name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {hard && !challengesUnlocked({ atlas }) && (
+            <div className="faint" style={{ fontSize: 12, margin: '0 0 8px' }}>Reach orbit once in Astronomer to unlock eight optional Astronomer Challenges.</div>
+          )}
           <Toggle
             on={settings.survival}
-            onChange={(v) => !MODES[settings.difficulty].survivalForced && setSettings({ ...settings, survival: v })}
+            onChange={(v) => !MODES[settings.difficulty].survivalForced && !chosen.includes('survival') && setSettings({ ...settings, survival: v })}
             label="Survival mode"
             sub={
               MODES[settings.difficulty].survivalForced
@@ -207,7 +237,7 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
           />
           <Toggle
             on={settings.formulas}
-            onChange={(v) => !MODES[settings.difficulty].formulasLocked && setSettings({ ...settings, formulas: v })}
+            onChange={(v) => !MODES[settings.difficulty].formulasLocked && !chosen.includes('noFormula') && setSettings({ ...settings, formulas: v })}
             label="Formula sheet"
             sub={
               MODES[settings.difficulty].formulasLocked

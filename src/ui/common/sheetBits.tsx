@@ -3,6 +3,7 @@ import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
 import { fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions } from '../../game/sim';
 import { currentMode, useMode } from '../../game/modes';
+import { hasChallenge } from '../../game/challenges';
 import { readingStats, useGame } from '../../game/store';
 import { toast } from './widgets';
 
@@ -132,7 +133,7 @@ export function Formula({ children }: { children: string }) {
 
 /** Compare a new reading with the kept ones; returns a warning when it looks off. */
 export function outlierNote(value: number, others: number[], tolerance: number) {
-  if (others.length < 1 || !currentMode().sanity) return null;
+  if (others.length < 1 || !currentMode().sanity || hasChallenge(useGame.getState(), 'noSanity')) return null;
   const sorted = [...others].sort((a, b) => a - b);
   const med = sorted[Math.floor(sorted.length / 2)];
   const off = Math.abs(value / med - 1);
@@ -142,7 +143,7 @@ export function outlierNote(value: number, others: number[], tolerance: number) 
 export function SanityWarning({ msgs }: { msgs: (string | null | false | undefined)[] }) {
   const mode = useMode();
   const list = msgs.filter(Boolean) as string[];
-  if (!list.length || !mode.sanity) return null;
+  if (!list.length || !mode.sanity || hasChallenge(useGame.getState(), 'noSanity')) return null;
   return (
     <div className="callout warn" style={{ margin: 0 }}>
       <b>⚠ Suspicious reading</b>
