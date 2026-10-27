@@ -132,6 +132,21 @@ export function actsFor(chapter: number): Act[] {
           ? { ...a, learned: ['Near opposition the planet is low in the east, so the parallax baseline runs north–south.', ...a.learned.slice(1)] }
           : a,
     );
+  if (chapter === 7)
+    return ACTS.map((a) =>
+      a.n === 3
+        ? { ...a, missions: ['opposition', 'farYear', 'giantTrack'], learned: ['The far planet’s synodic period is nearly our year — a poor clock — so its year comes from fitting its drift.', 'The giant is the key to the trip.'] }
+        : a.n === 4
+          ? {
+              ...a,
+              name: 'The giant',
+              missions: ['giantOrbit', 'parallax', 'disk', 'moon', 'giantMoon'],
+              learned: ['Parallax works best on near things: triangulate the giant.', 'A giant’s moon weighs it, as for the blue planet.', 'Kepler’s method pins a planet’s timing better than eyeballing its loop.'],
+            }
+          : a.n === 5
+            ? { ...a, learned: ['A gravity assist swaps speed with a planet: we leave the giant faster, relative to the star, than we arrived.'] }
+            : a,
+    );
   if (chapter === 5)
     return ACTS.map((a) =>
       a.n === 3

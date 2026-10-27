@@ -28,11 +28,12 @@ import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
 import { OrbitPanel } from './OrbitPanel';
+import { GiantPanel } from './GiantPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
-type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'micro' | 'moon';
+type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'giant' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'sky', label: 'Sky' },
@@ -40,6 +41,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'track', label: 'Tracker' },
   { id: 'transit', label: 'Transit' },
   { id: 'orbit', label: 'Orbit' },
+  { id: 'giant', label: 'Giant' },
   { id: 'micro', label: 'Micrometer' },
   { id: 'moon', label: 'Moon' },
 ];
@@ -412,7 +414,7 @@ export function Observatory() {
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
-            {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e)).map((tb) => (
+            {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e || !!sys.giant) && (tb.id !== 'giant' || !!sys.giant)).map((tb) => (
               <button
                 key={tb.id}
                 data-tut={`obs-tab-${tb.id}`}
@@ -533,6 +535,7 @@ export function Observatory() {
         )}
 
         {tab === 'orbit' && <OrbitPanel />}
+        {tab === 'giant' && <GiantPanel />}
         {tab === 'moon' && <MoonPanel />}
       </div>
     </div>

@@ -259,6 +259,55 @@ const CH6: Mission[] = [
   ...['opposition', 'disk', 'moon', 'synodic', 'plan'].map(byId),
 ];
 
+/** Chapter 7: a far target and a giant to swing past on the way. */
+const CH7: Mission[] = [
+  ...['gravity', 'radius', 'mass', 'identify', 'year', 'track', 'opposition'].map(byId),
+  {
+    id: 'farYear',
+    title: 'A poor clock',
+    short: 'Fit the blue planet’s year P₂.',
+    goal: 'The blue planet is so far out that its synodic period is almost our own year. Keep the tracker running, then use the Orbit tab to fit its year directly (Kepler’s method).',
+    why: 'When S is close to P₁, a day’s error in S becomes weeks in P₂. Fitting its slow drift avoids that.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.Porb,
+  },
+  {
+    id: 'giantTrack',
+    title: 'The giant',
+    short: 'Track the giant.',
+    goal: 'In the observatory’s Giant tab, turn on the giant tracker. It logs the giant nightly and its big moon through the night.',
+    why: 'We can’t reach the blue planet directly. The giant can throw us there — if we know where it will be and how heavy it is.',
+    screen: 'observatory',
+    done: (s) => s.trackGOn || s.trackG.length > 0,
+  },
+  {
+    id: 'giantOrbit',
+    title: 'Where the giant will be',
+    short: 'Measure the giant’s S_G and opposition.',
+    goal: 'Mark two of the giant’s oppositions, then sharpen them with Kepler’s method in the Giant tab. Send S_G and t_G to the sheet.',
+    why: 'We meet the giant years from now: a small error in its period grows into a big miss.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.Sg && !!s.sheet.tOppG,
+  },
+  {
+    ...byId('parallax'),
+    goal: 'This time triangulate the GIANT: it is far closer than the blue planet, so its shift is much bigger. Drive the rover out and image it from both sites at once.',
+    why: 'Parallax works best on near things. The giant’s distance sets the scale of the whole system.',
+  },
+  byId('disk'),
+  byId('moon'),
+  {
+    id: 'giantMoon',
+    title: 'Weigh the giant',
+    short: 'Measure the giant’s moon (θ_G and P_G).',
+    goal: 'Fit the swing of the giant’s moon in the Giant tab and send θ_G and its period to the sheet.',
+    why: 'The giant’s mass decides how hard it bends our path. Too light a guess, and it flings us off course.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.thetaMg && !!s.sheet.Pmg,
+  },
+  byId('plan'),
+];
+
 /** The missions of the current chapter. */
 export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 2) return CH2;
@@ -266,5 +315,6 @@ export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 4) return CH4;
   if (s.chapter === 5) return CH5;
   if (s.chapter === 6) return CH6;
+  if (s.chapter === 7) return CH7;
   return MISSIONS;
 }

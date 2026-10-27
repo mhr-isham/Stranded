@@ -3,10 +3,10 @@
 // time to observe two oppositions of the blue planet.
 
 import { AU, DAY, DEG, G, HOUR, L_SUN, M_EARTH, M_SUN, R_SUN, T_SUN, TAU } from './constants';
-import { meanLonForTrue, oppositions, orbitAngle, planetPos, planetVel, trueLongitude } from './ephemeris';
+import { meanLonForTrue, oppositions, oppositionsOf, orbitAngle, planetPos, planetVel, trueLongitude } from './ephemeris';
 import { cheapestAt, costMinima } from './windows';
-import { lambert } from './orbits';
-import { norm, sub } from './vec';
+import { lambert, propagate } from './orbits';
+import { add, norm, scale, sub, unit, type Vec3 } from './vec';
 import {
   captureCost,
   departCost,
@@ -14,7 +14,7 @@ import {
   hohmannVInfArrive,
   hohmannVInfDepart,
 } from './orbits';
-import { makeRng } from './rng';
+import { makeRng, type Rng } from './rng';
 import { featuresOf } from './chapters';
 import type { Difficulty, StarSystem } from './types';
 
@@ -192,7 +192,7 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       const H = Math.acos(Math.sin(-20 * DEG) / Math.cos(siteLat));
       home.rotPhase0 = H + home.phase0 + Math.PI;
     }
-    return {
+    const out: StarSystem = {
       seed,
       difficulty,
       chapter,
@@ -211,8 +211,133 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       fuelDv,
       lifeSupport,
     };
+    if (features.slingshot) {
+      const sl = makeSlingshot(out, rng, rules);
+      if (!sl) continue;
+      return sl;
+    }
+    return out;
   }
   throw new Error(`No valid system for seed ${seed}`);
+}
+
+/**
+ * Chapter 7: put a giant between us and a far-away target, arranged so that a
+ * real gravity-assist route opens once the player has had time to measure both
+ * planets — and so that the direct route costs more fuel than the ship carries.
+ * Built forwards from the route itself: depart, coast to the giant's orbit and
+ * put the giant there, fly past it, coast on and put the target where we cross its orbit.
+ */
+/** Test hook: reports each candidate's cost ratios against the direct route. */
+export let slingDebug: ((sling: number, fuel: number) => void) | null = null;
+export const setSlingDebug = (f: typeof slingDebug) => (slingDebug = f);
+
+function makeSlingshot(base: StarSystem, rng: Rng, rules: DifficultyRules): StarSystem | null {
+  const mu = G * base.star.mass;
+  const { home } = base;
+  const a1 = home.a;
+  const P1 = home.period;
+  const aT = rng.range(4.5, 6.5) * a1;
+  const PT = TAU * Math.sqrt(aT ** 3 / mu);
+  const aG = rng.range(1.7, 2.3) * a1;
+  const PG = TAU * Math.sqrt(aG ** 3 / mu);
+  const mG = rng.range(200, 600) * M_EARTH;
+  const rG = radiusFromDensity(mG, rng.range(900, 1500));
+  const moonGa = rng.range(25, 60) * rG;
+  const giantMoon = { a: moonGa, period: TAU * Math.sqrt(moonGa ** 3 / (G * mG)), phase0: rng.range(0, TAU), radius: 0.03 * rG };
+  const synT = 1 / Math.abs(1 / P1 - 1 / PT);
+  const synG = 1 / Math.abs(1 / P1 - 1 / PG);
+  // Depart once both planets have shown two oppositions each.
+  const tDep = 2 * Math.max(synT, synG) + rng.range(15, 60) * DAY;
+  const crossing = (r: Vec3, v: Vec3, rad: number, span: number) => {
+    // First time the coast reaches radius `rad` going outwards.
+    const n = 160;
+    let prev = 0;
+    for (let i = 1; i <= n; i++) {
+      const t = (span * i) / n;
+      if (norm(propagate(r, v, t, mu)[0]) >= rad) {
+        let lo = prev;
+        let hi = t;
+        for (let k = 0; k < 40; k++) {
+          const m = 0.5 * (lo + hi);
+          if (norm(propagate(r, v, m, mu)[0]) >= rad) hi = m;
+          else lo = m;
+        }
+        return 0.5 * (lo + hi);
+      }
+      prev = t;
+    }
+    return null;
+  };
+  const r0 = planetPos(home, tDep);
+  const vh = planetVel(home, tDep);
+  const muG = G * mG;
+  const rot = (v: Vec3, th: number): Vec3 => [v[0] * Math.cos(th) - v[1] * Math.sin(th), v[0] * Math.sin(th) + v[1] * Math.cos(th), 0];
+  // Search the departure ellipse and the flyby (closest approach, turn direction)
+  // for the cheapest route, the way a mission designer would.
+  let best: { cost: number; vInfDep: number; tof1: number; tof2: number; lonG: number; t1: number; lonT: number; t2: number; vInfArr: number } | null = null;
+  for (const qf of [1.03, 1.12, 1.25, 1.45]) {
+    const Q = qf * aG;
+    const vPeri = Math.sqrt((mu * 2 * Q) / (a1 * (a1 + Q)));
+    const v0 = add(vh, scale(unit(vh), vPeri - norm(vh)));
+    const vInfDep = vPeri - norm(vh);
+    const tof1 = crossing(r0, v0, aG, P1 * (Q / a1) ** 1.5);
+    if (tof1 === null) continue;
+    const t1 = tDep + tof1;
+    const [rS1, vS1] = propagate(r0, v0, tof1, mu);
+    const lonG = Math.atan2(rS1[1], rS1[0]);
+    const vG = scale([-Math.sin(lonG), Math.cos(lonG), 0], Math.sqrt(mu / aG));
+    const vInfIn = sub(vS1, vG);
+    for (const rpf of [1.6, 2.2, 3, 4.5, 7, 11, 18, 30]) {
+      const turn = 2 * Math.asin(1 / (1 + (rpf * rG * norm(vInfIn) ** 2) / muG));
+      for (const sgn of [1, -1]) {
+        const vOut = add(vG, rot(vInfIn, sgn * turn));
+        const tof2 = crossing(rS1, vOut, aT, 1.5 * PT);
+        if (tof2 === null) continue;
+        const [rS2, vS2] = propagate(rS1, vOut, tof2, mu);
+        const lonT = Math.atan2(rS2[1], rS2[0]);
+        // The target's circular velocity where we meet it.
+        const vT = scale([-Math.sin(lonT), Math.cos(lonT), 0], Math.sqrt(mu / aT));
+        const vInfArr = norm(sub(vS2, vT));
+        const cost = departCost(vInfDep, G * home.mass, home.radius) + captureCost(vInfArr, G * base.target.mass, base.parkingRadius);
+        if (!best || cost < best.cost) best = { cost, vInfDep, tof1, tof2, lonG, t1, lonT, t2: t1 + tof2, vInfArr };
+      }
+    }
+  }
+  if (!best) return null;
+  const { vInfDep, tof1, tof2, lonG, t1, lonT, t2, vInfArr } = best;
+  const giant = { a: aG, period: PG, phase0: lonG - (TAU * t1) / PG, mass: mG, radius: rG, moon: giantMoon };
+  const target = { ...base.target, a: aT, period: PT, phase0: lonT - (TAU * t2) / PT };
+  const dep = departCost(vInfDep, G * home.mass, home.radius);
+  const cap = captureCost(vInfArr, G * target.mass, base.parkingRadius);
+  const sling = dep + cap;
+  // The direct route must be out of reach.
+  const dHoh = departCost(Math.abs(hohmannVInfDepart(a1, aT, mu)), G * home.mass, home.radius) + captureCost(Math.abs(hohmannVInfArrive(a1, aT, mu)), G * target.mass, base.parkingRadius);
+  // A larger margin than usual (two legs, two corrections, and the giant's position after
+  // a long extrapolation), but always short of what the direct route would need.
+  const want = rules.fuelAllowance * (vInfDep + vInfArr);
+  const margin = Math.min(1.6 * want, 0.95 * dHoh - sling);
+  slingDebug?.(sling / dHoh, margin / want);
+  // In the easy modes the full margin matters more than the plot: the slingshot is then
+  // simply the cheaper route, not the only one.
+  const easy = rules.fuelAllowance >= DIFFICULTY.cadet.fuelAllowance;
+  if (margin < 0.7 * want && !easy) return null;
+  const fuelDv = sling + (easy ? want : margin);
+  const firstOpposition = oppositionsOf(home, target, 0, 2 * synT)[0];
+  const lifeSupport = tDep + rng.range(...rules.lifeSlack) * synT;
+  let lead = lonT - (TAU * (t2 - tDep)) / PT - orbitAngle(home, tDep);
+  lead = Math.atan2(Math.sin(lead), Math.cos(lead));
+  return {
+    ...base,
+    target,
+    giant,
+    synodic: synT,
+    firstOpposition,
+    hohmann: { tof: tof1 + tof2, leadAngle: lead, vInfDepart: vInfDep, vInfArrive: vInfArr, departCost: dep, captureCost: cap },
+    windows: [tDep],
+    fuelDv,
+    lifeSupport,
+  };
 }
 
 export const describeSystem = (s: StarSystem) => ({

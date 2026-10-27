@@ -5,7 +5,7 @@
 import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
 import { flareAt } from '../engine/flares';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
-import { moonOffset, targetLongitude } from '../engine/measure';
+import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude } from '../engine/measure';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
 import { norm } from '../engine/vec';
 import { hash32 } from '../engine/rng';
@@ -45,6 +45,17 @@ export function targetObservable(t: number, minAlt = 12 * DEG) {
   const cloudy = s.settings.survival && isCloudy(s.seed, t);
   const flare = !!flareAt(sys, t);
   return { ok: sunAlt < -12 * DEG && alt > minAlt && !cloudy && !flare, sunAlt, alt, cloudy, flare };
+}
+
+/** Chapter 7: can the giant be seen right now (dark sky, high enough, no clouds)? */
+export function giantObservable(t: number) {
+  const s = useGame.getState();
+  const { system: sys } = currentWorld();
+  if (!sys.giant) return false;
+  const f = localFrame(sys, t, sys.site);
+  const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
+  const alt = toHorizontal(topocentric(sys, 'giant', t, sys.site), f).alt;
+  return sunAlt < -12 * DEG && alt > 12 * DEG && !(s.settings.survival && isCloudy(s.seed, t));
 }
 
 export function advance(dtReal: number) {
@@ -116,6 +127,25 @@ function stepTo(t1Wanted: number, dtReal: number) {
       patch.lastNightLog = lastNight;
     }
     if (moon.length) patch.moonTrack = [...s.moonTrack, ...moon];
+  }
+
+  // Chapter 7: the giant tracker logs the giant nightly and its moon eight times a day.
+  if (s.trackGOn && sys.giant) {
+    const trackG: TimedValue[] = [];
+    const moonG: TimedValue[] = [];
+    let lastG = s.trackG.length ? Math.floor(s.trackG[s.trackG.length - 1].at / logDay) : -1;
+    for (let k = Math.floor(t0 / step) + 1; k * step <= t1; k++) {
+      const t = k * step;
+      if (!giantObservable(t)) continue;
+      const night = Math.floor(t / logDay);
+      if (night > lastG) {
+        lastG = night;
+        trackG.push({ at: t, v: Math.round(giantLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES });
+      }
+      moonG.push({ at: t, v: Math.round(giantMoonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
+    }
+    if (trackG.length) patch.trackG = [...s.trackG, ...trackG];
+    if (moonG.length) patch.moonTrackG = [...s.moonTrackG, ...moonG];
   }
 
   // Chapter 5 solar camera: once an hour while the star is up, log the planet's

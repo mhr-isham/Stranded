@@ -208,6 +208,35 @@ export const LOGS: Record<string, StoryLog> = {
       { who: 'mira', text: 'Funny: it’s easier to be brave about a rate than about a reason.' },
     ],
   },
+  brief7: {
+    title: 'Slingshot',
+    chapter: 7,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'The next Halcyon cache is on a planet far out — five times our distance from the star. The drive can’t get us there. I ran the numbers four times.' },
+      { who: 'echo', text: 'So I have woken Tomas Rhee.' },
+      { who: 'note', text: 'The engineer climbs out of his pod, reads the fuel display, and laughs once without humour.' },
+      { who: 'echo', text: 'Tomas, there is a giant planet between us and the target. Pass close behind it and it drags us forwards — we leave faster than we came, and it never notices.' },
+      { who: 'echo', text: 'Navigator: the giant must be exactly where we expect it, two years from now, and exactly as heavy as we think. Measure it like you measured everything else.' },
+      { who: 'note', text: 'Optional: the Flight School module “Gravity assists” is in the Codex.' },
+    ],
+  },
+  cache7: {
+    title: 'The spent stage',
+    chapter: 7,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Orbit confirmed. And something else on the scope: an empty rocket stage, in an orbit around the star that crosses the giant’s. The Halcyon’s.' },
+      { who: 'echo', text: 'They used the same slingshot forty years ago. Their stage is still on the path the giant bent it onto. I ran their trajectory forward: it lands exactly where we see it.' },
+      { who: 'note', text: 'Tomas spends the descent rebuilding the fold coils from the cache. “Mira’s crew did this with worse tools,” he says. “I’m not going to be outdone by a ghost.”' },
+    ],
+  },
+  mira7: {
+    title: 'Halcyon journal · Day 612',
+    chapter: 7,
+    kind: 'journal',
+    lines: [{ who: 'mira', text: 'We borrowed speed from a giant. I hope it didn’t notice. I weighed it three times before we went — an ounce of doubt there is a week of fuel later.' }],
+  },
   brief5: {
     title: 'Inward',
     chapter: 5,

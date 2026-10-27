@@ -30,8 +30,8 @@ export const targetLongitude = (sys: StarSystem, t: number, site: Site) =>
   eclLon(topocentric(sys, 'target', t, site));
 
 /** Angular shift of planet 2 between two sites observing at the same instant. */
-export const parallaxShift = (sys: StarSystem, t: number, a: Site, b: Site) =>
-  angleBetween(topocentric(sys, 'target', t, a), topocentric(sys, 'target', t, b));
+export const parallaxShift = (sys: StarSystem, t: number, a: Site, b: Site, body: 'target' | 'giant' = 'target') =>
+  angleBetween(topocentric(sys, body, t, a), topocentric(sys, body, t, b));
 
 export const targetDistance = (sys: StarSystem, t: number, site: Site) => norm(topocentric(sys, 'target', t, site));
 
@@ -63,6 +63,19 @@ export function moonOffset(sys: StarSystem, t: number, site: Site) {
  */
 export const parallaxSite = (sys: StarSystem, site: Site, dist: number): Site =>
   sys.features.locked ? { lat: site.lat - dist / sys.home.radius, lon: site.lon } : siteEastOf(sys, site, dist);
+
+/** Chapter 7: the giant's moon offset from the giant along the ecliptic (rad, + = east). */
+export function giantMoonOffset(sys: StarSystem, t: number, site: Site) {
+  const p = topocentric(sys, 'giant', t, site);
+  const m = topocentric(sys, 'giantMoon', t, site);
+  let d = eclLon(m) - eclLon(p);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/** Chapter 7: the giant's ecliptic longitude in our sky. */
+export const giantLongitude = (sys: StarSystem, t: number, site: Site) => eclLon(topocentric(sys, 'giant', t, site));
 
 /** Point on the home planet reached by travelling `dist` metres due east. */
 export const siteEastOf = (sys: StarSystem, site: Site, dist: number): Site => ({

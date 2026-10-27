@@ -5,7 +5,7 @@
 
 import { ARCSEC, DAY, DEG, HOUR } from './constants';
 import type { Estimate, Primaries } from './chain';
-import { leadAngle, oppositions } from './ephemeris';
+import { leadAngle, oppositions, oppositionsOf } from './ephemeris';
 import { fitOrbit, type OrbitObs } from './orbitfit';
 
 const leadAngleSigned = (sys: StarSystem, t: number) => {
@@ -14,6 +14,8 @@ const leadAngleSigned = (sys: StarSystem, t: number) => {
 };
 import { simulateLaunch, type LaunchResult } from './launch';
 import {
+  giantLongitude,
+  giantMoonOffset,
   horizonDip,
   moonOffset,
   parallaxShift,
@@ -84,8 +86,8 @@ function summarize(xs: number[], floorRel = 1e-6): Estimate {
 }
 
 /** Time near t0 when planet 2 is highest in the sky at a site. */
-export function transitNear(sys: StarSystem, site: Site, t0: number) {
-  const alt = (t: number) => toHorizontal(topocentric(sys, 'target', t, site), localFrame(sys, t, site)).alt;
+export function transitNear(sys: StarSystem, site: Site, t0: number, body: 'target' | 'giant' = 'target') {
+  const alt = (t: number) => toHorizontal(topocentric(sys, body, t, site), localFrame(sys, t, site)).alt;
   let best = t0;
   let bestAlt = -Infinity;
   const day = sys.home.siderealDay;
@@ -175,9 +177,11 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
   const rover = parallaxSite(sys, sys.site, B);
   const mid = parallaxSite(sys, sys.site, B / 2);
   // A locked planet's sky barely turns, so there is no nightly meridian crossing to wait for: measure at opposition.
-  const tObs = sys.features.locked ? o2 : transitNear(sys, mid, sys.features.inner ? o2 + 0.22 * sys.synodic : o2);
+  // Chapter 7: triangulate the nearer giant at its own opposition instead.
+  const gOpp = sys.giant ? oppositionsOf(sys.home, sys.giant, 0, sys.lifeSupport)[1] : 0;
+  const tObs = sys.features.locked ? o2 : sys.giant ? transitNear(sys, mid, gOpp, 'giant') : transitNear(sys, mid, sys.features.inner ? o2 + 0.22 * sys.synodic : o2);
   const baseline = norm(sub(observerPos(sys, tObs, sys.site), observerPos(sys, tObs, rover)));
-  const pTrue = parallaxShift(sys, tObs, sys.site, rover);
+  const pTrue = parallaxShift(sys, tObs, sys.site, rover, sys.giant ? 'giant' : 'target');
   p.dPar = { ...summarize(Array.from({ length: n }, () => baseline / (pTrue + rng.normal(0, skill.parallaxReading)))), at: tObs };
 
   // Angular diameter the same night, and the moon's greatest elongation nearest opposition.
@@ -206,7 +210,7 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
   }
 
   // Chapter 4: the blue planet's ellipse, fitted to its nightly positions (Kepler's method).
-  if (sys.target.e) {
+  if (sys.target.e || sys.giant) {
     const res = 0.01 * DEG;
     const obs: OrbitObs[] = [];
     for (let d = 3 * DAY; d < o2 + 20 * DAY; d += 3 * DAY) {
@@ -214,15 +218,52 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
       const lon = targetLongitude(sys, d, sys.site) + rng.normal(0, skill.lonReading * 0.3);
       obs.push({ t: d, lon: Math.round(lon / res) * res });
     }
-    const fit = fitOrbit(obs, p.P1.value, p.tOpp.value, (1 / (1 / p.P1.value - 1 / p.S2.value)));
+    // Chapter 7's far planet is on a circle: fit just its year.
+    const circle = !sys.target.e;
+    const fit = fitOrbit(obs, p.P1.value, p.tOpp.value, circle ? undefined : 1 / (1 / p.P1.value - 1 / p.S2.value), circle);
     if (fit) {
       p.Porb = { value: fit.P2, sigma: fit.sigmaP2 };
-      p.ecc = { value: fit.e, sigma: fit.sigmaE };
-      p.wPeri = { value: fit.wPeri, sigma: fit.sigmaW };
+      if (!circle) {
+        p.ecc = { value: fit.e, sigma: fit.sigmaE };
+        p.wPeri = { value: fit.wPeri, sigma: fit.sigmaW };
+      }
     }
   }
 
-  return { primaries: p, readyAt: o2 + 5 * DAY };
+  // Chapter 7: the giant, measured like a second blue planet.
+  let readyAt = o2 + 5 * DAY;
+  if (sys.giant) {
+    const [g1, g2] = oppositionsOf(sys.home, sys.giant, 0, sys.lifeSupport);
+    const s1 = g1 + rng.normal(0, skill.oppositionPick);
+    const s2 = g2 + rng.normal(0, skill.oppositionPick);
+    p.Sg = { value: s2 - s1, sigma: Math.SQRT2 * pickSigma };
+    p.tOppG = { value: s2, sigma: pickSigma };
+    // Better: Kepler's method on the giant's whole track pins its year and opposition.
+    const res = 0.01 * DEG;
+    const obsG: OrbitObs[] = [];
+    for (let d = 3 * DAY; d < g2 + 20 * DAY; d += 3 * DAY) {
+      const lon = giantLongitude(sys, d, sys.site) + rng.normal(0, skill.lonReading * 0.3);
+      obsG.push({ t: d, lon: Math.round(lon / res) * res });
+    }
+    const fg = fitOrbit(obsG, p.P1.value, s2, 1 / (1 / p.P1.value - 1 / p.Sg.value), true);
+    if (fg) {
+      const SgFit = 1 / (1 / p.P1.value - 1 / fg.P2);
+      p.Sg = { value: SgFit, sigma: (SgFit * SgFit * fg.sigmaP2) / (fg.P2 * fg.P2) + SgFit * 2e-4 };
+      p.tOppG = { value: fg.tOppFit, sigma: Math.max(fg.sigmaTOpp, 0.05 * DAY) };
+    }
+    let maxG = 0;
+    let tG = g2;
+    for (let i = -200; i <= 200; i++) {
+      const t = g2 + (i / 400) * sys.giant.moon.period;
+      const off = Math.abs(giantMoonOffset(sys, t, sys.site));
+      if (off > maxG) [maxG, tG] = [off, t];
+    }
+    p.thetaMg = { ...summarize(Array.from({ length: n }, () => maxG + rng.normal(0, skill.elongationReading))), at: tG };
+    p.Pmg = summarize(Array.from({ length: n }, () => (3 * sys.giant!.moon.period + rng.normal(0, skill.moonTiming)) / 3));
+    readyAt = Math.max(readyAt, g2 + 5 * DAY);
+  }
+
+  return { primaries: p, readyAt };
 }
 
 export function linearFit(x: number[], y: number[]) {

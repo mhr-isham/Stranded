@@ -435,3 +435,94 @@ export function LockedLesson() {
     </LessonShell>
   );
 }
+
+/** Chapter 7: a gravity assist, seen from the giant and from the star. */
+export function SlingshotLesson() {
+  const [rp, setRp] = useState(3); // giant radii
+  const [mass, setMass] = useState(1); // relative to what you measured
+  const vInf = 6; // km/s relative to the giant
+  const vG = 13; // giant's orbital speed, km/s
+  const mu = 1.27e8 * 3; // km³/s², a heavy giant
+  const R = 70000; // km
+  const turn = (m: number) => 2 * Math.asin(1 / (1 + (rp * R * vInf * vInf) / (mu * m)));
+  const dPlan = turn(1);
+  const dReal = turn(mass);
+  // Incoming relative velocity points backwards-and-inwards; outgoing is turned by δ.
+  const inAng = Math.PI + 0.5;
+  const rel = (a: number) => [vInf * Math.cos(a), vInf * Math.sin(a)];
+  const vin = rel(inAng);
+  const vout = rel(inAng - dReal);
+  const voutPlan = rel(inAng - dPlan);
+  const helioIn = Math.hypot(vin[0] + vG, vin[1]);
+  const helioOut = Math.hypot(vout[0] + vG, vout[1]);
+  const S = 9;
+  const ox = 140;
+  const oy = 150;
+  const arrow = (x0: number, y0: number, v: number[], c: string, dash = false) => (
+    <line x1={x0} y1={y0} x2={x0 + v[0] * S} y2={y0 - v[1] * S} stroke={c} strokeWidth={2.2} strokeDasharray={dash ? '5 4' : undefined} markerEnd="url(#arrow)" />
+  );
+  const missDeg = ((dReal - dPlan) * 180) / Math.PI;
+  return (
+    <LessonShell
+      kicker="Chapter 7 · Slingshot"
+      title="Gravity assists"
+      demo={
+        <Demo h={360}>
+          <svg viewBox="0 0 600 300" style={{ width: '100%' }}>
+            <ArrowDefs />
+            <circle cx={ox} cy={oy} r={22} fill="#e9d6a8" />
+            <text x={ox} y={oy + 40} fill="#93a2c3" fontSize={11} textAnchor="middle">
+              the giant (its own view)
+            </text>
+            {arrow(ox, oy, vin.map((x) => -x), '#93a2c3')}
+            {arrow(ox, oy, vout, '#6cc4ff')}
+            {mass !== 1 && arrow(ox, oy, voutPlan, 'rgba(255,196,107,0.8)', true)}
+            <text x={ox - 120} y={30} fill="#93a2c3" fontSize={12}>
+              In: {fmtN(vInf, 1)} km/s · Out: {fmtN(vInf, 1)} km/s
+            </text>
+            <text x={ox - 120} y={48} fill="#93a2c3" fontSize={12}>
+              Same speed, new direction: turned {fmtN((dReal * 180) / Math.PI, 0)}°
+            </text>
+            <text x={360} y={60} fill="#93a2c3" fontSize={12}>
+              Seen from the star (add the giant’s {vG} km/s):
+            </text>
+            <text x={360} y={84} fill="#ffc46b" fontSize={13}>
+              before {fmtN(helioIn, 1)} km/s → after {fmtN(helioOut, 1)} km/s
+            </text>
+            <text x={360} y={108} fill={helioOut > helioIn ? '#5be3a4' : '#ff8a7a'} fontSize={12}>
+              {helioOut > helioIn ? `+${fmtN(helioOut - helioIn, 1)} km/s for free` : 'slowed down'}
+            </text>
+            <text x={360} y={160} fill="#93a2c3" fontSize={12}>
+              Real mass ÷ your measured mass: {fmtN(mass, 2)}
+            </text>
+            <text x={360} y={180} fill={Math.abs(missDeg) < 1 ? '#5be3a4' : '#ff8a7a'} fontSize={12}>
+              {Math.abs(missDeg) < 0.05 ? 'Bends exactly as planned.' : `Bends ${fmtN(Math.abs(missDeg), 1)}° ${missDeg > 0 ? 'more' : 'less'} than planned.`}
+            </text>
+            <text x={360} y={200} fill="#93a2c3" fontSize={11}>
+              dashed: the direction you planned
+            </text>
+          </svg>
+          <Slider label="Closest approach (giant radii)" value={rp} min={1.5} max={20} step={0.5} onChange={setRp} fmt={(v) => fmtN(v, 1)} />
+          <Slider label="Real mass ÷ your measurement" value={mass} min={0.8} max={1.2} step={0.01} onChange={setMass} fmt={(v) => fmtN(v, 2)} />
+          <Note>Pass closer and the giant turns you more. A heavier giant than you measured turns you more than you planned.</Note>
+        </Demo>
+      }
+      formula={
+        <>
+          turn δ = 2 asin(1 / (1 + r_p v∞² / GM_G))
+          <br />
+          relative to the giant: |v∞,out| = |v∞,in|; relative to the star: v = v_giant + v∞
+        </>
+      }
+      keyIdea="Relative to the giant, a flyby only changes your direction — you leave as fast as you came. But the giant itself is moving around the star, so turning your velocity towards its direction of motion adds its speed to yours. You leave faster, relative to the star, than you arrived: speed borrowed from the giant’s orbit."
+      tip="The bend depends on the giant’s mass and on how close you pass. ECHO aims the flyby with YOUR mass. Weigh the giant carefully (its moon), and pin down where it will be (its oppositions, sharpened with the orbit fit)."
+      warn="The giant pays for your speed by slowing down a tiny, tiny bit. It never notices — but your error bars will."
+    >
+      <P>
+        Voyager 2 used Jupiter, Saturn and Uranus to reach Neptune in 12 years instead of 30. Cassini swung past Venus twice, Earth and Jupiter to reach
+        Saturn.
+      </P>
+      <P>The idea came from asking what a planet’s gravity looks like from the planet’s own point of view: just a turn. Everything else is adding velocities.</P>
+    </LessonShell>
+  );
+}

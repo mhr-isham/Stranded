@@ -3,7 +3,7 @@ import { QUANTITY_INFO, keysFor, labelFor } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { DAY, DEG, G } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
-import { propagate } from '../../engine/orbits';
+import { lambert, propagate } from '../../engine/orbits';
 import {
   bestTransfer,
   hohmannFor,
@@ -11,6 +11,7 @@ import {
   planTransfer,
   posAt,
   targetState,
+  giantState,
   predictedWindows,
   sampleModel,
   systemFromModel,
@@ -64,12 +65,13 @@ export function Launch() {
   const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (windows[0] ?? t) / DAY);
   const plan: PlannedTransfer | null = useMemo(() => {
     if (!model) return null;
-    return autoTof ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
+    return autoTof || model.giant ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
   }, [model, depDay, autoTof, tofDays]);
 
   // Porkchop: estimated total delta-v over departure date x flight time.
   const pork = useMemo(() => {
-    if (!model || !hoh) return null;
+    // A slingshot has two flight times; the windows list and the route summary replace the map.
+    if (!model || !hoh || model.giant) return null;
     const nx = 56;
     const ny = 30;
     const d0 = Math.floor(t / DAY);
@@ -139,7 +141,7 @@ export function Launch() {
   const margin = plan ? budget - plan.total : NaN;
 
   const launch = (manual = false) => {
-    const p = autoTof ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, tofDays * DAY);
+    const p = autoTof || model.giant ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, tofDays * DAY);
     if (!p) return toast('No transfer found for this date.');
     sfx('launch');
     if (!s.tutorial.active) savePrelaunch();
@@ -190,6 +192,26 @@ export function Launch() {
               Now
             </button>
           </div>
+          {model.giant && plan?.plan.flyby && (
+            <div className="callout key" style={{ margin: 0 }}>
+              <b>Slingshot route</b>
+              <dl className="kv" style={{ marginTop: 4 }}>
+                <dt>To the giant</dt>
+                <dd>{fmt(plan.plan.flyby.tof1 / DAY, 0)} days</dd>
+                <dt>Closest approach</dt>
+                <dd>{fmt(plan.plan.flyby.rp / 1e6, 0)} thousand km</dd>
+                <dt>Burn at closest approach</dt>
+                <dd>{fmt(Math.abs(plan.plan.flyby.dv) + plan.plan.flyby.extraDv, 0)} m/s</dd>
+                <dt>Giant to the blue planet</dt>
+                <dd>{fmt((plan.plan.tof - plan.plan.flyby.tof1) / DAY, 0)} days</dd>
+              </dl>
+              <div className="faint" style={{ fontSize: 12 }}>
+                ECHO aims the flyby with YOUR giant mass. If it is heavier than you think, it bends us further — and the correction after it costs fuel.
+              </div>
+            </div>
+          )}
+          {!model.giant && (
+          <>
           <div className="row" style={{ gap: 6 }}>
             <button className={`btn small ${autoTof ? 'primary' : ''}`} onClick={() => setAutoTof(true)} title="The cheapest flight time for this date">
               ⛽ Fuel-saver
@@ -217,8 +239,15 @@ export function Launch() {
               <input type="range" min={Math.round((hoh.tof / DAY) * 0.5)} max={Math.round((hoh.tof / DAY) * 1.6)} value={tofDays} onChange={(e) => setTofDays(Number(e.target.value))} />
             </>
           )}
+          </>
+          )}
           {pork && <div data-tut="launch-porkchop"><Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} /></div>}
-          {model.ecc ? (
+          {model.giant ? (
+            <div className="muted" style={{ fontSize: 13 }}>
+              No single lead angle here: the route needs the giant AND the blue planet in the right places, so windows are rare. ECHO searches your own
+              numbers date by date for routes past the giant.
+            </div>
+          ) : model.ecc ? (
             <div className="muted" style={{ fontSize: 13 }}>
               On an ellipse there is no single lead angle: the planet speeds up near perihelion, so windows come unevenly. The cost map above searches your own
               ellipse date by date — the cheap bands are the windows. Rough flight time ≈ {fmt(hoh.tof / DAY, 0)} days.
@@ -386,6 +415,16 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
     const vInf = add(scale(unit(r1), plan.plan.vInfRadial), scale(unit(v1), plan.plan.vInfPrograde));
     const v0 = add(v1, vInf);
     const mu = G * model.Mstar;
+    const fb = plan.plan.flyby;
+    if (fb && model.giant) {
+      // Two legs: out to the giant, then on from it to the blue planet.
+      const leg1 = Array.from({ length: 61 }, (_, i) => propagate(r1, v0, (fb.tof1 * i) / 60, mu)[0]);
+      const tof2 = plan.plan.tof - fb.tof1;
+      const rg = giantState(model, td + fb.tof1)[0];
+      const sol = lambert(rg, targetState(model, td + plan.plan.tof)[0], tof2, mu);
+      const leg2 = sol ? Array.from({ length: 61 }, (_, i) => propagate(rg, sol[0], (tof2 * i) / 60, mu)[0]) : [];
+      return [...leg1, ...leg2];
+    }
     return Array.from({ length: 121 }, (_, i) => propagate(r1, v0, (plan.plan.tof * i) / 120, mu)[0]);
   }, [plan, model, depDay]);
   return (
@@ -403,6 +442,7 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
         for (const [a, c] of [
           [model.a1, 'rgba(255,190,120,0.35)'],
           [model.a2, 'rgba(108,196,255,0.35)'],
+          ...(model.giant ? ([[model.giant.a, 'rgba(255,230,184,0.35)']] as const) : []),
         ] as const) {
           ctx.strokeStyle = c;
           ctx.lineWidth = dpr;
@@ -453,6 +493,17 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
             ctx.beginPath();
             ctx.arc(X(rs), Y(rs), 3 * dpr, 0, Math.PI * 2);
             ctx.fill();
+          }
+          // The giant at the flyby (ghost).
+          if (plan.plan.flyby && model.giant) {
+            const rg = giantState(model, td + plan.plan.flyby.tof1)[0];
+            ctx.strokeStyle = 'rgba(255,230,184,0.85)';
+            ctx.beginPath();
+            ctx.arc(X(rg), Y(rg), 9 * dpr, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(255,230,184,0.85)';
+            ctx.font = `${11 * dpr}px Inter`;
+            ctx.fillText('flyby', X(rg) + 11 * dpr, Y(rg));
           }
           // Planet 2 at arrival (ghost).
           const r2a = targetState(model, td + plan.plan.tof)[0];

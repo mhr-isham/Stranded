@@ -7,6 +7,7 @@ import { DAY, DEG } from '../../engine/constants';
 import { fitOrbit, type OrbitFit } from '../../engine/orbitfit';
 import { fmt } from '../../game/format';
 import { useGame } from '../../game/store';
+import { currentWorld } from '../../game/sim';
 import { currentMode } from '../../game/modes';
 import { Formula, SendToSheet } from '../common/sheetBits';
 import { toast } from '../common/widgets';
@@ -23,6 +24,8 @@ export function OrbitPanel() {
   const guess = P1 && picks.length >= 2 ? 1 / (1 / P1 - (picks.length - 1) / (picks[picks.length - 1] - picks[0])) : undefined;
   const enough = obs.length >= 12 && P1 && tOpp && span > 0.6 * (guess ?? 1.8 * P1) / DAY;
   const mode = currentMode();
+  // Chapter 7's far planet is on a circle; only its year is needed (its synodic period is nearly our year — a poor clock).
+  const circleOnly = !!currentWorld().system.giant;
 
   const run = () => {
     if (!P1 || !tOpp) return;
@@ -30,7 +33,7 @@ export function OrbitPanel() {
     // Let the button repaint before the (half-second) fit.
     setTimeout(() => {
       const circle = fitOrbit(obs, P1, tOpp, guess, true);
-      const ellipse = fitOrbit(obs, P1, tOpp, guess);
+      const ellipse = circleOnly ? circle : fitOrbit(obs, P1, tOpp, guess);
       setFits({ circle, ellipse, n: obs.length });
       setBusy(false);
       if (!ellipse) toast('The fit did not converge — log more nights.');
@@ -61,7 +64,23 @@ export function OrbitPanel() {
       <button className="btn primary" disabled={!enough || busy} onClick={run}>
         {busy ? 'Fitting…' : fits ? `Refit with ${obs.length} nights` : 'Fit the orbit'}
       </button>
-      {fits && f && c && (
+      {fits && f && circleOnly && (
+        <>
+          <OrbitPlot fit={f} obsT={obs.map((o) => o.t)} />
+          <div className="muted" style={{ fontSize: 13 }}>
+            This planet is so far out that its synodic period is almost exactly our own year — a poor clock: a day’s error there becomes weeks in its
+            year. Its slow drift across the sky, fitted with Kepler’s method, gives the year directly.
+          </div>
+          <dl className="kv">
+            <dt>Its year P₂</dt>
+            <dd className="blue">
+              {fmt(f.P2 / DAY, 1)} ± {fmt(f.sigmaP2 / DAY, 1)} days
+            </dd>
+          </dl>
+          <SendToSheet k="Porb" value={f.P2} spread={f.sigmaP2} />
+        </>
+      )}
+      {fits && f && c && !circleOnly && (
         <>
           <OrbitPlot fit={f} obsT={obs.map((o) => o.t)} />
           <table className="log">

@@ -14,6 +14,8 @@ export interface Scene {
   target: Dir;
   targetDist: number;
   moon: Dir;
+  /** Chapter 7: the giant planet. */
+  giant: Dir | null;
   sunDist: number;
   stars: Float32Array; // local (e, n, u) triples for the catalogue
   milky: Float32Array; // local (e, n, u, brightness)
@@ -68,6 +70,7 @@ export function buildScene(sys: StarSystem, catalog: CatalogStar[], t: number, s
     target: toLocal(tgtV, frame),
     targetDist: norm(tgtV),
     moon: toLocal(moonV, frame),
+    giant: sys.giant ? toLocal(topocentric(sys, 'giant', t, site), frame) : null,
     sunDist: norm(sunV),
     stars,
     milky: mw.local,

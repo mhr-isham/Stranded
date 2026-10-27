@@ -3,7 +3,7 @@
 // obliquity about the x axis), and the local horizon (alt/az).
 
 import { TAU } from './constants';
-import { moonPos, planetPos } from './ephemeris';
+import { giantMoonPos, moonPos, planetPos } from './ephemeris';
 import { hash32, makeRng } from './rng';
 import type { Site, StarSystem } from './types';
 import { add, angleBetween, cross, dot, norm, rotX, scale, sub, unit, type Vec3 } from './vec';
@@ -28,11 +28,13 @@ export function observerPos(sys: StarSystem, t: number, site: Site): Vec3 {
   return add(planetPos(sys.home, t), scale(up, sys.home.radius));
 }
 
-export type BodyId = 'star' | 'target' | 'moon';
+export type BodyId = 'star' | 'target' | 'moon' | 'giant' | 'giantMoon';
 
 export function bodyPos(sys: StarSystem, id: BodyId, t: number): Vec3 {
   if (id === 'star') return [0, 0, 0];
   if (id === 'target') return planetPos(sys.target, t);
+  if (id === 'giant') return planetPos(sys.giant!, t);
+  if (id === 'giantMoon') return giantMoonPos(sys, t);
   return moonPos(sys, t);
 }
 

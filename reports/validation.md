@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-27T08:19:40.696Z with 40 systems per difficulty.
+Generated 2026-10-27T08:39:47.745Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
@@ -23,6 +23,10 @@ approximations (e.g. measuring near, not exactly at, opposition; topocentric off
 | Blue planet year (orbit fit) (P₂) | NaN% |
 | Orbit eccentricity (e) | NaN% |
 | Perihelion direction (from opposition) (ϖ) | NaN% |
+| Synodic period of the giant (S_G) | NaN% |
+| Date of the giant’s opposition (t_G) | NaN% |
+| Giant’s moon greatest elongation (θ_G) | NaN% |
+| Giant’s moon period (P_G) | NaN% |
 | Home planet mass (M₁) | 0.061% |
 | Blue planet year (P₂) | 0.016% |
 | Orbit ratio a₂/a₁ (a₂/a₁) | 0.006% |
@@ -32,6 +36,8 @@ approximations (e.g. measuring near, not exactly at, opposition; topocentric off
 | Blue planet radius (R₂) | 0.000% |
 | Moon orbit radius (aₘ) | 0.035% |
 | Blue planet mass (M₂) | 0.105% |
+| Giant orbit radius (a_G) | NaN% |
+| Giant mass (M_G) | NaN% |
 
 ## 2. Noisy solver (competent player skill)
 
@@ -56,6 +62,10 @@ Outcomes: success 40/40. Median fuel left: 27.328% of budget.
 | P₂ | NaN% | NaN% | NaN% |
 | e | NaN% | NaN% | NaN% |
 | ϖ | NaN% | NaN% | NaN% |
+| S_G | NaN% | NaN% | NaN% |
+| t_G | NaN% | NaN% | NaN% |
+| θ_G | NaN% | NaN% | NaN% |
+| P_G | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -65,6 +75,8 @@ Outcomes: success 40/40. Median fuel left: 27.328% of budget.
 | R₂ | 1.034% | 60.000% | 90.000% |
 | aₘ | 0.966% | 62.500% | 92.500% |
 | M₂ | 2.664% | 62.500% | 92.500% |
+| a_G | NaN% | NaN% | NaN% |
+| M_G | NaN% | NaN% | NaN% |
 
 ### cadet
 
@@ -87,6 +99,10 @@ Outcomes: success 40/40. Median fuel left: 17.040% of budget.
 | P₂ | NaN% | NaN% | NaN% |
 | e | NaN% | NaN% | NaN% |
 | ϖ | NaN% | NaN% | NaN% |
+| S_G | NaN% | NaN% | NaN% |
+| t_G | NaN% | NaN% | NaN% |
+| θ_G | NaN% | NaN% | NaN% |
+| P_G | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -96,6 +112,8 @@ Outcomes: success 40/40. Median fuel left: 17.040% of budget.
 | R₂ | 1.034% | 60.000% | 90.000% |
 | aₘ | 0.966% | 62.500% | 92.500% |
 | M₂ | 2.664% | 62.500% | 92.500% |
+| a_G | NaN% | NaN% | NaN% |
+| M_G | NaN% | NaN% | NaN% |
 
 ### navigator
 
@@ -118,6 +136,10 @@ Outcomes: success 38/40, flyby 2/40. Median fuel left: 9.686% of budget.
 | P₂ | NaN% | NaN% | NaN% |
 | e | NaN% | NaN% | NaN% |
 | ϖ | NaN% | NaN% | NaN% |
+| S_G | NaN% | NaN% | NaN% |
+| t_G | NaN% | NaN% | NaN% |
+| θ_G | NaN% | NaN% | NaN% |
+| P_G | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -127,6 +149,8 @@ Outcomes: success 38/40, flyby 2/40. Median fuel left: 9.686% of budget.
 | R₂ | 1.034% | 60.000% | 90.000% |
 | aₘ | 0.966% | 62.500% | 92.500% |
 | M₂ | 2.664% | 62.500% | 92.500% |
+| a_G | NaN% | NaN% | NaN% |
+| M_G | NaN% | NaN% | NaN% |
 
 ### astronomer
 
@@ -149,6 +173,10 @@ Outcomes: success 33/40, flyby 7/40. Median fuel left: 4.870% of budget.
 | P₂ | NaN% | NaN% | NaN% |
 | e | NaN% | NaN% | NaN% |
 | ϖ | NaN% | NaN% | NaN% |
+| S_G | NaN% | NaN% | NaN% |
+| t_G | NaN% | NaN% | NaN% |
+| θ_G | NaN% | NaN% | NaN% |
+| P_G | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -158,6 +186,8 @@ Outcomes: success 33/40, flyby 7/40. Median fuel left: 4.870% of budget.
 | R₂ | 1.034% | 60.000% | 90.000% |
 | aₘ | 0.966% | 62.500% | 92.500% |
 | M₂ | 2.664% | 62.500% | 92.500% |
+| a_G | NaN% | NaN% | NaN% |
+| M_G | NaN% | NaN% | NaN% |
 
 ### legend
 
@@ -180,6 +210,10 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | P₂ | NaN% | NaN% | NaN% |
 | e | NaN% | NaN% | NaN% |
 | ϖ | NaN% | NaN% | NaN% |
+| S_G | NaN% | NaN% | NaN% |
+| t_G | NaN% | NaN% | NaN% |
+| θ_G | NaN% | NaN% | NaN% |
+| P_G | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -189,6 +223,8 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | R₂ | 1.034% | 60.000% | 90.000% |
 | aₘ | 0.966% | 62.500% | 92.500% |
 | M₂ | 2.664% | 62.500% | 92.500% |
+| a_G | NaN% | NaN% | NaN% |
+| M_G | NaN% | NaN% | NaN% |
 
 ## 3. Campaign chapters (competent solver, Navigator)
 
@@ -200,5 +236,6 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | 4 | success 36/40, flyby 4/40 | 9.912% |
 | 5 | success 38/40, flyby 2/40 | 9.649% |
 | 6 | success 35/40, flyby 5/40 | 12.596% |
+| 7 | success 39/40, flyby 1/40 | 11.034% |
 | 9 | success 39/40, flyby 1/40 | 13.949% |
 

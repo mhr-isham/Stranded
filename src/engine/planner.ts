@@ -11,6 +11,7 @@ import type { StarSystem } from './types';
 import { dot, norm, sub, type Vec3 } from './vec';
 import { keplerState, meanLonForTrue } from './ephemeris';
 import { cheapestAt, costMinima } from './windows';
+import { planFlyby } from './flyby';
 
 /** The player's picture of the system, built from the progress sheet. */
 export interface PlayerModel {
@@ -30,6 +31,8 @@ export interface PlayerModel {
   /** Chapter 4: the target's eccentricity and perihelion direction (model frame: our planet at angle 0 at tOpp). */
   ecc?: number;
   peri?: number;
+  /** Chapter 7: the giant, from the player's own measurements. */
+  giant?: { a: number; P: number; tOpp: number; M: number };
 }
 
 export const LAUNCH_KEYS: PrimaryKey[] = keysFor('standard');
@@ -52,6 +55,9 @@ export function modelFromPrimaries(p: Primaries, variant: ChainVariant = 'standa
     R2: d.R2.value,
     inner: variant === 'inner',
     ...(variant === 'ellipse' && p.ecc && p.wPeri ? { ecc: p.ecc.value, peri: p.wPeri.value } : {}),
+    ...(variant === 'slingshot' && d.aG && d.Mg && p.Sg && p.tOppG
+      ? { giant: { a: d.aG.value, P: 1 / (1 / p.P1!.value - 1 / p.Sg.value), tOpp: p.tOppG.value, M: d.Mg.value } }
+      : {}),
   };
 }
 
@@ -142,9 +148,127 @@ function ellipseWindows(m: PlayerModel): number[] {
   return w;
 }
 
+/** The giant's position and velocity in the player's model (circular; at tOppG it lines up with us). */
+export function giantState(m: PlayerModel, t: number): [Vec3, Vec3] {
+  const g = m.giant!;
+  const th = (TAU * (g.tOpp - m.tOpp)) / m.P1 + (TAU * (t - g.tOpp)) / g.P;
+  const v = (TAU * g.a) / g.P;
+  return [
+    [g.a * Math.cos(th), g.a * Math.sin(th), 0],
+    [-v * Math.sin(th), v * Math.cos(th), 0],
+  ];
+}
+
+/**
+ * How close ECHO will dare to pass: twice the giant's radius as estimated from
+ * the measured mass, for a gas giant's density (about 1300 kg/m³).
+ */
+export const giantRpMin = (M: number) => 2 * Math.cbrt((3 * M) / (4 * Math.PI * 1300));
+
+/** A two-leg route in the player's model: home → giant (tof1) → target (tof2). */
+export function planSlingshot(m: PlayerModel, t0: number, tof1: number, tof2: number): PlannedTransfer | null {
+  const mu = G * m.Mstar;
+  const r1 = posAt(m.a1, m.P1, m, t0);
+  const v1 = velAt(m.a1, m.P1, m, t0);
+  const [rg, vg] = giantState(m, t0 + tof1);
+  const leg1 = lambert(r1, rg, tof1, mu);
+  if (!leg1) return null;
+  const [r2, v2] = targetState(m, t0 + tof1 + tof2);
+  const leg2 = lambert(rg, r2, tof2, mu);
+  if (!leg2) return null;
+  const vInf = sub(leg1[0], v1);
+  const fb = planFlyby(sub(leg1[1], vg), sub(leg2[0], vg), G * m.giant!.M, giantRpMin(m.giant!.M));
+  const vInfArr = norm(sub(leg2[1], v2));
+  const rHat = r1.map((x) => x / norm(r1)) as Vec3;
+  const pHat = v1.map((x) => x / norm(v1)) as Vec3;
+  const dep = departCost(norm(vInf), G * m.M1, m.R1);
+  const cap = captureCost(vInfArr, G * m.M2, 1.3 * m.R2);
+  const { cost: fbCost, ...flyby } = fb;
+  return {
+    plan: {
+      departTime: t0,
+      tof: tof1 + tof2,
+      vInfRadial: dot(vInf, rHat),
+      vInfPrograde: dot(vInf, pHat),
+      flyby: { ...flyby, tof1, muModel: G * m.giant!.M, rpMin: giantRpMin(m.giant!.M) },
+    },
+    departCost: dep + fbCost,
+    captureCost: cap,
+    total: dep + fbCost + cap,
+    vInfDepart: norm(vInf),
+    vInfArrive: vInfArr,
+  };
+}
+
+/** Rough flight-time ranges for the two legs (Hohmann-like times in the player's model). */
+function legRanges(m: PlayerModel) {
+  const mu = G * m.Mstar;
+  const t1 = hohmannTof(m.a1, m.giant!.a, mu);
+  const t2 = hohmannTof(m.giant!.a, m.a2, mu);
+  return { t1, t2 };
+}
+
+/** Best slingshot route leaving at t0: grid over both flight times, then refined. */
+export function bestSlingshot(m: PlayerModel, t0: number, coarse = 8, refine = true): PlannedTransfer | null {
+  const { t1, t2 } = legRanges(m);
+  let best: PlannedTransfer | null = null;
+  let bi = 0;
+  let bj = 0;
+  const f1 = (i: number) => t1 * (0.5 + (0.9 * i) / coarse);
+  const f2 = (j: number) => t2 * (0.35 + (1.0 * j) / coarse);
+  for (let i = 0; i <= coarse; i++)
+    for (let j = 0; j <= coarse; j++) {
+      const p = planSlingshot(m, t0, f1(i), f2(j));
+      if (p && (!best || p.total < best.total)) [best, bi, bj] = [p, i, j];
+    }
+  if (!best || !refine) return best;
+  // Pattern search around the best grid point.
+  let a = f1(bi);
+  let b = f2(bj);
+  let h1 = (0.9 * t1) / coarse;
+  let h2 = (1.0 * t2) / coarse;
+  for (let it = 0; it < 30 && (h1 > 3600 || h2 > 3600); it++) {
+    let moved = false;
+    for (const [da, db] of [[h1, 0], [-h1, 0], [0, h2], [0, -h2]]) {
+      const p = planSlingshot(m, t0, a + da, b + db);
+      if (p && p.total < best.total) {
+        best = p;
+        a += da;
+        b += db;
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) {
+      h1 /= 2;
+      h2 /= 2;
+    }
+  }
+  return best;
+}
+
+const slingCache = new Map<string, number[]>();
+const DAY_S = 86400;
+
+/** Slingshot windows in the player's model: dips of the best route cost over departure dates. */
+function slingshotWindows(m: PlayerModel, t0: number, t1: number): number[] {
+  // Searched only over the dates asked for (rounded, so it caches): it is the slow part.
+  const a = Math.floor(t0 / (10 * DAY_S)) * 10 * DAY_S;
+  const b = Math.ceil(t1 / (10 * DAY_S)) * 10 * DAY_S;
+  const key = [m.P1, m.P2, m.a1, m.a2, m.Mstar, m.tOpp, m.M1, m.R1, m.M2, m.R2, m.giant!.a, m.giant!.P, m.giant!.tOpp, m.giant!.M, a, b].join(',');
+  let w = slingCache.get(key);
+  if (w) return w;
+  const cost = (t: number) => bestSlingshot(m, t, 4, false)?.total ?? Infinity;
+  w = costMinima(cost, Math.max(0, a), b, m.P1 / 30, m.P1 / 6, 1.15);
+  if (slingCache.size > 100) slingCache.clear();
+  slingCache.set(key, w);
+  return w;
+}
+
 /** Hohmann windows predicted by the player's model between t0 and t1. */
 export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
   if (m.ecc) return ellipseWindows(m).filter((t) => t >= t0 && t <= t1);
+  if (m.giant) return slingshotWindows(m, t0, t1).filter((t) => t >= t0 && t <= t1);
   const { lead } = hohmannFor(m);
   const out: number[] = [];
   // Outer target: the lead shrinks with time; inner target: it grows.
@@ -160,6 +284,7 @@ export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
 
 /** Best flight time for a given departure, by golden-section search on total cost. */
 export function bestTransfer(m: PlayerModel, departTime: number): PlannedTransfer | null {
+  if (m.giant) return bestSlingshot(m, departTime);
   const tH = hohmannFor(m).tof;
   let a = 0.45 * tH;
   let b = 1.6 * tH;
@@ -199,6 +324,18 @@ export function systemFromModel(m: PlayerModel, template: StarSystem): StarSyste
       ? { a: m.a2, period: m.P2, phase0: meanLonForTrue(m.ecc, m.peri ?? 0, 0) - (TAU * m.tOpp) / m.P2, mass: m.M2, radius: m.R2, e: m.ecc, peri: m.peri ?? 0 }
       : { a: m.a2, period: m.P2, phase0: -(TAU * m.tOpp) / m.P2, mass: m.M2, radius: m.R2 },
     parkingRadius: 1.3 * m.R2,
+    // The giant as the player measured it (never the real one).
+    giant:
+      m.giant && template.giant
+        ? {
+            ...template.giant,
+            a: m.giant.a,
+            period: m.giant.P,
+            phase0: (TAU * (m.giant.tOpp - m.tOpp)) / m.P1 - (TAU * m.giant.tOpp) / m.giant.P,
+            mass: m.giant.M,
+            radius: giantRpMin(m.giant.M) / 2,
+          }
+        : undefined,
   };
 }
 

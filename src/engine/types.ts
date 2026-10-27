@@ -37,6 +37,11 @@ export interface Moon {
   radius: number;
 }
 
+/** Chapter 7: a giant planet between us and the target, with a big moon of its own. */
+export interface Giant extends Planet {
+  moon: Moon;
+}
+
 export interface Site {
   lat: number; // rad
   lon: number; // rad, measured on the home planet from the crash site meridian
@@ -71,4 +76,6 @@ export interface StarSystem {
   parkingRadius: number; // capture orbit radius around planet 2 (m)
   fuelDv: number; // total delta-v the ship carries (m/s)
   lifeSupport: number; // time at which life support runs out (s)
+  /** Chapter 7: the giant used for the slingshot. */
+  giant?: Giant;
 }

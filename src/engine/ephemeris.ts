@@ -160,3 +160,23 @@ export function nearestOpposition(sys: StarSystem, t: number) {
   const near = oppositions(sys, t - 1.5 * sys.synodic, t + 1.5 * sys.synodic);
   return near.reduce((b, x) => (Math.abs(x - t) < Math.abs(b - t) ? x : b), near[0] ?? sys.firstOpposition);
 }
+
+/** Chapter 7: the giant's moon. */
+export function giantMoonPos(sys: StarSystem, t: number): Vec3 {
+  const g = sys.giant!;
+  const c = planetPos(g, t);
+  const th = orbitAngle(g.moon, t);
+  return [c[0] + g.moon.a * Math.cos(th), c[1] + g.moon.a * Math.sin(th), 0];
+}
+
+/** Oppositions of any circular outer planet (for the giant): when it shares our heliocentric longitude. */
+export function oppositionsOf(home: Planet, p: Planet, t0: number, t1: number): number[] {
+  const rate = TAU * (1 / home.period - 1 / p.period); // how fast we gain on it
+  const S = TAU / Math.abs(rate);
+  // Phase of the gap at t = 0, wrapped: opposition when home.phase0 + rate·t − p.phase0 ≡ 0.
+  const g0 = home.phase0 - p.phase0;
+  const tFirst = ((((-g0 / rate) % S) + S) % S);
+  const out: number[] = [];
+  for (let t = tFirst + Math.floor((t0 - tFirst) / S) * S; t <= t1; t += S) if (t >= t0) out.push(t);
+  return out;
+}

@@ -36,7 +36,9 @@ export function Flight() {
     : [
         `Ignition. Burning ${fmt(result.departCost / 1000, 2)} km/s to escape.`,
         'Coasting. Cryo-pods engaged.',
-        `Mid-course: ECHO sights the blue planet and corrects course — ${fmt(result.correctionCost, 0)} m/s.`,
+        outcome.plan.flyby
+          ? `Slingshot: we swing past the giant ${fmt(outcome.plan.flyby.rp / 1e6, 0)} thousand km from its centre. ECHO’s corrections before and after: ${fmt(result.correctionCost, 0)} m/s.`
+          : `Mid-course: ECHO sights the blue planet and corrects course — ${fmt(result.correctionCost, 0)} m/s.`,
         result.outcome === 'lost' ? 'Not enough fuel to correct. We drift past the blue planet’s orbit…' : `Arrival. Braking ${fmt(result.captureCost / 1000, 2)} km/s into orbit…`,
         result.outcome === 'success' ? 'Orbit achieved. Heat shield armed for landing.' : result.outcome === 'flyby' ? 'The tanks run dry mid-burn. We fly past.' : 'Lost in space.',
       ];
@@ -67,6 +69,7 @@ export function Flight() {
           for (const [pl, c] of [
             [sys.home, 'rgba(255,190,120,0.3)'],
             [sys.target, 'rgba(108,196,255,0.3)'],
+            ...(sys.giant ? ([[sys.giant, 'rgba(255,230,184,0.3)']] as const) : []),
           ] as const) {
             ctx.strokeStyle = c;
             ctx.lineWidth = dpr;
@@ -92,6 +95,7 @@ export function Flight() {
           };
           dot(planetPos(sys.home, tNow), '#ffb26b', 6);
           dot(planetPos(sys.target, tNow), '#6cc4ff', 7);
+          if (sys.giant) dot(planetPos(sys.giant, tNow), '#ffe6b8', 9);
           if (predicted.length > 1) {
             ctx.strokeStyle = 'rgba(181,156,255,0.55)';
             ctx.setLineDash([5 * dpr, 5 * dpr]);
@@ -120,7 +124,7 @@ export function Flight() {
           ctx.textAlign = 'left';
           ctx.fillText(`mission day ${fmt(tNow / DAY, 0)}`, 16 * dpr, h - 20 * dpr);
           ctx.fillStyle = 'rgba(181,156,255,0.85)';
-          ctx.fillText('- - your numbers’ path (no correction)', 16 * dpr, 28 * dpr);
+          if (predicted.length) ctx.fillText('- - your numbers’ path (no correction)', 16 * dpr, 28 * dpr);
           ctx.fillStyle = '#ffc46b';
           ctx.fillText('—— the real path, with ECHO’s mid-course correction', 16 * dpr, 46 * dpr);
         }}
@@ -152,6 +156,8 @@ export function Flight() {
 
 /** The coast your own model predicts for this plan, drawn in the real system's frame. */
 function predictedPath(outcome: NonNullable<ReturnType<typeof useGame.getState>['outcome']>, sys: StarSystem): Vec3[] {
+  // A slingshot's path depends on the flyby: the single-coast comparison would mislead.
+  if (outcome.plan.flyby) return [];
   const variant = variantOf(sys.features);
   const m = modelFromPrimaries(outcome.sheet, variant);
   if (!m) return [];

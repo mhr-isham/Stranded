@@ -114,6 +114,11 @@ export interface GameState {
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
   moonTrack: TimedValue[]; // moon offset from planet (rad)
+  /** Chapter 7: the giant's nightly longitude, its moon's offset, and its marked oppositions. */
+  trackGOn: boolean;
+  trackG: TimedValue[];
+  moonTrackG: TimedValue[];
+  oppPicksG: number[];
   identified: boolean;
   oppPicks: number[]; // times the player marked as oppositions
   rover: { dist: number; target: number; departAt: number; arriveAt: number };
@@ -221,6 +226,10 @@ const initial = {
   track: [],
   moonTrackOn: false,
   moonTrack: [],
+  trackGOn: false,
+  trackG: [] as TimedValue[],
+  moonTrackG: [] as TimedValue[],
+  oppPicksG: [] as number[],
   identified: false,
   oppPicks: [] as number[],
   rover: { dist: 0, target: 0, departAt: 0, arriveAt: 0 },

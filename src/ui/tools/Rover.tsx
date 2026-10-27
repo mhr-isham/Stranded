@@ -38,13 +38,16 @@ export function Rover() {
   const [fovAs, setFovAs] = useState(150);
 
   const driving = s.rover.arriveAt > t;
+  // Chapter 7 triangulates the nearer, brighter giant instead of the far blue planet.
+  const body = sys.giant ? 'giant' : 'target';
+  const what = sys.giant ? 'giant' : 'blue planet';
   const roverSite = parallaxSite(sys, sys.site, s.rover.dist);
   const midSite = parallaxSite(sys, sys.site, s.rover.dist / 2);
 
   const siteInfo = (site: typeof sys.site) => {
     const f = localFrame(sys, t, site);
     return {
-      alt: toHorizontal(topocentric(sys, 'target', t, site), f).alt / DEG,
+      alt: toHorizontal(topocentric(sys, body, t, site), f).alt / DEG,
       sun: toHorizontal(topocentric(sys, 'star', t, site), f).alt / DEG,
     };
   };
@@ -62,13 +65,13 @@ export function Rover() {
 
   const capture = () => {
     const tt = clock.t;
-    const vA = topocentric(sys, 'target', tt, sys.site);
-    const vB = topocentric(sys, 'target', tt, roverSite);
+    const vA = topocentric(sys, body, tt, sys.site);
+    const vB = topocentric(sys, body, tt, roverSite);
     setCap({
       at: tt,
       dirA: unit(vA),
       dirB: unit(vB),
-      radius: Math.asin(sys.target.radius / norm(vA)),
+      radius: Math.asin((sys.giant ?? sys.target).radius / norm(vA)),
       baseline: norm(sub(observerPos(sys, tt, sys.site), observerPos(sys, tt, roverSite))),
     });
     setMarks({ A: null, B: null });
@@ -155,7 +158,7 @@ export function Rover() {
       </div>
 
       <div className="tool-side">
-        <ToolHeader title="Rover & parallax" sub="Two sites, one instant: the blue planet shifts against the distant stars. The shift gives the distance." />
+        <ToolHeader title="Rover & parallax" sub={`Two sites, one instant: the ${what} shifts against the distant stars. The shift gives the distance.`} />
         <div className="panel panel-pad stack" data-tut="rover-drive">
           <b>1 · Position the rover</b>
           <div className="row between">
@@ -175,9 +178,9 @@ export function Rover() {
         <div className="panel panel-pad stack" data-tut="rover-image">
           <b>2 · Image both sites at once</b>
           <dl className="kv">
-            <dt>Camp: blue planet altitude</dt>
+            <dt>Camp: {what} altitude</dt>
             <dd>{fmt(A.alt, 1)}° · {hhmm(localSolarHours(sys, t))}</dd>
-            <dt>Rover: blue planet altitude</dt>
+            <dt>Rover: {what} altitude</dt>
             <dd>{fmt(B.alt, 1)}°</dd>
             <dt>Midpoint: altitude</dt>
             <dd>{fmt(M.alt, 1)}°</dd>

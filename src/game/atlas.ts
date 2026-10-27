@@ -58,6 +58,10 @@ export const TOOL_OF: Record<PrimaryKey, string> = {
   Porb: 'Orbit fit',
   ecc: 'Orbit fit',
   wPeri: 'Orbit fit',
+  Sg: 'Tracker (giant)',
+  tOppG: 'Tracker (giant)',
+  thetaMg: 'Giant’s moon',
+  Pmg: 'Giant’s moon',
 };
 
 export interface Calibration {

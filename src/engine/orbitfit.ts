@@ -30,6 +30,9 @@ export interface OrbitFit {
   predict: (t: number) => number;
   /** Rotation from the model frame to the sky frame (our planet's direction at tOpp). */
   lambda0: number;
+  /** The fitted opposition nearest tOpp (when both planets point the same way), and its error. */
+  tOppFit: number;
+  sigmaTOpp: number;
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -191,5 +194,14 @@ export function fitOrbit(obs: OrbitObs[], P1: number, tOpp: number, P2guess?: nu
     home: (t) => rot(m.home(t), x[4]),
     predict: m.lon,
     lambda0: x[4],
+    // Opposition: the planet's longitude catches up with ours. Near tOpp the gap closes at
+    // (2π/P₁ − 2π/P₂ per second, ignoring the ellipse's small speed changes).
+    ...(() => {
+      const rate = TAU / P1 - TAU / Math.abs(x[0]);
+      const gap = wrap(x[3] - x[4]);
+      // Error of the gap from the covariance of L0 and λ0.
+      const vGap = C ? C[3][3] + C[4][4] - 2 * C[3][4] : NaN;
+      return { tOppFit: tOpp + gap / rate, sigmaTOpp: Math.sqrt(Math.max(0, vGap)) / Math.abs(rate) };
+    })(),
   };
 }

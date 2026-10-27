@@ -1,7 +1,7 @@
 import { variantOf } from '../src/engine/chapters';
 import { nominalFlyby } from '../src/engine/probe';
 import { describe, expect, it } from 'vitest';
-import { DERIVED_KEYS, deriveAll, keysFor, truthValues } from '../src/engine/chain';
+import { DERIVED_KEYS, deriveAll, derivedFor, keysFor, truthValues } from '../src/engine/chain';
 import { DEG } from '../src/engine/constants';
 import { horizonDip, pendulumPeriod } from '../src/engine/measure';
 import { scoreQuantity } from '../src/engine/scoring';
@@ -31,7 +31,7 @@ describe('solve chain', () => {
       const { primaries } = botMeasure(sys, PERFECT, makeRng(seed));
       const est = { ...primaries, ...deriveAll(primaries) };
       const truth = truthValues(sys, primaries);
-      for (const k of [...keysFor('standard'), ...DERIVED_KEYS]) {
+      for (const k of [...keysFor('standard'), ...DERIVED_KEYS.filter((d) => derivedFor('standard')[d])]) {
         if (k === 'tOpp') continue;
         // g carries a real 0.06% bias from the 4 degree pendulum release.
         expect(Math.abs(est[k]!.value / truth[k] - 1), k).toBeLessThan(1.5e-3);
@@ -39,8 +39,8 @@ describe('solve chain', () => {
     }
   });
 
-  it('recovers chapter variants too (no moon: probe flyby; inner planet)', () => {
-    for (const chapter of [2, 5]) {
+  it('recovers chapter variants too (probe, ellipse, inner, locked, slingshot, real)', () => {
+    for (const chapter of [2, 4, 5, 6, 7, 9]) {
       for (let seed = 1; seed <= 8; seed++) {
         const sys = generateSystem(seed, 'navigator', chapter);
         const variant = variantOf(sys.features);
@@ -48,9 +48,11 @@ describe('solve chain', () => {
         const est = { ...primaries, ...deriveAll(primaries, variant) };
         const fb = nominalFlyby(sys);
         const truth = truthValues(sys, primaries, { vInf: fb.vInf, vPeak: fb.vPeak, rPeri: fb.rPeri });
-        for (const k of [...keysFor(variant), 'M2', 'a1', 'a2', 'Mstar', 'P2'] as const) {
-          if (k === 'tOpp') continue;
-          expect(Math.abs(est[k]!.value / truth[k] - 1), `ch${chapter} ${k}`).toBeLessThan(2e-3);
+        for (const k of [...keysFor(variant), 'M2', 'a1', 'a2', 'Mstar', 'P2', ...(variant === 'slingshot' ? (['aG', 'Mg'] as const) : [])] as const) {
+          if (k === 'tOpp' || k === 'tOppG' || k === 'wPeri') continue;
+          // Fitted quantities (orbit fits) carry the tracker's 0.01° rounding.
+          const tol = ['Porb', 'ecc', 'Sg'].includes(k) ? 5e-3 : variant === 'slingshot' || variant === 'ellipse' ? 1e-2 : chapter === 6 ? 2e-2 : 2e-3; // ch6: a quick system, so the moon's swing and the parallax carry small real biases
+          expect(Math.abs(est[k]!.value / truth[k] - 1), `ch${chapter} ${k}`).toBeLessThan(tol);
         }
       }
     }

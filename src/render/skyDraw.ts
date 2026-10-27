@@ -134,6 +134,23 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
     ctx.fill();
   }
 
+  // Chapter 7: the giant — the brightest steady light in the sky, creamy white.
+  const gp = scene.giant ? P.project(scene.giant) : null;
+  if (gp && lim > 0) {
+    const a = Math.max(0, Math.min(1, (lim + 0.5) / 2));
+    const r = 2.8 * o.dpr;
+    const halo = ctx.createRadialGradient(gp.x, gp.y, 0, gp.x, gp.y, r * 5);
+    halo.addColorStop(0, `rgba(255,236,200,${0.95 * a})`);
+    halo.addColorStop(0.3, `rgba(255,220,170,${0.3 * a})`);
+    halo.addColorStop(1, 'rgba(255,220,170,0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(gp.x - r * 5, gp.y - r * 5, r * 10, r * 10);
+    ctx.fillStyle = `rgba(255,244,222,${a})`;
+    ctx.beginPath();
+    ctx.arc(gp.x, gp.y, r * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // The star itself.
   if (sp) {
     const rDisk = Math.max(3 * o.dpr, o.starAngularRadius * P.scale);

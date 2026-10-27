@@ -26,6 +26,12 @@ export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; to
   rPeri: { what: 'How close the probe passed: its distance from the planet’s centre at closest approach.', tool: 'probe', toolName: 'the probe tracker' },
   Porb: { what: 'How long the blue planet takes to go once round its ellipse, from fitting Kepler’s laws to its path across our sky.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
   ecc: { what: 'How stretched the blue planet’s orbit is: 0 is a circle; the closest and farthest points are a(1 − e) and a(1 + e) from the star.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
+  Sg: { what: 'Time between two oppositions of the giant.', tool: 'observatory', toolName: 'the Giant tab in the observatory' },
+  tOppG: { what: 'A date when the giant was exactly opposite the star — the middle of its retrograde loop.', tool: 'observatory', toolName: 'the Giant tab in the observatory' },
+  thetaMg: { what: 'How far the giant’s big moon swings from it, at most, as an angle in our sky.', tool: 'observatory', toolName: 'the Giant tab in the observatory' },
+  Pmg: { what: 'How long the giant’s moon takes to go once round it.', tool: 'observatory', toolName: 'the Giant tab in the observatory' },
+  aG: { what: 'The radius of the giant’s orbit.', formula: 'a_G = a₁ (P_G/P₁)^⅔,  1/P_G = 1/P₁ − 1/S_G' },
+  Mg: { what: 'The giant’s mass. It decides how hard the giant bends our path in the slingshot.', formula: 'M_G = 4π² a³ / (G P²) for its moon' },
   wPeri: { what: 'Which way the orbit’s closest point (perihelion) lies, measured from the direction of the blue planet at opposition.', tool: 'observatory', toolName: 'the orbit fit in the observatory' },
 };
 
@@ -53,6 +59,12 @@ export const HINTS: Record<QuantityKey, string[]> = {
   rPeri: ['How close did it pass?', 'The probe’s radar altimeter reports its height above the cloud tops at closest approach; add the planet’s radius.', 'rₚ = R₂ + altitude.'],
   Porb: ['The planet repeats its path once per orbit.', 'Log the blue planet’s position on as many nights as you can, over most of an orbit.', 'Then run the orbit fit in the observatory and send P₂ to the sheet.'],
   ecc: ['An oval orbit makes the planet speed up near the star and slow down far from it.', 'The orbit fit finds the ellipse that matches every night’s position.', 'More nights, spread over more of the orbit, give a tighter e.'],
+  Sg: ['The giant does its own retrograde loop.', 'Track it and mark two of its oppositions.', 'S_G is the time between them.'],
+  tOppG: ['When is the giant opposite the star?', 'The middle of its retrograde loop.', 'Mark it in the Giant tab.'],
+  thetaMg: ['Its moon swings to and fro.', 'Fit the swing in the Giant tab.', 'The swing’s half-height is θ_G.'],
+  Pmg: ['How long one swing takes.', 'Fit the swing in the Giant tab.', 'Peak to peak is P_G.'],
+  aG: ['Like a₂ for the blue planet.', 'It follows from S_G, P₁ and a₁.', 'Kepler’s third law.'],
+  Mg: ['Weigh the giant with its moon.', 'Same method as M₂.', 'Its mass sets the slingshot’s bend.'],
   wPeri: ['Where on its orbit is the planet closest to the star?', 'The orbit fit draws the ellipse; its closest point is the perihelion.', 'Send ϖ from the orbit fit.'],
 };
 

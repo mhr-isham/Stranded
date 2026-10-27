@@ -82,7 +82,16 @@ export const CHAPTERS: ChapterSpec[] = [
     successLogs: ['cache6', 'mira6'],
     ready: true,
   },
-  { n: 7, title: 'Slingshot', idea: 'Gravity assist from a third planet.', twist: 'The target is too far for the fuel.', lessons: [], briefing: null, successLogs: [], ready: false },
+  {
+    n: 7,
+    title: 'Slingshot',
+    idea: 'A gravity assist: borrow speed from a giant planet on the way.',
+    twist: 'The blue planet is too far for our fuel — unless the giant throws us there.',
+    lessons: ['slingshot'],
+    briefing: 'brief7',
+    successLogs: ['cache7', 'mira7'],
+    ready: true,
+  },
   { n: 8, title: 'Lost Among Stars', idea: 'Stellar parallax: finding where we are.', twist: 'The question is no longer where the planet is, but where we are.', lessons: [], briefing: null, successLogs: [], ready: false },
   {
     n: 9,

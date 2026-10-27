@@ -31,6 +31,13 @@ const POS: Record<QuantityKey | 'launch', [number, number]> = {
   Porb: [0, 3.7],
   ecc: [0.9, 4.1],
   wPeri: [1.5, 4.7],
+  // Chapter 7: the giant, measured like a second blue planet.
+  Sg: [0, 10.1],
+  tOppG: [0, 11.1],
+  thetaMg: [0, 12.1],
+  Pmg: [0, 13.1],
+  aG: [2.4, 10.6],
+  Mg: [3.4, 12.2],
   M1: [1.3, 1],
   P2: [1.1, 3.2],
   ratio: [2.1, 3.6],
