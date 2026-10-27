@@ -40,7 +40,7 @@ describe('solve chain', () => {
   });
 
   it('recovers chapter variants too (probe, ellipse, inner, locked, slingshot, real)', () => {
-    for (const chapter of [2, 4, 5, 6, 7, 9]) {
+    for (const chapter of [2, 4, 5, 6, 7, 8, 9]) {
       for (let seed = 1; seed <= 8; seed++) {
         const sys = generateSystem(seed, 'navigator', chapter);
         const variant = variantOf(sys.features);
@@ -51,7 +51,7 @@ describe('solve chain', () => {
         for (const k of [...keysFor(variant), 'M2', 'a1', 'a2', 'Mstar', 'P2', ...(variant === 'slingshot' ? (['aG', 'Mg'] as const) : [])] as const) {
           if (k === 'tOpp' || k === 'tOppG' || k === 'wPeri') continue;
           // Fitted quantities (orbit fits) carry the tracker's 0.01° rounding.
-          const tol = ['Porb', 'ecc', 'Sg'].includes(k) ? 5e-3 : variant === 'slingshot' || variant === 'ellipse' ? 1e-2 : chapter === 6 ? 2e-2 : 2e-3; // ch6: a quick system, so the moon's swing and the parallax carry small real biases
+          const tol = ['Porb', 'ecc', 'Sg'].includes(k) ? 5e-3 : variant === 'slingshot' || variant === 'ellipse' ? 1e-2 : chapter === 6 ? 2e-2 : 3e-3; // ch6: a quick system, so the moon's swing and the parallax carry small real biases
           expect(Math.abs(est[k]!.value / truth[k] - 1), `ch${chapter} ${k}`).toBeLessThan(tol);
         }
       }

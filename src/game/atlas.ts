@@ -62,6 +62,9 @@ export const TOOL_OF: Record<PrimaryKey, string> = {
   tOppG: 'Tracker (giant)',
   thetaMg: 'Giant’s moon',
   Pmg: 'Giant’s moon',
+  pStarA: 'Stellar parallax',
+  pStarB: 'Stellar parallax',
+  pStarC: 'Stellar parallax',
 };
 
 export interface Calibration {

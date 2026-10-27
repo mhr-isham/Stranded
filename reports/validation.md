@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-27T08:39:47.745Z with 40 systems per difficulty.
+Generated 2026-10-27T08:46:56.860Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
@@ -27,6 +27,9 @@ approximations (e.g. measuring near, not exactly at, opposition; topocentric off
 | Date of the giant’s opposition (t_G) | NaN% |
 | Giant’s moon greatest elongation (θ_G) | NaN% |
 | Giant’s moon period (P_G) | NaN% |
+| Parallax of Kestrel (p_K) | NaN% |
+| Parallax of Wren (p_W) | NaN% |
+| Parallax of Osprey (p_O) | NaN% |
 | Home planet mass (M₁) | 0.061% |
 | Blue planet year (P₂) | 0.016% |
 | Orbit ratio a₂/a₁ (a₂/a₁) | 0.006% |
@@ -66,6 +69,9 @@ Outcomes: success 40/40. Median fuel left: 27.328% of budget.
 | t_G | NaN% | NaN% | NaN% |
 | θ_G | NaN% | NaN% | NaN% |
 | P_G | NaN% | NaN% | NaN% |
+| p_K | NaN% | NaN% | NaN% |
+| p_W | NaN% | NaN% | NaN% |
+| p_O | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -103,6 +109,9 @@ Outcomes: success 40/40. Median fuel left: 17.040% of budget.
 | t_G | NaN% | NaN% | NaN% |
 | θ_G | NaN% | NaN% | NaN% |
 | P_G | NaN% | NaN% | NaN% |
+| p_K | NaN% | NaN% | NaN% |
+| p_W | NaN% | NaN% | NaN% |
+| p_O | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -140,6 +149,9 @@ Outcomes: success 38/40, flyby 2/40. Median fuel left: 9.686% of budget.
 | t_G | NaN% | NaN% | NaN% |
 | θ_G | NaN% | NaN% | NaN% |
 | P_G | NaN% | NaN% | NaN% |
+| p_K | NaN% | NaN% | NaN% |
+| p_W | NaN% | NaN% | NaN% |
+| p_O | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -177,6 +189,9 @@ Outcomes: success 33/40, flyby 7/40. Median fuel left: 4.870% of budget.
 | t_G | NaN% | NaN% | NaN% |
 | θ_G | NaN% | NaN% | NaN% |
 | P_G | NaN% | NaN% | NaN% |
+| p_K | NaN% | NaN% | NaN% |
+| p_W | NaN% | NaN% | NaN% |
+| p_O | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -214,6 +229,9 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | t_G | NaN% | NaN% | NaN% |
 | θ_G | NaN% | NaN% | NaN% |
 | P_G | NaN% | NaN% | NaN% |
+| p_K | NaN% | NaN% | NaN% |
+| p_W | NaN% | NaN% | NaN% |
+| p_O | NaN% | NaN% | NaN% |
 | M₁ | 0.575% | 65.000% | 97.500% |
 | P₂ | 0.201% | 80.000% | 97.500% |
 | a₂/a₁ | 0.127% | 77.500% | 97.500% |
@@ -237,5 +255,6 @@ Outcomes: success 28/40, flyby 12/40. Median fuel left: 2.768% of budget.
 | 5 | success 38/40, flyby 2/40 | 9.649% |
 | 6 | success 35/40, flyby 5/40 | 12.596% |
 | 7 | success 39/40, flyby 1/40 | 11.034% |
+| 8 | success 38/40, flyby 2/40 | 10.048% |
 | 9 | success 39/40, flyby 1/40 | 13.949% |
 

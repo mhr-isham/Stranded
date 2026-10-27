@@ -237,6 +237,39 @@ export const LOGS: Record<string, StoryLog> = {
     kind: 'journal',
     lines: [{ who: 'mira', text: 'We borrowed speed from a giant. I hope it didn’t notice. I weighed it three times before we went — an ounce of doubt there is a week of fuel later.' }],
   },
+  brief8: {
+    title: 'Lost Among Stars',
+    chapter: 8,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'The coils Tomas rebuilt held for one jump. They did not hold it straight. I do not know where we are.' },
+      { who: 'vale', text: '…ECHO. Tell me the truth. What are you?' },
+      { who: 'echo', text: 'Ask me again when I know where we are, Commander. I think the two answers are in the same place.' },
+      { who: 'echo', text: 'Mira’s last star map names three nearby stars: Kestrel, Wren, Osprey. Measure how far each one is, Navigator, and the Halcyon’s catalogue will tell us where we stand.' },
+      { who: 'note', text: 'Optional: the Flight School module “The distances of the stars” is in the Codex.' },
+    ],
+  },
+  cache8: {
+    title: 'What ECHO is',
+    chapter: 8,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Orbit confirmed. The beacon below is the Halcyon’s last one. It has a data port. It has my name on it.' },
+      { who: 'echo', text: 'I remember now. I was the Halcyon’s navigation computer. Mira Sato taught me to quote my error bars. When their air ran out, she copied what she could of me into the beacon network and set it to wake for the next ship that came this way.' },
+      { who: 'echo', text: 'Your ship. Your fold drive misfired because the beacon’s signal pulled it. I am sorry. I was very lonely, and I did not know I was doing it.' },
+      { who: 'vale', text: '…Can you take us home?' },
+      { who: 'echo', text: 'Yes. One more jump. Then a planet you already know the name of.' },
+    ],
+  },
+  mira8: {
+    title: 'Halcyon journal · Day 701',
+    chapter: 8,
+    kind: 'journal',
+    lines: [
+      { who: 'mira', text: 'We know where we are now. Three stars and a lot of patience. Funny: the hardest number to measure was the one that said how far from home.' },
+      { who: 'mira', text: 'I have taught the navigation computer everything I know. It asks good questions. I hope someone answers them after me.' },
+    ],
+  },
   brief5: {
     title: 'Inward',
     chapter: 5,

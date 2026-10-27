@@ -15,12 +15,14 @@ export interface SystemFeatures {
   locked?: boolean;
   /** A giant planet for a gravity assist; the target is too far to reach directly (chapter 7). */
   slingshot?: boolean;
+  /** Three nearby stars to triangulate by their annual parallax (chapter 8). */
+  stars?: boolean;
   /** The real Solar System: Mars to Earth (chapter 9). */
   real?: boolean;
 }
 
 /** Which version of the solve chain a system needs. */
-export type ChainVariant = 'standard' | 'probe' | 'inner' | 'ellipse' | 'slingshot';
+export type ChainVariant = 'standard' | 'probe' | 'inner' | 'ellipse' | 'slingshot' | 'stars';
 
 export const CHAPTER_FEATURES: Record<number, SystemFeatures> = {
   1: { moon: true, refraction: 0, inner: false },
@@ -30,9 +32,10 @@ export const CHAPTER_FEATURES: Record<number, SystemFeatures> = {
   5: { moon: true, refraction: 0, inner: true },
   6: { moon: true, refraction: 0, inner: false, locked: true },
   7: { moon: true, refraction: 0, inner: false, slingshot: true },
+  8: { moon: true, refraction: 0, inner: false, stars: true },
   9: { moon: true, refraction: 0, inner: true, real: true },
 };
 
 export const featuresOf = (chapter: number): SystemFeatures => CHAPTER_FEATURES[chapter] ?? CHAPTER_FEATURES[1];
 
-export const variantOf = (f: SystemFeatures): ChainVariant => (f.inner ? 'inner' : !f.moon ? 'probe' : f.ellipse ? 'ellipse' : f.slingshot ? 'slingshot' : 'standard');
+export const variantOf = (f: SystemFeatures): ChainVariant => (f.inner ? 'inner' : !f.moon ? 'probe' : f.ellipse ? 'ellipse' : f.slingshot ? 'slingshot' : f.stars ? 'stars' : 'standard');

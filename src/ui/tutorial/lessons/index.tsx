@@ -5,7 +5,7 @@ import { DeltaVLesson, HonestyLesson, MeasureLesson, PropagationLesson } from '.
 import { AngularLesson, MoonLesson, ParallaxLesson } from './distance';
 import { HohmannLesson } from './flight';
 import { EstimateLesson } from './estimate';
-import { EllipseLesson, FlybyLesson, InnerLesson, LockedLesson, RefractionLesson, SlingshotLesson } from './chapters';
+import { EllipseLesson, FlybyLesson, InnerLesson, LockedLesson, RefractionLesson, SlingshotLesson, StellarLesson } from './chapters';
 import { HorizonLesson, MassLesson, PendulumLesson } from './ground';
 import { KeplerLesson, RetrogradeLesson, SynodicLesson, TwinkleLesson, YearLesson } from './sky';
 
@@ -33,6 +33,7 @@ export const LESSONS = {
   ellipse: { title: 'Kepler’s laws: ellipses', icon: '🥚', C: EllipseLesson },
   locked: { title: 'Tidal locking and flares', icon: '🔴', C: LockedLesson },
   slingshot: { title: 'Gravity assists', icon: '☄️', C: SlingshotLesson },
+  stellar: { title: 'The distances of the stars', icon: '✨', C: StellarLesson },
 } satisfies Record<string, { title: string; icon: string; C: ComponentType }>;
 
 export type LessonId = keyof typeof LESSONS;

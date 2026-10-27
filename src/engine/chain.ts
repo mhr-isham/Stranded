@@ -2,6 +2,7 @@
 // other quantity follows from them, and how errors propagate along the way.
 
 import { DAY, G } from './constants';
+import { nearStarsOf } from './nearstars';
 import { keplerState, meanLonForTrue, nearestOpposition, oppositionsOf, orbitAngle, planetPos } from './ephemeris';
 
 const nearestOf = (ts: number[], t: number) => ts.reduce((b, x) => (Math.abs(x - t) < Math.abs(b - t) ? x : b), ts[0] ?? NaN);
@@ -10,7 +11,7 @@ import type { StarSystem } from './types';
 import { norm, sub } from './vec';
 
 /** Every primary any chapter uses. Each chain variant measures a subset (keysFor). */
-export const PRIMARY_KEYS = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'vInf', 'vPeak', 'rPeri', 'Porb', 'ecc', 'wPeri', 'Sg', 'tOppG', 'thetaMg', 'Pmg'] as const;
+export const PRIMARY_KEYS = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'vInf', 'vPeak', 'rPeri', 'Porb', 'ecc', 'wPeri', 'Sg', 'tOppG', 'thetaMg', 'Pmg', 'pStarA', 'pStarB', 'pStarC'] as const;
 export const DERIVED_KEYS = ['M1', 'P2', 'ratio', 'a1', 'a2', 'Mstar', 'R2', 'aM', 'M2', 'aG', 'Mg'] as const;
 export type PrimaryKey = (typeof PRIMARY_KEYS)[number];
 export type DerivedKey = (typeof DERIVED_KEYS)[number];
@@ -37,7 +38,9 @@ export const keysFor = (variant: ChainVariant = 'standard'): PrimaryKey[] =>
       ? ['R1', 'g', 'P1', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'Porb', 'ecc', 'wPeri']
       : variant === 'slingshot'
         ? ['R1', 'g', 'P1', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm', 'Porb', 'Sg', 'tOppG', 'thetaMg', 'Pmg']
-        : STANDARD_KEYS;
+        : variant === 'stars'
+          ? [...STANDARD_KEYS, 'pStarA', 'pStarB', 'pStarC']
+          : STANDARD_KEYS;
 
 type V = Record<PrimaryKey, number>;
 type At = Partial<Record<PrimaryKey, number>>;
@@ -252,6 +255,11 @@ export function truthValues(sys: StarSystem, p: Primaries = {}, extra: Partial<R
     Pmg: sys.giant?.moon.period ?? NaN,
     aG: sys.giant?.a ?? NaN,
     Mg: sys.giant?.mass ?? NaN,
+    // Chapter 8: the three nearby stars' annual parallaxes.
+    ...(() => {
+      const ns = nearStarsOf(sys);
+      return { pStarA: ns[0]?.parallax ?? NaN, pStarB: ns[1]?.parallax ?? NaN, pStarC: ns[2]?.parallax ?? NaN };
+    })(),
     Porb: sys.target.period,
     ecc: sys.target.e ?? 0,
     wPeri,
@@ -287,6 +295,9 @@ export const QUANTITY_INFO: Record<QuantityKey, { label: string; symbol: string;
   Pmg: { label: 'Giant’s moon period', symbol: 'P_G', unit: 'days', scale: DAY, digits: 3 },
   aG: { label: 'Giant orbit radius', symbol: 'a_G', unit: 'million km', scale: 1e9, digits: 1 },
   Mg: { label: 'Giant mass', symbol: 'M_G', unit: '×10²⁴ kg', scale: 1e24, digits: 1 },
+  pStarA: { label: 'Parallax of Kestrel', symbol: 'p_K', unit: '″', scale: Math.PI / 648000, digits: 4 },
+  pStarB: { label: 'Parallax of Wren', symbol: 'p_W', unit: '″', scale: Math.PI / 648000, digits: 4 },
+  pStarC: { label: 'Parallax of Osprey', symbol: 'p_O', unit: '″', scale: Math.PI / 648000, digits: 4 },
   Porb: { label: 'Blue planet year (orbit fit)', symbol: 'P₂', unit: 'days', scale: DAY, digits: 2 },
   ecc: { label: 'Orbit eccentricity', symbol: 'e', unit: '', scale: 1, digits: 3 },
   wPeri: { label: 'Perihelion direction (from opposition)', symbol: 'ϖ', unit: '°', scale: Math.PI / 180, digits: 1 },

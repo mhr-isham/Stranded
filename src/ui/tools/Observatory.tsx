@@ -29,11 +29,12 @@ import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
 import { OrbitPanel } from './OrbitPanel';
 import { GiantPanel } from './GiantPanel';
+import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
-type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'giant' | 'micro' | 'moon';
+type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'giant' | 'stars' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'sky', label: 'Sky' },
@@ -42,6 +43,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'transit', label: 'Transit' },
   { id: 'orbit', label: 'Orbit' },
   { id: 'giant', label: 'Giant' },
+  { id: 'stars', label: 'Stars' },
   { id: 'micro', label: 'Micrometer' },
   { id: 'moon', label: 'Moon' },
 ];
@@ -414,7 +416,7 @@ export function Observatory() {
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
-            {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e || !!sys.giant) && (tb.id !== 'giant' || !!sys.giant)).map((tb) => (
+            {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e || !!sys.giant) && (tb.id !== 'giant' || !!sys.giant) && (tb.id !== 'stars' || !!sys.features.stars)).map((tb) => (
               <button
                 key={tb.id}
                 data-tut={`obs-tab-${tb.id}`}
@@ -536,6 +538,7 @@ export function Observatory() {
 
         {tab === 'orbit' && <OrbitPanel />}
         {tab === 'giant' && <GiantPanel />}
+        {tab === 'stars' && <StarsPanel />}
         {tab === 'moon' && <MoonPanel />}
       </div>
     </div>

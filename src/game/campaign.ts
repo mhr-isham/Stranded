@@ -92,7 +92,16 @@ export const CHAPTERS: ChapterSpec[] = [
     successLogs: ['cache7', 'mira7'],
     ready: true,
   },
-  { n: 8, title: 'Lost Among Stars', idea: 'Stellar parallax: finding where we are.', twist: 'The question is no longer where the planet is, but where we are.', lessons: [], briefing: null, successLogs: [], ready: false },
+  {
+    n: 8,
+    title: 'Lost Among Stars',
+    idea: 'Stellar parallax: three nearby stars, our own orbit as the baseline — and a fix on where we are.',
+    twist: 'The question is no longer only where the planet is, but where we are.',
+    lessons: ['stellar'],
+    briefing: 'brief8',
+    successLogs: ['cache8', 'mira8'],
+    ready: true,
+  },
   {
     n: 9,
     title: 'Home',

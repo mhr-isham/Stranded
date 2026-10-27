@@ -526,3 +526,80 @@ export function SlingshotLesson() {
     </LessonShell>
   );
 }
+
+/** Chapter 8: stellar parallax — our orbit as the baseline. */
+export function StellarLesson() {
+  const [phase, setPhase] = useState(0.2);
+  const [dist, setDist] = useState(6); // in units of our orbit, exaggerated for the picture
+  const cx = 120;
+  const cy = 170;
+  const a = 60;
+  const th = 2 * Math.PI * phase;
+  const us = [cx + a * Math.cos(th), cy - a * Math.sin(th)];
+  const star = [cx, cy - a * dist * 0.35];
+  // Where the near star appears on the far background (a band at the top).
+  const appX = star[0] + ((star[0] - us[0]) * (star[1] - 20)) / Math.max(1, us[1] - star[1]);
+  const pDeg = (Math.atan(1 / dist) * 180) / Math.PI;
+  return (
+    <LessonShell
+      kicker="Chapter 8 · Lost Among Stars"
+      title="The distances of the stars"
+      demo={
+        <Demo h={360}>
+          <svg viewBox="0 0 600 300" style={{ width: '100%' }}>
+            <rect x={0} y={8} width={260} height={16} fill="rgba(147,162,195,0.12)" />
+            <text x={4} y={20} fill="#5d6a88" fontSize={10}>
+              far background stars
+            </text>
+            <circle cx={cx} cy={cy} r={a} fill="none" stroke="rgba(255,196,107,0.35)" />
+            <circle cx={cx} cy={cy} r={7} fill="#ffd36b" />
+            <circle cx={us[0]} cy={us[1]} r={5} fill="#ffc46b" />
+            <circle cx={star[0]} cy={star[1]} r={4} fill="#ffe6b8" />
+            <line x1={us[0]} y1={us[1]} x2={appX} y2={16} stroke="rgba(255,230,184,0.5)" strokeDasharray="4 3" />
+            <circle cx={appX} cy={16} r={3} fill="#ffe6b8" />
+            <text x={star[0] + 8} y={star[1]} fill="#ffe6b8" fontSize={11}>
+              near star
+            </text>
+            <text x={330} y={70} fill="#93a2c3" fontSize={12}>
+              As we go round, the near star seems to slide
+            </text>
+            <text x={330} y={88} fill="#93a2c3" fontSize={12}>
+              to and fro against the background — once a year.
+            </text>
+            <text x={330} y={130} fill="#6cc4ff" fontSize={13}>
+              p = {fmtN(pDeg, 2)}° (half the full swing)
+            </text>
+            <text x={330} y={150} fill="#93a2c3" fontSize={12}>
+              d = a₁ / tan p = {fmtN(dist, 1)} a₁
+            </text>
+            <text x={330} y={200} fill="#93a2c3" fontSize={11}>
+              Real stars are so far that p is well under 1″:
+            </text>
+            <text x={330} y={216} fill="#93a2c3" fontSize={11}>
+              the nearest star to the Sun shows 0.77″.
+            </text>
+          </svg>
+          <Slider label="Where we are in our year" value={phase} min={0} max={1} step={0.01} onChange={setPhase} fmt={(v) => fmtN(v, 2)} />
+          <Slider label="Star distance (in units of our orbit, exaggerated)" value={dist} min={2} max={14} step={0.5} onChange={setDist} fmt={(v) => fmtN(v, 1)} />
+          <Note>The farther the star, the smaller its yearly swing. Our orbit is the longest baseline we have.</Note>
+        </Demo>
+      }
+      formula={
+        <>
+          d = a₁ / tan p,   1 parsec = the distance where p = 1″ for a₁ = 1 AU (3.26 light-years)
+          <br />
+          offset(t) = A sin(2πt/P₁) + B cos(2πt/P₁) + C + μt,   p = √(A² + B²)
+        </>
+      }
+      keyIdea="A near star seen from opposite sides of our orbit points in slightly different directions, so against the far background it swings to and fro once a year. The size of the swing, with our orbit radius as the baseline, gives its distance. Stars also drift on their own (proper motion): a slow straight line under the yearly wobble."
+      tip="Log each star every few weeks for most of a year (it hides near the star for a season). The fit uses YOUR year P₁ — and the distance uses YOUR a₁: errors there pass straight through."
+      warn="Stellar parallaxes are tiny: a few tenths of an arcsecond. Bad-seeing nights add scatter, so log many nights and fit them all."
+    >
+      <P>
+        Friedrich Bessel measured the first stellar parallax in 1838: 61 Cygni, 0.31″. People had looked for it since the Greeks; it is so small that its
+        absence was once taken as proof that the Earth does not move.
+      </P>
+      <P>The space telescope Gaia has measured parallaxes for more than a billion stars, to a few millionths of an arcsecond.</P>
+    </LessonShell>
+  );
+}

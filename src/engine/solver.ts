@@ -5,7 +5,8 @@
 
 import { ARCSEC, DAY, DEG, HOUR } from './constants';
 import type { Estimate, Primaries } from './chain';
-import { leadAngle, oppositions, oppositionsOf } from './ephemeris';
+import { leadAngle, oppositions, oppositionsOf, orbitAngle } from './ephemeris';
+import { fitParallax, nearStarsOf, parallaxOffset } from './nearstars';
 import { fitOrbit, type OrbitObs } from './orbitfit';
 
 const leadAngleSigned = (sys: StarSystem, t: number) => {
@@ -262,6 +263,19 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
     p.Pmg = summarize(Array.from({ length: n }, () => (3 * sys.giant!.moon.period + rng.normal(0, skill.moonTiming)) / 3));
     readyAt = Math.max(readyAt, g2 + 5 * DAY);
   }
+
+  // Chapter 8: each nearby star logged every couple of weeks for a year, away from the star's glare.
+  const near = nearStarsOf(sys);
+  near.forEach((st, i) => {
+    const obs: { t: number; v: number }[] = [];
+    for (let t = 5 * DAY; t < Math.min(sys.lifeSupport, 1.3 * sys.home.period + 5 * DAY); t += 12 * DAY) {
+      const sunLon = orbitAngle(sys.home, t) + Math.PI;
+      if (Math.cos(st.lon - sunLon) > Math.cos(40 * DEG)) continue;
+      obs.push({ t, v: parallaxOffset(sys, st, t) + rng.normal(0, skill.lonReading > 0 ? 0.01 * ARCSEC : 0) });
+    }
+    const f = fitParallax(obs, p.P1!.value);
+    if (f) p[(['pStarA', 'pStarB', 'pStarC'] as const)[i]] = { value: f.parallax, sigma: 1.3 * f.sigma };
+  });
 
   return { primaries: p, readyAt };
 }

@@ -36,6 +36,10 @@ const POS: Record<QuantityKey | 'launch', [number, number]> = {
   tOppG: [0, 11.1],
   thetaMg: [0, 12.1],
   Pmg: [0, 13.1],
+  // Chapter 8: three nearby stars (they feed the navigation fix, not the flight).
+  pStarA: [4.6, 7.6],
+  pStarB: [4.6, 8.6],
+  pStarC: [4.6, 9.6],
   aG: [2.4, 10.6],
   Mg: [3.4, 12.2],
   M1: [1.3, 1],

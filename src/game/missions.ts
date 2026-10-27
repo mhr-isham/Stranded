@@ -308,6 +308,30 @@ const CH7: Mission[] = [
   byId('plan'),
 ];
 
+/** Chapter 8: the usual chain, plus stellar parallax for a navigation fix. */
+const CH8: Mission[] = [
+  ...['gravity', 'radius', 'mass', 'identify', 'year', 'track', 'opposition', 'parallax', 'disk', 'moon', 'synodic'].map(byId),
+  {
+    id: 'starPar',
+    title: 'Three wobbling stars',
+    short: 'Measure the parallax of Kestrel, Wren and Osprey.',
+    goal: 'In the observatory’s Stars tab, log each of the three stars every few weeks for most of a year, fit each yearly wobble and send the parallaxes to the sheet.',
+    why: 'Our own orbit is the baseline: a star whose wobble is p away is a₁ / tan p from here.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.pStarA && !!s.sheet.pStarB && !!s.sheet.pStarC,
+  },
+  {
+    id: 'fix',
+    title: 'Where we are',
+    short: 'Confirm a navigation fix.',
+    goal: 'Compare your three distances with the Halcyon’s catalogue in the Stars tab. When exactly one place fits, confirm it.',
+    why: 'Three distances to known stars pin down where you are, the way three radio beacons would.',
+    screen: 'observatory',
+    done: (s) => !!s.navFix,
+  },
+  byId('plan'),
+];
+
 /** The missions of the current chapter. */
 export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 2) return CH2;
@@ -316,5 +340,6 @@ export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 5) return CH5;
   if (s.chapter === 6) return CH6;
   if (s.chapter === 7) return CH7;
+  if (s.chapter === 8) return CH8;
   return MISSIONS;
 }

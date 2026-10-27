@@ -91,7 +91,7 @@ out('## 3. Campaign chapters (competent solver, Navigator)');
 out();
 out('| Chapter | Outcomes | Median fuel left |');
 out('|---|---|---|');
-for (const chapter of [1, 2, 3, 4, 5, 6, 7, 9]) {
+for (const chapter of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
   const outcomes: Record<string, number> = {};
   const fuelLeft: number[] = [];
   for (let seed = 1; seed <= N; seed++) {
