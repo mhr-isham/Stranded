@@ -73,6 +73,7 @@ export default function App() {
       {phase === 'ascent' && <Ascent />}
       {phase === 'flight' && <Flight />}
       {phase === 'landing' && <Prologue arrival />}
+      {phase === 'hop' && <Prologue hop />}
       {phase === 'results' && <Results />}
       {tutorial && <Tutorial />}
       {phase !== 'title' && phase !== 'prologue' && <StoryHost />}

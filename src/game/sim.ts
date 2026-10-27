@@ -18,6 +18,7 @@ import { isCloudy, lifeSupportEnd, survivalDay } from './survival';
 import { world } from './world';
 import { variantOf } from '../engine/chapters';
 import { resolvePredictions } from './predictions';
+import { advanceSurface } from './surface';
 
 const TRACK_RES = 0.01 * DEG; // tracker reading resolution
 const MOON_RES = 0.5 * ARCSEC;
@@ -147,6 +148,7 @@ function stepTo(t1Wanted: number, dtReal: number) {
     if (d1 > d0) Object.assign(patch, survivalDay({ ...s, ...patch }, sys, d0, d1));
   }
 
+  Object.assign(patch, advanceSurface({ ...s, ...patch }, sys, t0, t1));
   if (Object.keys(patch).length) useGame.setState(patch);
   resolvePredictions(t1);
 

@@ -63,7 +63,7 @@ interface Sim {
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
-export function Prologue({ arrival = false }: { arrival?: boolean }) {
+export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; hop?: boolean }) {
   const s = useGame();
   const { system: sys } = currentWorld();
   const mode = modeOf(s.settings.difficulty);
@@ -86,9 +86,10 @@ export function Prologue({ arrival = false }: { arrival?: boolean }) {
   }, [sys]);
 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
-  const later = s.chapter > 1 && !arrival;
+  const later = s.chapter > 1 && !arrival && !hop;
+  const hopTo = hop ? (s.hop?.toX ?? 0) : 0;
   const sim = useRef<Sim>({
-    stage: arrival ? 'entry' : later ? 'deorbit' : 'tumble',
+    stage: hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble',
     stageT: 0,
     ang: later ? 0.3 : 0.4,
     spin: later ? 0 : 1.9,
@@ -98,16 +99,20 @@ export function Prologue({ arrival = false }: { arrival?: boolean }) {
     gamma: -4.5,
     heat: 0,
     shieldHurt: false,
-    d: { x: -3500, y: 8000, vx: 120, vy: -100, th: 0, om: 0, fuel: mode.landingDv, chute: 'stowed', t: 0 },
+    d: hop
+      ? { x: hopTo - 350, y: terrain.height(hopTo) + 900, vx: 18, vy: -12, th: 0, om: 0, fuel: mode.landingDv, chute: 'stowed', t: 0 }
+      : { x: -3500, y: 8000, vx: 120, vy: -100, th: 0, om: 0, fuel: mode.landingDv, chute: 'stowed', t: 0 },
     rescued: false,
     said: new Set(),
     dust: [],
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
-  const [stage, setStage] = useState<Stage>(arrival ? 'entry' : later ? 'deorbit' : 'tumble');
+  const [stage, setStage] = useState<Stage>(hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble');
   const [line, setLine] = useState(
-    arrival
+    hop
+      ? 'Hop! We’re coming down over the new site. Same as before: slow down, stay upright, touch down gently.'
+      : arrival
       ? 'Entry interface at the blue planet. Same rules as before: keep the flight-path angle in the green corridor. The beacon is on flat ground ahead.'
       : later
       ? 'Fold exit — controlled, this time. Mostly. New star, new planets, and we’re falling toward the nearest one. Turn the nose to the green retrograde marker and burn.'
@@ -186,6 +191,10 @@ export function Prologue({ arrival = false }: { arrival?: boolean }) {
       useGame.setState({ arrival: { landing: camp.landing, site: camp.site }, phase: 'results' });
       return;
     }
+    if (hop) {
+      useGame.setState({ camp: { ...camp, landing: s.camp?.landing ?? camp.landing }, hop: null, phase: 'play', screen: 'map' });
+      return;
+    }
     if (later) {
       // A new chapter: straight to camp, then the chapter's briefing.
       useGame.setState({ camp });
@@ -204,6 +213,10 @@ export function Prologue({ arrival = false }: { arrival?: boolean }) {
     stopRumble();
     if (arrival) {
       useGame.setState({ arrival: { landing: 'skipped', site: 'flat' }, phase: 'results' });
+      return;
+    }
+    if (hop) {
+      useGame.setState({ camp: { ...campAt(hopTo, 'skipped'), landing: s.camp?.landing ?? 'skipped' }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
     useGame.setState({ camp: campAt(x, 'skipped') });

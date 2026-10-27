@@ -17,6 +17,7 @@ import { Workshop } from './tools/Workshop';
 import { Codex } from './Codex';
 import { ActCard } from './ActCard';
 import { ProbeBay } from './tools/ProbeBay';
+import { SurfaceMap } from './tools/SurfaceMap';
 import { Gnomon } from './tools/Gnomon';
 
 const NAV: { screen: Screen; label: string; ico: string }[] = [
@@ -50,6 +51,7 @@ export function Game() {
       {screen === 'workshop' && <Workshop />}
       {screen === 'codex' && <Codex />}
       {screen === 'probe' && <ProbeBay />}
+      {screen === 'map' && <SurfaceMap />}
       {screen === 'gnomon' && <Gnomon />}
       <Hud />
       {screen === 'hub' && !tutorial && <MissionPanel />}

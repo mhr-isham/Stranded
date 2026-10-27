@@ -45,7 +45,9 @@ export function Hill() {
   const climb = (i: number) => {
     if (i === at || moving) return;
     const dh = Math.abs(stations[i].h - stations[at].h);
-    const dur = (dh / 350 + 0.25) * HOUR;
+    // Walking out from camp to the foot of the hill (and back) takes time too.
+    const walk = at === 0 || i === 0 ? ((s.camp?.hillKm ?? 4) / 4) * HOUR : 0;
+    const dur = (dh / 350 + 0.25) * HOUR + walk;
     setMoving(true);
     spendTime(dur, () => {
       setAt(i);

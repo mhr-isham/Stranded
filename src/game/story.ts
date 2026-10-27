@@ -78,6 +78,16 @@ export const LOGS: Record<string, StoryLog> = {
       },
     ],
   },
+  toolbox: {
+    title: 'A Halcyon toolbox',
+    chapter: 0,
+    kind: 'discovery',
+    lines: [
+      { who: 'note', text: 'Half buried in the regolith: a dented toolbox stamped HALCYON. Inside, wrapped in plastic, a page of horizon-dip readings.' },
+      { who: 'echo', text: 'Every reading has an error bar. Some of them are wider than mine would have been. All of them are honest.' },
+      { who: 'mira', text: 'Dip 1.07° ± 0.02°. Wind. Hands cold. Taking the mean anyway — Mira.' },
+    ],
+  },
   brief2: {
     title: 'The Silent Planet',
     chapter: 2,

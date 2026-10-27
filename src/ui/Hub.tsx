@@ -28,7 +28,8 @@ export function Hub() {
       { kind: 'observatory', az: 118 * DEG, alt: -2.6 * DEG, size: 7 * DEG, label: 'Observatory', icon: '🔭', screen: 'observatory' },
       { kind: 'pendulum', az: 143 * DEG, alt: -4.5 * DEG, size: 6.5 * DEG, label: 'Pendulum rig', icon: '⏱', screen: 'pendulum' },
       { kind: 'ship', az: 166 * DEG, alt: -6 * DEG, size: 15 * DEG, label: 'Ship · Progress sheet', icon: '🛰', screen: 'sheet' },
-      { kind: 'rover', az: 190 * DEG, alt: -3.2 * DEG, size: 4.2 * DEG, label: 'Rover', icon: '🚙', screen: 'rover' },
+      { kind: 'rover', az: 190 * DEG, alt: -3.2 * DEG, size: 4.2 * DEG, label: 'Rover · parallax', icon: '🚙', screen: 'rover' },
+      { kind: 'gnomon', az: 178 * DEG, alt: -8.5 * DEG, size: 0.1 * DEG, label: 'Surface map', icon: '🗺', screen: 'map' },
       { kind: 'hill', az: land.hillAz, alt: land.ridges[1].alt(land.hillAz) - 0.2 * DEG, size: 2.2 * DEG, label: 'The hill', icon: '⛰', screen: 'hill' },
     ];
     if (survival) list.push({ kind: 'workshop' as StationKind, az: 207 * DEG, alt: -3 * DEG, size: 5 * DEG, label: 'Workshop', icon: '🔧', screen: 'workshop' });

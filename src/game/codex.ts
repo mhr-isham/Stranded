@@ -9,6 +9,12 @@ export interface CodexCard {
 
 export const CODEX: CodexCard[] = [
   {
+    id: 'meteorite',
+    title: 'Stones from the sky',
+    year: '1794 – today',
+    text: 'For centuries scientists refused to believe stones could fall from the sky. In 1794 Ernst Chladni argued they came from space; a shower of stones over L’Aigle, France, in 1803 settled it. Iron meteorites are fragments of the metal cores of shattered early planetesimals — samples of how planets are built.',
+  },
+  {
     id: 'galileo',
     title: 'The pendulum clock',
     year: '1602 – 1673',
