@@ -32,6 +32,17 @@ export function findsFor(seed: number): Find[] {
 
 export const SCAN_RANGE = 1500;
 
+/** The nearest spot to x (within 400 m) gentle enough to land a hop on. */
+export function safePad(tr: Terrain, x: number) {
+  const slope = (q: number) => Math.abs(tr.height(q + 6) - tr.height(q - 6)) / 12;
+  const ok = (q: number) => Math.abs(q) <= STRIP - 100 && [-6, 0, 6].every((k) => slope(q + k) < 0.1);
+  for (let r = 0; r <= 400; r += 2) {
+    if (ok(x + r)) return x + r;
+    if (ok(x - r)) return x - r;
+  }
+  return x;
+}
+
 export function terrainFor(sys: StarSystem): Terrain {
   return makeTerrain(sys.seed, sys.hillHeight);
 }

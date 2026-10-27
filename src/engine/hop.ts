@@ -15,46 +15,60 @@ export interface HopPlan {
 
 export type HopPhase = 'lift' | 'burn' | 'coast' | 'brake' | 'hover';
 
-/** Where the ship comes down if it stops burning now (flat ground at height `ground`). */
-export function coastImpactX(p: DescentParams, s: DescentState, ground: number) {
+/** Ground height: a constant (flat ground) or the real terrain profile. */
+export type Ground = number | ((x: number) => number);
+const heightAt = (g: Ground, x: number) => (typeof g === 'number' ? g : g(x));
+
+/** Where the ship comes down if it stops burning now. */
+export function coastImpactX(p: DescentParams, s: DescentState, ground: Ground) {
   let c = { ...s };
-  for (let i = 0; i < 8000 && (c.y > ground || c.vy > 0); i++) c = stepDescent(p, c, { turn: 0, throttle: 0 }, 0.1);
+  for (let i = 0; i < 8000 && (c.y > heightAt(ground, c.x) || c.vy > 0); i++) c = stepDescent(p, c, { turn: 0, throttle: 0 }, 0.1);
   return c.x;
 }
 
 /**
  * One step of the autopilot: the controls a good pilot would use now.
- * `toX` is the target, `ground` the ground height below; `phase` is carried between calls.
+ * `toX` is the target, `ground` the terrain (or a flat height); `phase` is carried between calls.
  */
-export function hopPilot(p: DescentParams, s: DescentState, toX: number, ground: number, plan: HopPlan, mem: { phase: HopPhase; n: number }) {
+export function hopPilot(p: DescentParams, s: DescentState, toX: number, ground: Ground, plan: HopPlan, mem: { phase: HopPhase; n: number }) {
   const dir = Math.sign(toX - s.x) || 1;
-  const h = s.y - ground;
+  const h = s.y - heightAt(ground, s.x);
   const v = Math.hypot(s.vx, s.vy);
   const att = (thCmd: number) => Math.max(-1, Math.min(1, (thCmd - s.th) * 4 - s.om * 2.5));
   mem.n++;
   if (mem.phase === 'lift') {
-    if (h > 15) mem.phase = 'burn';
+    // Uphill: first climb above the target's height, then fly the hop as if on the level.
+    if (h > 15 && s.y > heightAt(ground, toX) + 15) mem.phase = 'burn';
     return { turn: att(0), throttle: 1 };
   }
   if (mem.phase === 'burn') {
     if (mem.n % 10 === 0 && (coastImpactX(p, s, ground) - toX) * dir >= 0) mem.phase = 'coast';
-    return { turn: att((dir * plan.burnDeg * Math.PI) / 180), throttle: 1 };
+    // Rising ground ahead: stand up more and climb before leaning over again.
+    let clear = Infinity;
+    for (const k of [2, 4, 6]) clear = Math.min(clear, s.y + s.vy * k - heightAt(ground, s.x + s.vx * k));
+    const deg = clear < 80 ? Math.min(plan.burnDeg, 15) : plan.burnDeg;
+    return { turn: att((dir * deg * Math.PI) / 180), throttle: 1 };
   }
   const retro = Math.atan2(-s.vx, -s.vy);
   if (mem.phase === 'coast') {
     const aNet = p.thrust - p.g * Math.max(0, -s.vy / Math.max(v, 1e-6));
     const stop = (v * v) / (2 * Math.max(0.3 * p.g, aNet));
-    if (s.vy < 0 && h < stop * plan.brakeMargin * Math.max(0.2, -s.vy / Math.max(v, 1e-6)) + plan.hoverH) mem.phase = 'brake';
+    // Height above whichever is higher: the ground here or at the target (an uphill hop brakes earlier).
+    const hRef = s.y - Math.max(heightAt(ground, s.x), heightAt(ground, toX));
+    if (s.vy < 0 && Math.min(h, hRef) < stop * plan.brakeMargin * Math.max(0.2, -s.vy / Math.max(v, 1e-6)) + plan.hoverH) mem.phase = 'brake';
     return { turn: att(Math.max(-1.8, Math.min(1.8, retro))), throttle: 0 };
   }
   if (mem.phase === 'brake') {
-    if (v < 4 || h < plan.hoverH * 0.5) mem.phase = 'hover';
+    // Slow enough, low enough, or the burn has us rising again: settle.
+    if (v < 4 || h < plan.hoverH * 0.5 || s.vy > 0) mem.phase = 'hover';
     return { turn: att(Math.max(-1.2, Math.min(1.2, retro))), throttle: 1 };
   }
   // Settle: nearly upright, cancel the drift (and creep towards the target), 1.5–4 m/s down.
   const want = Math.max(-3, Math.min(3, (toX - s.x) * 0.05));
   const thCmd = Math.max(-0.35, Math.min(0.35, (want - s.vx) * 0.08));
-  const targetVy = -Math.max(1.5, Math.min(4, h * 0.08));
+  // Hold height until over the pad, then come down.
+  const off = Math.abs(toX - s.x);
+  const targetVy = off > 8 && h < 40 ? 0 : -Math.max(1.5, Math.min(4, h * 0.08));
   return { turn: att(thCmd), throttle: Math.max(0, Math.min(1, (p.g + (targetVy - s.vy) * 2) / (p.thrust * Math.max(0.5, Math.cos(s.th))))) };
 }
 

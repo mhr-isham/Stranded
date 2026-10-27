@@ -73,6 +73,8 @@ interface Sim {
   thr: number;
   echoFly: boolean;
   pilot: { phase: HopPhase; n: number };
+  /** Emergency fuel ECHO added during a rescue (m/s). */
+  reserve: number;
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
@@ -90,7 +92,19 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     return { ...tr, features: tr.features.map((f) => ({ ...f, label: label[f.kind] ?? f.label })) };
   }, [sys, arrival]);
   const params: DescentParams = useMemo(
-    () => ({ g, rho0: 1.1, scaleH: 8500, thrust: 2.6 * g, bodyCdA: 0.0025, chuteCdA: 0.1, chuteMaxQ: assist ? 14000 : 9000, turnAccel: 1.4, assist }),
+    () => ({
+      g,
+      rho0: 1.1,
+      scaleH: 8500,
+      thrust: 2.6 * g,
+      bodyCdA: 0.0025,
+      chuteCdA: 0.1,
+      // The chute tears above a share of the falling ship's terminal pressure g/CdA: never at
+      // terminal speed with assist, but in the hard modes you must burn to slow down first.
+      chuteMaxQ: ((assist ? 1.6 : 0.8) * g) / 0.0025,
+      turnAccel: 1.4,
+      assist,
+    }),
     [g, assist],
   );
   const stars = useMemo(() => {
@@ -166,6 +180,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     launched: !hop,
     thr: 0,
     echoFly: false,
+    reserve: 0,
     pilot: { phase: 'lift', n: 0 },
     result: null,
   });
@@ -262,7 +277,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (hop) {
-      chargeHop(Math.max(0, (s.hop?.budget ?? 0) - sim.current.d.fuel));
+      chargeHop(Math.max(0, (s.hop?.budget ?? 0) + sim.current.reserve - sim.current.d.fuel));
       useGame.setState({ camp: { ...camp, landing: s.camp?.landing ?? camp.landing }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
@@ -291,6 +306,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       useGame.setState({ camp: { ...campAt(hopTo, 'skipped'), landing: s.camp?.landing ?? 'skipped' }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
+    if (!later) unlockLog('fall', false);
     useGame.setState({ camp: campAt(x, 'skipped') });
     beginPlay();
     const b = later ? chapterOf(s.chapter).briefing : null;
@@ -357,6 +373,12 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       S.ang += S.spin * dt;
       if (Math.abs(S.spin) < 0.1) S.calm += dt;
       else S.calm = 0;
+      if (S.stageT > 20 && turn === 0) say('stabhint', `Tap ${S.spin > 0 ? '← (or A)' : '→ (or D)'} to push against the spin — little taps.`);
+      // Nobody at the controls for a long time: ECHO steadies us.
+      if (S.stageT > 45 && turn === 0) {
+        S.spin *= Math.exp(-1.5 * dt);
+        say('stabecho', 'I’ll steady us. Take the controls whenever you’re ready.');
+      }
       if (turn !== 0 && Math.sign(turn) === Math.sign(S.spin) && Math.abs(S.spin) > 2.3) say('wrongway', 'Other way — you’re spinning us faster. Push against the turn.');
       if (S.calm > 0.8) {
         S.spin = 0;
@@ -372,6 +394,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const err = Math.atan2(Math.sin(S.ang - target), Math.cos(S.ang - target));
       const tol = (assist ? 20 : 12) * DEG;
       const aligned = Math.abs(err) < tol;
+      if (S.stageT > 20 && S.burn === 0 && !u.thrust)
+        say('deohint', aligned ? 'The nose is on the marker — hold BURN now (↑, W or Space).' : `Turn the nose onto the green marker: hold ${err > 0 ? '←' : '→'}, then BURN.`);
       if (u.thrust && aligned) {
         S.burn = Math.min(1, S.burn + dt / 3.5);
         setRumble(0.6, 0.35);
@@ -435,10 +459,12 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const fuelOk = S.d.fuel > 0;
       const stoppable =
         fuelOk &&
-        ((burning && canStop(0, params.thrust * Math.cos(S.d.th) - g)) || canStop(Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3, params.thrust - g));
+        ((burning && canStop(0, params.thrust * Math.cos(S.d.th) - g)) ||
+          canStop(Math.abs(S.d.om) / params.turnAccel + Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3, params.thrust - g));
+      // ECHO's own hop flights skip the stopping test (they brake late on purpose) but not the skid check.
       const doomed =
-        !(hop && S.echoFly) &&
-        ((h < 2500 && S.d.vy < 0 && !stoppable && fuelOk) || (h < 35 && Math.abs(S.d.vx) > 12) || (!fuelOk && S.d.vy < -8 && h < 400));
+        (!(hop && S.echoFly) && ((h < 2500 && S.d.vy < 0 && !stoppable && fuelOk) || (!fuelOk && S.d.vy < -8 && h < 400))) ||
+        (h < 35 && Math.abs(S.d.vx) > 12);
       if (S.launched && !S.rescued && doomed) {
         S.rescued = true;
         sfx('bad');
@@ -446,7 +472,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       }
       let uu = { turn, throttle: u.thrust ? 1 : 0 };
       // ECHO flies the hop the way a good pilot would.
-      if (hop && S.echoFly && !S.rescued) uu = hopPilot(params, S.d, hopTo, terrain.height(S.d.x), hopPlan, S.pilot);
+      if (hop && S.echoFly && !S.rescued) uu = hopPilot(params, S.d, hopTo, terrain.height, hopPlan, S.pilot);
       if (S.rescued) {
         const targetVy = -Math.max(2, h * 0.12);
         const thCmd = Math.max(-0.45, Math.min(0.45, -S.d.vx * 0.035));
@@ -454,13 +480,18 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
           turn: Math.max(-1, Math.min(1, (thCmd - S.d.th) * 3 - S.d.om)),
           throttle: Math.max(0, Math.min(1, (g + (targetVy - S.d.vy) * 1.8) / (params.thrust * Math.max(0.5, Math.cos(S.d.th))))),
         };
-        S.d.fuel = Math.max(S.d.fuel, 200); // emergency reserve
+        // Emergency reserve (counted as burned on a hop).
+        if (S.d.fuel < 200) {
+          S.reserve += 200 - S.d.fuel;
+          S.d.fuel = 200;
+        }
       }
       // ECHO's hops run at 4x (2x for the final settle) so a long one doesn't drag.
       const speedUp = hop && S.echoFly && !S.rescued ? (h > 60 ? 4 : 2) : h > 2500 && !S.rescued ? 3 : 1;
       const n = Math.ceil((dt * speedUp) / 0.02);
       for (let i = 0; i < n; i++) S.d = stepDescent(params, S.d, uu, (dt * speedUp) / n);
       S.thr = S.d.fuel > 0 ? uu.throttle : 0;
+      if (hop && !S.launched && S.stageT > 15 && !u.thrust && !S.echoFly) say('padhint', 'Hold BURN to lift off — or tap “Let ECHO fly”.');
       if (!S.launched) {
         // Still on the pad: the ground holds us up until the engine lifts us.
         const gh = terrain.height(S.d.x);
@@ -493,7 +524,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         }
         S.d = { ...S.d, y: ground };
         const judged = judgeTouchdown(terrain, S.d, assist);
-        const touch = S.rescued ? 'rescued' : judged === 'crash' ? 'rough' : judged;
+        // The prologue can't kill you: a crash counts as a rescue (with its damage).
+        const touch = S.rescued || judged === 'crash' ? 'rescued' : judged;
         S.result = { touch, site: siteAt(terrain, S.d.x) };
         stopRumble();
         sfx(touch === 'clean' ? 'unlock' : 'bad');
@@ -1064,9 +1096,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         </span>
         <div>{line}</div>
       </div>
-      <button className="btn small ghost prologue-skip" onClick={skip}>
-        Skip
-      </button>
+      {stage !== 'landed' && (
+        <button className="btn small ghost prologue-skip" onClick={skip}>
+          Skip
+        </button>
+      )}
 
       {stage === 'tumble' && <div className="prologue-alert">CONTROLS NOT RESPONDING</div>}
 

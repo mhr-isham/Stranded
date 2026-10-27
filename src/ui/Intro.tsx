@@ -80,8 +80,14 @@ export function beginPlay() {
   clock.t = findDusk();
   const g = useGame.getState();
   const survival = freshSurvival(sys.lifeSupport / DAY);
-  // A hard landing costs a spare part (the landing legs needed fixing).
+  // A hard landing costs a spare part (the landing legs needed fixing). In Legend,
+  // ECHO's rescue is rougher still: two parts and a slow oxygen leak to patch.
   if (g.camp && (g.camp.landing === 'rough' || g.camp.landing === 'rescued')) survival.parts = Math.max(0, survival.parts - 1);
+  if (g.camp?.landing === 'rescued' && g.settings.difficulty === 'legend') {
+    survival.parts = Math.max(0, survival.parts - 1);
+    survival.leak = true;
+    survival.log = ['Day 1: the rescue landing cracked an oxygen line. Repair it in the workshop.', ...survival.log];
+  }
   useGame.setState({ phase: 'play', screen: 'hub', survival });
 }
 

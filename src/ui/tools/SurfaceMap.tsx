@@ -20,6 +20,7 @@ import {
   SURFACE_RULES,
   TOW_KMH,
   findsFor,
+  safePad,
   spareFuel,
   terrainFor,
 } from '../../game/surface';
@@ -126,9 +127,12 @@ export function SurfaceMap() {
     )
       return;
     if (sf.roverX !== null) toast('The rover stays where it is parked. Drive it to the new camp, or bring it home from the map.');
+    // Land on the nearest ground flat enough for the legs.
+    const pad = safePad(tr, target);
+    if (Math.abs(pad - target) > 20) toast(`ECHO marked a flat pad ${fmt(Math.abs(pad - target), 0)} m from your spot.`);
     useGame.setState({
       surface: { ...sf, hopTank },
-      hop: { toX: target, cost: est, fromX: campX, budget },
+      hop: { toX: pad, cost: est, fromX: campX, budget },
       phase: 'hop',
     });
     sfx('launch');

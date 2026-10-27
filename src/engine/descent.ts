@@ -54,7 +54,12 @@ export function stepDescent(p: DescentParams, s: DescentState, u: DescentInput, 
   om *= Math.exp(-0.25 * dt); // a little aerodynamic damping
   if (chute === 'open') om += (-th * 3 - om * 2) * dt; // a parachute hangs the ship upright
   th += om * dt;
-  th = Math.max(-Math.PI * 0.6, Math.min(Math.PI * 0.6, th));
+  // The tilt has hard stops; at a stop the spin stops too (no hidden spin to unwind).
+  const lim = Math.PI * 0.6;
+  if (Math.abs(th) > lim) {
+    th = Math.sign(th) * lim;
+    if (om * th > 0) om = 0;
+  }
 
   // Forces.
   const rho = density(p, y);
