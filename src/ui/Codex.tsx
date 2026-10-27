@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGame } from '../game/store';
 import { LESSONS, LESSON_IDS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
+import { AtlasGrid, CalibrationPanel } from './Atlas';
 
 export function Codex() {
   const s = useGame();
@@ -11,7 +12,11 @@ export function Codex() {
   return (
     <div className="screen scroll" style={{ background: 'radial-gradient(ellipse at 30% 20%, #142040 0%, #05070f 65%)', zIndex: 5 }}>
       <div style={{ maxWidth: 980, margin: '0 auto', padding: 'calc(76px + var(--safe-top)) 14px 100px' }} className="stack">
-        <h1 style={{ fontSize: 28 }}>Physics lessons</h1>
+        <h1 style={{ fontSize: 28 }}>Atlas</h1>
+        <div className="muted">Every system you’ve measured, and how honest your error bars have been.</div>
+        <CalibrationPanel />
+        <AtlasGrid />
+        <h1 style={{ fontSize: 28, marginTop: 16 }}>Physics lessons</h1>
         <div className="muted">Interactive explanations of every method in the game — open any of them, any time.</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
           {LESSON_IDS.map((id) => (

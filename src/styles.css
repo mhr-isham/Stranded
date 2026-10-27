@@ -104,7 +104,7 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .hud-block { display: flex; align-items: center; gap: 10px; padding: 6px 12px; min-height: 48px; }
 .hud-time .day { font-family: var(--display); font-weight: 700; font-size: 17px; }
 .hud-time .clock { font-family: var(--mono); color: var(--muted); font-size: 13px; }
-.show-phone { display: none; }
+.show-phone, .show-phone-block { display: none; }
 .meter { width: 90px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .meter > i { display: block; height: 100%; border-radius: 3px; background: var(--green); transition: width 0.3s; }
 .meter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -135,6 +135,9 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
   position: absolute; left: 50%; bottom: calc(84px + var(--safe-bottom)); transform: translateX(-50%);
   width: min(640px, calc(100% - 16px)); display: flex; gap: 14px; align-items: flex-start; z-index: 40;
   animation: rise 0.35s ease-out;
+}
+@media (min-width: 861px) {
+  .echo.in-tool { left: calc((100% - 360px) / 2); width: min(600px, calc(100% - 400px)); }
 }
 .echo .avatar { width: 46px; height: 46px; flex: none; border-radius: 50%; position: relative; background: radial-gradient(circle at 50% 50%, #9fe0ff 0, #2a7fd4 35%, rgba(42, 127, 212, 0.15) 70%); box-shadow: 0 0 24px rgba(108, 196, 255, 0.55); }
 .echo .avatar::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid rgba(108, 196, 255, 0.5); animation: pulse 2.4s ease-out infinite; }
@@ -255,6 +258,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .mode-chip { font-size: 12px; padding: 8px 2px; }
   .hide-phone { display: none !important; }
   .show-phone { display: inline !important; }
+  .show-phone-block { display: block !important; }
   .hud-ready { padding: 4px 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -351,3 +355,14 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .act-card h2 { font-size: 30px; margin: 4px 0 8px; }
 .act-hook { font-size: 16px; font-style: italic; color: var(--text); margin: 0 0 10px; }
 .act-learned { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+/* Atlas & calibration */
+.atlas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.atlas-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; height: auto; white-space: normal; }
+.atlas-card .grade { font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--blue); }
+.calib-bar { position: relative; height: 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.07); }
+.calib-band { position: absolute; left: 55%; width: 25%; top: 0; bottom: 0; background: rgba(91, 227, 164, 0.22); border-radius: 4px; }
+.calib-ideal { position: absolute; left: 68%; top: -2px; bottom: -2px; width: 2px; background: var(--green); }
+.calib-mark { position: absolute; top: -4px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.6); }
+.calib-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+.calib-row { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr 44px; gap: 10px; align-items: center; }

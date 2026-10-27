@@ -10,11 +10,13 @@ import { dailySeed, randomSeed } from '../game/world';
 import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle } from './common/widgets';
+import { AtlasGrid, CalibrationPanel } from './Atlas';
 
 export function Title() {
   const s = useGame();
   const [setup, setSetup] = useState(false);
   const [how, setHow] = useState(false);
+  const [atlas, setAtlas] = useState(false);
   const [settings, setSettings] = useState<Settings>({ ...s.settings });
   const [seedText, setSeedText] = useState('');
   const demo = useMemo(() => {
@@ -58,9 +60,16 @@ export function Title() {
           <button className={`btn big ${canContinue ? '' : 'primary'}`} onClick={() => setSetup(true)}>
             New expedition
           </button>
-          <button className="btn" onClick={() => setHow(true)}>
-            How to play
-          </button>
+          <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
+            <button className="btn" onClick={() => setHow(true)}>
+              How to play
+            </button>
+            {s.atlas.length > 0 && (
+              <button className="btn" onClick={() => setAtlas(true)}>
+                📖 Atlas
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -143,6 +152,15 @@ export function Title() {
             <button className="btn primary" onClick={() => start(seedText ? Number(seedText) : randomSeed())}>
               Launch expedition
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {atlas && (
+        <Modal onClose={() => setAtlas(false)}>
+          <div className="stack">
+            <CalibrationPanel />
+            <AtlasGrid />
           </div>
         </Modal>
       )}

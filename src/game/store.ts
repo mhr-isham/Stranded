@@ -8,6 +8,7 @@ import type { Difficulty } from '../engine/types';
 import { clock } from './clock';
 import { modeOf } from './modes';
 import type { Prediction } from './predictions';
+import type { AtlasCard, SystemNames } from './atlas';
 
 export type Screen =
   | 'hub'
@@ -122,6 +123,10 @@ export interface GameState {
   /** Where and how the ship came down in the prologue. */
   camp: CampInfo | null;
   predictions: Prediction[];
+  /** Your names for this system's bodies (private). */
+  names: SystemNames;
+  /** Every finished run, kept across expeditions. */
+  atlas: AtlasCard[];
   /** Acts whose end card the player has seen. */
   actsSeen: number[];
   checkpointsUsed: number;
@@ -185,6 +190,8 @@ const initial = {
   runId: 0,
   camp: null as CampInfo | null,
   predictions: [] as Prediction[],
+  names: {} as SystemNames,
+  atlas: [] as AtlasCard[],
   actsSeen: [] as number[],
   checkpointsUsed: 0,
   rewindsUsed: 0,
@@ -212,6 +219,7 @@ export const useGame = create<GameState>()(
           settings,
           codex: get().codex,
           achievements: get().achievements,
+          atlas: get().atlas ?? [],
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
         });
       },

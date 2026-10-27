@@ -7,6 +7,7 @@ import { checkMissions, currentWorld } from '../../game/sim';
 import { readingStats, useGame, type Screen } from '../../game/store';
 import { HINTS, NODE_INFO } from './nodeInfo';
 import { flag } from '../../game/tutorial';
+import { NamesDialog } from '../Atlas';
 import { countText, useMode } from '../../game/modes';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
@@ -37,6 +38,7 @@ export function Sheet() {
   const s = useGame();
   const { system: sys } = currentWorld();
   const [sel, setSel] = useState<QuantityKey | 'launch'>('g');
+  const [naming, setNaming] = useState(false);
   const derived = deriveAll(s.sheet);
   const est = (k: QuantityKey) => (PRIMARY_KEYS as readonly string[]).includes(k) ? s.sheet[k as PrimaryKey] : derived[k as keyof typeof derived];
   const relErr = (k: QuantityKey) => {
@@ -100,7 +102,12 @@ export function Sheet() {
       </div>
       <div className="tool-side">
         <div className="panel panel-pad hide-phone">
-          <h2 style={{ fontSize: 16 }}>Progress sheet</h2>
+          <div className="row between">
+            <h2 style={{ fontSize: 16 }}>Progress sheet</h2>
+            <button className="btn small ghost" onClick={() => setNaming(true)}>
+              ✎ Name this system
+            </button>
+          </div>
           <div className="muted" style={{ fontSize: 12 }}>
             Every star is a quantity. Measured ones light up; sharper stars have smaller error bars. Lines show what depends on what. Tap a star.
           </div>
@@ -123,7 +130,11 @@ export function Sheet() {
           <NodePanel k={sel} derivedEst={derived} />
         )}
         <Checks />
+        <button className="btn small ghost show-phone-block" onClick={() => setNaming(true)}>
+          ✎ Name this system
+        </button>
       </div>
+      {naming && <NamesDialog onClose={() => setNaming(false)} />}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { toast } from '../common/widgets';
 import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
 import { countText, modeOf } from '../../game/modes';
 import { predictionPoints } from '../../game/predictions';
+import { nameOf, type AtlasCard } from '../../game/atlas';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
   success: {
@@ -146,6 +147,25 @@ function Debrief() {
   const earned = useMemo(() => evaluateAchievements(s, sys, kind, rows), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!s.debriefSeen) useGame.setState({ debriefSeen: true });
+    // Every run, success or not, becomes a finished card in the Atlas.
+    const g = useGame.getState();
+    if (!g.tutorial.active && !g.atlas.some((c) => c.id === g.runId)) {
+      const card: AtlasCard = {
+        id: g.runId,
+        seed: g.seed,
+        mode: g.settings.difficulty,
+        survival: g.settings.survival,
+        date: Date.now(),
+        names: g.names,
+        outcome: kind,
+        grade: grade.letter,
+        score: grade.total,
+        camp: g.camp,
+        predictions: { made: g.predictions.filter((p) => p.result).length, inside: g.predictions.filter((p) => p.result && p.result.z <= 1).length },
+        rows: rows.filter((r) => r.e && r.sc).map((r) => ({ k: r.k, value: r.e!.value, sigma: r.e!.sigma, truth: truth[r.k], z: r.sc!.z })),
+      };
+      useGame.setState({ atlas: [...g.atlas, card] });
+    }
     earned.forEach((a) => useGame.getState().unlock('achievements', a));
     sfx(kind === 'success' ? 'unlock' : 'bad');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,7 +184,9 @@ function Debrief() {
     <div className="screen scroll" style={{ background: 'radial-gradient(ellipse at 50% 0%, #10204a 0%, #05070f 65%)' }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(24px + var(--safe-top)) 14px 40px' }} className="stack">
         <div className="panel panel-pad" style={{ textAlign: 'center' }} data-tut="results-grade">
-          <div className="meter-label">Mission debrief · system #{s.seed}</div>
+          <div className="meter-label">
+            Mission debrief · {s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
+          </div>
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}
           </h1>
