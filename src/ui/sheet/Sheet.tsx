@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { DERIVED, EDGES, PRIMARY_KEYS, QUANTITY_INFO, deriveAll, truthValues, type PrimaryKey, type QuantityKey } from '../../engine/chain';
+import { PRIMARY_KEYS, QUANTITY_INFO, derivedFor, deriveAll, edgesFor, keysFor, labelFor, truthValues, type PrimaryKey, type QuantityKey } from '../../engine/chain';
+import { variantOf } from '../../engine/chapters';
+import { probeTruth } from '../../game/probeState';
 import { scoreQuantity } from '../../engine/scoring';
 import { sfx } from '../../game/audio';
 import { fmt, fromDisplay, sig, toDisplay } from '../../game/format';
-import { checkMissions, currentWorld } from '../../game/sim';
+import { checkMissions, currentVariant, currentWorld } from '../../game/sim';
 import { readingStats, useGame, type Screen } from '../../game/store';
-import { HINTS, NODE_INFO } from './nodeInfo';
+import { hintsFor, nodeInfoFor } from './nodeInfo';
 import { flag } from '../../game/tutorial';
 import { NamesDialog } from '../Atlas';
 import { countText, useMode } from '../../game/modes';
@@ -21,6 +23,10 @@ const POS: Record<QuantityKey | 'launch', [number, number]> = {
   alpha2: [0, 6.9],
   thetaM: [0, 7.9],
   Pm: [0, 8.9],
+  // Chapter 2 measures the probe flyby instead of a moon.
+  vInf: [0, 7.9],
+  vPeak: [0, 8.9],
+  rPeri: [1.2, 9.2],
   M1: [1.3, 1],
   P2: [1.1, 3.2],
   ratio: [2.1, 3.6],
@@ -39,7 +45,13 @@ export function Sheet() {
   const { system: sys } = currentWorld();
   const [sel, setSel] = useState<QuantityKey | 'launch'>('g');
   const [naming, setNaming] = useState(false);
-  const derived = deriveAll(s.sheet);
+  const variant = variantOf(sys.features);
+  const EDGES = edgesFor(variant);
+  const primaries = keysFor(variant);
+  // Nodes this chapter's chain uses (chapter 2 has the probe instead of a moon).
+  const shown = (k: QuantityKey | 'launch') =>
+    k === 'launch' || (PRIMARY_KEYS as readonly string[]).includes(k) ? k === 'launch' || primaries.includes(k as PrimaryKey) : k in EDGES;
+  const derived = deriveAll(s.sheet, variant);
   const est = (k: QuantityKey) => (PRIMARY_KEYS as readonly string[]).includes(k) ? s.sheet[k as PrimaryKey] : derived[k as keyof typeof derived];
   const relErr = (k: QuantityKey) => {
     const e = est(k);
@@ -69,7 +81,7 @@ export function Sheet() {
           </defs>
           {/* Constellation lines */}
           {(Object.keys(EDGES) as (keyof typeof EDGES)[]).flatMap((k) =>
-            EDGES[k].map((src) => {
+            (EDGES[k] ?? []).map((src) => {
               const lit = !!est(k) && !!est(src);
               return <line key={`${src}-${k}`} x1={pos(src)[0]} y1={pos(src)[1]} x2={pos(k)[0]} y2={pos(k)[1]} stroke={lit ? 'rgba(140,200,255,0.55)' : 'rgba(140,160,200,0.13)'} strokeWidth={lit ? 0.025 : 0.015} strokeDasharray={lit ? undefined : '0.06 0.06'} />;
             }),
@@ -78,7 +90,7 @@ export function Sheet() {
             <line key={`L-${k}`} x1={pos(k)[0]} y1={pos(k)[1]} x2={pos('launch')[0]} y2={pos('launch')[1]} stroke={est(k) ? 'rgba(255,196,107,0.45)' : 'rgba(255,196,107,0.1)'} strokeWidth={0.018} strokeDasharray={est(k) ? undefined : '0.06 0.06'} />
           ))}
           {/* Stars */}
-          {(Object.keys(POS) as (QuantityKey | 'launch')[]).map((k) => {
+          {(Object.keys(POS) as (QuantityKey | 'launch')[]).filter(shown).map((k) => {
             const [x, y] = pos(k);
             const isLaunch = k === 'launch';
             const e = isLaunch ? null : relErr(k);
@@ -118,7 +130,7 @@ export function Sheet() {
             <div className="muted" style={{ fontSize: 13 }}>Needs: {LAUNCH_INPUTS.map((k) => QUANTITY_INFO[k].symbol).join(', ')}</div>
             {LAUNCH_INPUTS.map((k) => (
               <div key={k} className="row between" style={{ fontSize: 13 }}>
-                <span>{QUANTITY_INFO[k].label}</span>
+                <span>{labelFor(k, variant)}</span>
                 <span className={est(k) ? 'green' : 'faint'}>{est(k) ? '✓' : 'missing'}</span>
               </div>
             ))}
@@ -143,13 +155,15 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   const s = useGame();
   const { system: sys } = currentWorld();
   const info = QUANTITY_INFO[k];
-  const node = NODE_INFO[k];
+  const variant = variantOf(sys.features);
+  const node = nodeInfoFor(k, variant);
+  const HINTS_K = hintsFor(k, variant);
   const isPrimary = (PRIMARY_KEYS as readonly string[]).includes(k);
   const e = isPrimary ? s.sheet[k as PrimaryKey] : derivedEst[k as keyof typeof derivedEst];
   const [hintLevel, setHintLevel] = useState(0);
   const [verdict, setVerdict] = useState<string | null>(null);
   const mode = useMode();
-  const maxHints = Math.min(HINTS[k].length, mode.hints);
+  const maxHints = Math.min(HINTS_K.length, mode.hints);
   const verifiesLeft = mode.verifies - s.checksUsed;
   const stats = isPrimary ? readingStats(s.readings, k as PrimaryKey) : null;
 
@@ -165,7 +179,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
 
   const check = () => {
     if (!e || verifiesLeft <= 0) return;
-    const truth = truthValues(sys, s.sheet)[k];
+    const truth = truthValues(sys, s.sheet, probeTruth(s))[k];
     const sc = scoreQuantity(e.value, e.sigma, truth);
     s.set({ penaltyDv: s.penaltyDv + 40, checksUsed: s.checksUsed + 1 });
     setVerdict(sc.inside ? 'ECHO cross-checked with the ship’s damaged sensors: the true value lies INSIDE your error bar.' : sc.z < 2 ? 'Close, but the true value lies just OUTSIDE your error bar.' : 'The true value lies well OUTSIDE your error bar.');
@@ -176,7 +190,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
     <div className="panel panel-pad stack" data-tut="sheet-panel">
       <div className="row between">
         <h2>
-          {info.symbol} <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}>{info.label}</span>
+          {info.symbol} <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}>{labelFor(k, variant)}</span>
         </h2>
       </div>
       <div className="muted" style={{ fontSize: 13 }}>{node.what}</div>
@@ -210,7 +224,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
         <>
           <div className="readout small">{e ? `${sig(toDisplay(k, e.value), 5)} ± ${sig(toDisplay(k, e.sigma), 2)} ${info.unit}` : 'not yet computable'}</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            Computed by ECHO from: {DERIVED[k as keyof typeof DERIVED].inputs.map((i) => QUANTITY_INFO[i].symbol).join(', ')}. Errors propagate
+            Computed by ECHO from: {(derivedFor(variant)[k as keyof ReturnType<typeof derivedFor>]?.inputs ?? []).map((i) => QUANTITY_INFO[i].symbol).join(', ')}. Errors propagate
             automatically.
           </div>
           {e && <div className="muted" style={{ fontSize: 12 }}>Relative error: {fmt((100 * e.sigma) / Math.abs(e.value), 2)}%</div>}
@@ -225,7 +239,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
             <b style={{ fontSize: 13 }}>Hints</b>
             <span className="faint" style={{ fontSize: 12 }}>{mode.hintsCost ? 'each costs score' : 'free in this mode'}</span>
           </div>
-          {HINTS[k].slice(0, hintLevel).map((h, i) => (
+          {HINTS_K.slice(0, hintLevel).map((h, i) => (
             <div key={i} className="hint">{h}</div>
           ))}
           {hintLevel < maxHints && (
@@ -260,7 +274,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
 /** Free consistency checks: they never reveal the truth, only whether your numbers hang together. */
 function Checks() {
   const s = useGame();
-  const d = deriveAll(s.sheet);
+  const d = deriveAll(s.sheet, currentVariant());
   const rows: { name: string; text: string; ok: boolean | null }[] = [];
   if (d.M1 && s.sheet.R1) {
     const rho = d.M1.value / ((4 / 3) * Math.PI * s.sheet.R1.value ** 3) / 1000;

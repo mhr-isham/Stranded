@@ -4,16 +4,19 @@
 
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { moonOffset, targetLongitude } from '../engine/measure';
-import { localFrame, toHorizontal, topocentric } from '../engine/sky';
+import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
+import { norm } from '../engine/vec';
+import { hash32 } from '../engine/rng';
 import { clock } from './clock';
 import { ECHO } from './echo';
-import { MISSIONS, activeMission } from './missions';
+import { activeMission, missionsFor } from './missions';
 import { MISSION_CODEX } from './codex';
 import { sfx } from './audio';
 import { WARPS } from './clock';
 import { useGame, type GameState, type TimedValue } from './store';
 import { isCloudy, lifeSupportEnd, survivalDay } from './survival';
 import { world } from './world';
+import { variantOf } from '../engine/chapters';
 import { resolvePredictions } from './predictions';
 
 const TRACK_RES = 0.01 * DEG; // tracker reading resolution
@@ -21,9 +24,12 @@ const MOON_RES = 0.5 * ARCSEC;
 
 let missionTimer = 0;
 
+/** Which version of the solve chain the current system needs. */
+export const currentVariant = () => variantOf(currentWorld().system.features);
+
 export function currentWorld() {
   const s = useGame.getState();
-  return world(s.seed, s.settings.difficulty);
+  return world(s.seed, s.settings.difficulty, s.chapter);
 }
 
 /** Can the tracker see the blue planet right now? */
@@ -96,13 +102,36 @@ function stepTo(t1Wanted: number, dtReal: number) {
         lastNight = night;
         track.push({ at: t, v: Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES });
       }
-      if (s.moonTrackOn) moon.push({ at: t, v: Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
+      if (s.moonTrackOn && sys.features.moon) moon.push({ at: t, v: Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
     }
     if (track.length) {
       patch.track = [...s.track, ...track];
       patch.lastNightLog = lastNight;
     }
     if (moon.length) patch.moonTrack = [...s.moonTrack, ...moon];
+  }
+
+  // Chapter 5 solar camera: once an hour while the star is up, log the planet's
+  // offset from the star's centre when it is crossing the disk (a transit).
+  if (s.sunCamOn && sys.features.inner) {
+    const log: TimedValue[] = [];
+    for (let k = Math.floor(t0 / 3600) + 1; k * 3600 <= t1; k++) {
+      const t = k * 3600;
+      const sv = topocentric(sys, 'star', t, sys.site);
+      const tv = topocentric(sys, 'target', t, sys.site);
+      if (norm(tv) > norm(sv)) continue;
+      if (toHorizontal(sv, localFrame(sys, t, sys.site)).alt < 3 * DEG) continue;
+      let off = eclLon(tv) - eclLon(sv);
+      if (off > Math.PI) off -= 2 * Math.PI;
+      if (off < -Math.PI) off += 2 * Math.PI;
+      if (Math.abs(off) > Math.asin(sys.star.radius / norm(sv))) continue;
+      // Seeing blurs the limb and the dot: about ±4″ per reading.
+      const u1 = (hash32(sys.seed, k, 0x5e) + 1) / 4294967297;
+      const u2 = hash32(sys.seed, k, 0x5f) / 4294967296;
+      const jitter = 4 * ARCSEC * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      log.push({ at: t, v: Math.round((off + jitter) / ARCSEC) * ARCSEC });
+    }
+    if (log.length) patch.sunLog = [...s.sunLog, ...log];
   }
 
   // Rover arrival.
@@ -124,11 +153,18 @@ function stepTo(t1Wanted: number, dtReal: number) {
   // Story beats tied to time.
   const life = (end - t1) / end;
   if (life < 0.15) s.say(ECHO.lowLife);
-  if (s.track.length > 6) {
-    const n = s.track.length;
-    if (s.track[n - 1].v < s.track[n - 2].v) s.say(ECHO.retrograde);
+  if (!sys.features.inner) {
+    if (s.track.length > 6) {
+      const n = s.track.length;
+      if (s.track[n - 1].v < s.track[n - 2].v) s.say(ECHO.retrograde);
+    }
+    if (s.identified && Math.abs(t1 - nearestOpposition(t1)) < 25 * DAY) s.say(ECHO.parallax);
+  } else if (s.identified) {
+    // An inner planet: warn (coaching modes) when it is about to cross the star.
+    const k = Math.round((t1 - sys.firstOpposition) / sys.synodic);
+    const conj = sys.firstOpposition + k * sys.synodic;
+    if (conj > t1 && conj - t1 < 3 * DAY) s.say({ ...ECHO.transitSoon, id: `transitSoon-${k}` });
   }
-  if (s.identified && Math.abs(t1 - nearestOpposition(t1)) < 25 * DAY) s.say(ECHO.parallax);
   if (s.missionsDone.includes('year') && !s.logs.includes('relay') && !s.tutorial.active) s.say(ECHO.relayHint);
   if (s.identified && !s.names.target && !s.tutorial.active && s.missionsDone.includes('identify')) s.say(ECHO.nameIt);
 
@@ -148,7 +184,7 @@ function nearestOpposition(t: number) {
 /** Mark finished missions and introduce the next one. */
 export function checkMissions() {
   const s = useGame.getState();
-  const done = MISSIONS.filter((m) => m.done(s) && !s.missionsDone.includes(m.id)).map((m) => m.id);
+  const done = missionsFor(s).filter((m) => m.done(s) && !s.missionsDone.includes(m.id)).map((m) => m.id);
   if (done.length) {
     useGame.setState({ missionsDone: [...s.missionsDone, ...done] });
     for (const id of done) if (MISSION_CODEX[id]) useGame.getState().unlock('codex', MISSION_CODEX[id]);

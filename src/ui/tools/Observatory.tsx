@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
+import { starLongitude } from '../../engine/measure';
 import { unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
 import { clock } from '../../game/clock';
@@ -21,17 +22,19 @@ import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
 import { PredictCard } from '../common/Predict';
+import { useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
 
 type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
-type Tab = 'sky' | 'year' | 'track' | 'micro' | 'moon';
+type Tab = 'sky' | 'year' | 'track' | 'transit' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'sky', label: 'Sky' },
   { id: 'year', label: 'Year' },
   { id: 'track', label: 'Tracker' },
+  { id: 'transit', label: 'Transit' },
   { id: 'micro', label: 'Micrometer' },
   { id: 'moon', label: 'Moon' },
 ];
@@ -319,12 +322,13 @@ export function Observatory() {
                   starColor: starRGB(sys),
                   targetDir: unit(tgtV),
                   targetRadius: Math.asin(sys.target.radius / Math.hypot(...tgtV)),
-                  moonDir: unit(moonV),
+                  moonDir: sys.features.moon ? unit(moonV) : null,
                   moonRadius: Math.asin(sys.moon.radius / Math.hypot(...moonV)),
                   skyBrightness: Math.max(0, Math.min(1, (sunAlt + 10) / 14)),
                   seeing: SEEING,
                   realTime: now,
                   filter,
+                  targetInFront: sys.features.inner && Math.hypot(...tgtV) < Math.hypot(...sunV),
                   shimmer: { x: 0.35 * ARCSEC * Math.sin(ts * 2.1) * Math.sin(ts * 0.7), y: 0.35 * ARCSEC * Math.sin(ts * 1.7 + 1) },
                 },
                 dpr,
@@ -403,7 +407,7 @@ export function Observatory() {
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
-            {TABS.map((tb) => (
+            {TABS.filter((tb) => tb.id !== 'transit' || sys.features.inner).map((tb) => (
               <button
                 key={tb.id}
                 data-tut={`obs-tab-${tb.id}`}
@@ -472,6 +476,7 @@ export function Observatory() {
         )}
 
         {tab === 'track' && <TrackerPanel />}
+        {tab === 'transit' && <TransitPanel onPoint={() => pointAt('star', 1.2)} />}
 
         {tab === 'micro' && (
           <div className="panel panel-pad stack">
@@ -632,14 +637,29 @@ function TrackerPanel() {
   const t = useGameTime(4);
   const [cursor, setCursor] = useState<number | null>(null);
   const obs = targetObservable(t);
+  const { system: sysT } = currentWorld();
+  const inner = sysT.features.inner;
   const days = s.track.map((o) => o.at / DAY);
-  const lon = unwrapDeg(s.track.map((o) => o.v / DEG));
+  // An inner planet is shown by its elongation (angle from the star), which swings back and forth.
+  const lon = inner
+    ? s.track.map((o) => {
+        let e = (o.v - starLongitude(sysT, o.at, sysT.site)) / DEG;
+        e = ((e + 540) % 360) - 180;
+        return e;
+      })
+    : unwrapDeg(s.track.map((o) => o.v / DEG));
   const pts = days.map((x, i) => ({ x, y: lon[i] }));
-  const picks = [...s.oppPicks].sort((a, b) => a - b);
+  const picks = inner ? [] : [...s.oppPicks].sort((a, b) => a - b);
   const S = picks.length >= 2 ? (picks[picks.length - 1] - picks[0]) / (picks.length - 1) : null;
   return (
     <div className="panel panel-pad stack">
       <b>Blue planet tracker</b>
+      {inner && (
+        <div className="muted" style={{ fontSize: 13 }}>
+          This planet orbits inside ours, so it never strays far from the star. The tracker logs its elongation — its angle east (+) or west (−)
+          of the star — in twilight. Its largest value is the greatest elongation, sin ε = a₂/a₁. Time its transits in the Transit tab.
+        </div>
+      )}
       {!s.identified ? (
         <div className="amber" style={{ fontSize: 13 }}>Identify the blue planet first (Sky tab).</div>
       ) : (
@@ -661,7 +681,7 @@ function TrackerPanel() {
           cursor={cursor}
           onCursor={setCursor}
           xLabel="day"
-          yLabel="longitude vs stars (°)"
+          yLabel={inner ? 'elongation from the star (°)' : 'longitude vs stars (°)'}
           xFmt={(x) => x.toFixed(0)}
           yFmt={(y) => y.toFixed(1)}
         />
@@ -670,6 +690,12 @@ function TrackerPanel() {
         <div className="faint" style={{ fontSize: 12 }}>
           Drag across a region to zoom in, tap to place the cursor. Opposition is the middle of the backward (retrograde) loop, where the planet
           moves backwards fastest.
+        </div>
+      )}
+      {inner && pts.length > 1 && (
+        <div className="faint" style={{ fontSize: 12 }}>
+          When the planet passes in front of the star it vanishes from the twilight for a while. The middle of that gap is the moment it passed the
+          star (a rougher alternative to timing a transit).
         </div>
       )}
       {cursor !== null && (
@@ -684,7 +710,7 @@ function TrackerPanel() {
               setTimeout(checkMissions, 0);
             }}
           >
-            Mark opposition here
+            {inner ? 'Mark: passed the star here' : 'Mark opposition here'}
           </button>
         </div>
       )}
@@ -712,7 +738,7 @@ function TrackerPanel() {
           )}
         </div>
       )}
-      <RetroPrediction pts={pts} />
+      {!inner && <RetroPrediction pts={pts} />}
     </div>
   );
 }
@@ -755,7 +781,7 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
       pending={pending}
       last={last}
       onCommit={(value, sigma) => {
-        const st = nextStationary(s.seed, s.settings.difficulty, clock.t);
+        const st = nextStationary(currentWorld().system, clock.t);
         if (st === null) return;
         makePrediction({ kind: 'retro', made: clock.t, due: st + DAY, value, sigma });
       }}
@@ -766,6 +792,16 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
 
 function MoonPanel() {
   const s = useGame();
+  if (!currentWorld().system.features.moon)
+    return (
+      <div className="panel panel-pad stack">
+        <b>No moon</b>
+        <div className="muted" style={{ fontSize: 13 }}>
+          However long you look, nothing orbits this blue planet. Without a moon to act as a scale, its mass has to come from something else —
+          the probe bay at camp.
+        </div>
+      </div>
+    );
   const [band, setBand] = useState<[number, number] | null>(null);
   const pts = s.moonTrack.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
   const used = pts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
@@ -856,7 +892,7 @@ function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
       pending={pending}
       last={null}
       onCommit={(value, sigma) => {
-        const e = nextMoonEast(s.seed, s.settings.difficulty, clock.t);
+        const e = nextMoonEast(currentWorld().system, clock.t);
         if (e === null) return;
         makePrediction({ kind: 'moon', made: clock.t, due: e + 0.05 * DAY, value, sigma });
       }}
@@ -887,6 +923,116 @@ function RelayInfo() {
         </button>
       ) : (
         <div className="hint">The Halcyon’s dead relay satellite, in orbit around this planet.</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Chapter 5: time transits of the inner planet. The solar camera logs the
+ * planet's offset from the star's centre every hour while the star is up; the
+ * offset changes steadily, so a straight-line fit gives the moment it crossed
+ * the centre — even if that happened at night.
+ */
+function TransitPanel({ onPoint }: { onPoint: () => void }) {
+  const s = useGame();
+  const t = useGameTime(2);
+  const { system: sys } = currentWorld();
+  const [band, setBand] = useState<[number, number] | null>(null);
+  const pts = s.sunLog.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
+  const used = band ? pts.filter((p) => p.x >= band[0] && p.x <= band[1]) : [];
+  const fit = used.length >= 3 ? linearFit(used.map((p) => p.x), used.map((p) => p.y)) : null;
+  const mid = fit && fit.slope !== 0 ? -fit.intercept / fit.slope : null;
+  // Uncertainty of the zero crossing from the line's scatter (simple propagation).
+  const midSigma = fit && mid !== null && used.length > 2
+    ? (() => {
+        const n = used.length;
+        const mx = used.reduce((a, p) => a + p.x, 0) / n;
+        const sxx = used.reduce((a, p) => a + (p.x - mx) ** 2, 0);
+        const resid = Math.sqrt(used.reduce((a, p) => a + (p.y - fit.intercept - fit.slope * p.x) ** 2, 0) / Math.max(1, n - 2));
+        return (resid / Math.abs(fit.slope)) * Math.sqrt(1 / n + (mid - mx) ** 2 / sxx);
+      })()
+    : null;
+  const picks = [...s.oppPicks].sort((a, b) => a - b);
+  const S = picks.length >= 2 ? (picks[picks.length - 1] - picks[0]) / (picks.length - 1) : null;
+  const sv = topocentric(sys, 'star', t, sys.site);
+  const tv = topocentric(sys, 'target', t, sys.site);
+  const now = Math.abs(eclLon(tv) - eclLon(sv)) < Math.asin(sys.star.radius / Math.hypot(...sv)) && Math.hypot(...tv) < Math.hypot(...sv);
+  const mode = useMode();
+  return (
+    <div className="panel panel-pad stack">
+      <b>Transit timer</b>
+      <div className="muted" style={{ fontSize: 13 }}>
+        When the inner planet passes exactly between us and the star, it crosses the star’s face as a small black dot. The solar camera logs where the
+        dot is every hour while the star is up.
+      </div>
+      <button className="btn" onClick={onPoint}>
+        Look at the star (solar filter)
+      </button>
+      <button className={`btn ${s.sunCamOn ? '' : 'primary'}`} onClick={() => s.set({ sunCamOn: !s.sunCamOn })}>
+        {s.sunCamOn ? 'Solar camera: ON (hourly)' : 'Turn on the solar camera'}
+      </button>
+      {mode.coaching && now && <div className="green" style={{ fontSize: 13 }}>A transit is happening now.</div>}
+      {pts.length > 1 && (
+        <>
+          <Chart
+            series={[
+              { pts, color: '#ffc46b', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
+              ...(fit && used.length ? [{ pts: [used[0].x, used[used.length - 1].x, mid ?? used[0].x].sort((a, b) => a - b).map((x) => ({ x, y: fit.intercept + fit.slope * x })), color: 'rgba(108,196,255,0.8)', kind: 'line' as const }] : []),
+            ]}
+            band={band}
+            onBand={setBand}
+            brushMode="band"
+            xLabel="day"
+            yLabel="offset from the star’s centre (″)"
+            yFmt={(y) => y.toFixed(0)}
+          />
+          <div className="faint" style={{ fontSize: 12 }}>Drag across one transit’s logs. The line’s zero crossing is mid-transit.</div>
+        </>
+      )}
+      {mid !== null && (
+        <>
+          <dl className="kv">
+            <dt>Mid-transit (line crosses zero)</dt>
+            <dd className="blue">day {fmt(mid, 3)}</dd>
+            <dt>Uncertainty</dt>
+            <dd>{midSigma !== null ? `± ${fmt(midSigma * 24 * 60, 0)} min` : '—'}</dd>
+          </dl>
+          <button
+            className="btn primary small"
+            onClick={() => {
+              s.set({ oppPicks: [...s.oppPicks, mid * DAY] });
+              setBand(null);
+              sfx('good');
+              setTimeout(checkMissions, 0);
+            }}
+          >
+            Log this transit
+          </button>
+        </>
+      )}
+      {picks.length > 0 && (
+        <div className="stack">
+          {picks.map((p, i) => (
+            <div key={p} className="row between">
+              <span>
+                Passage {i + 1}: <span className="mono">day {fmt(p / DAY, 3)}</span>
+              </span>
+              <button className="btn small ghost" onClick={() => s.set({ oppPicks: s.oppPicks.filter((x) => x !== p) })}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <b style={{ marginTop: 6 }}>Date of transit t₀ (latest)</b>
+          <SendToSheet k="tOpp" value={picks[picks.length - 1]} spread={midSigma !== null ? midSigma * DAY : undefined} />
+          {S && (
+            <>
+              <b style={{ marginTop: 6 }}>Synodic period S = {fmt(S / DAY, 2)} days</b>
+              <Formula>1/P₂ = 1/P₁ + 1/S</Formula>
+              <SendToSheet k="S2" value={S} />
+            </>
+          )}
+        </div>
       )}
     </div>
   );

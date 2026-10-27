@@ -21,6 +21,8 @@ import { bestTransfer, modelFromPrimaries, predictedWindows, type PlayerModel } 
 import { makeRng, type Rng } from './rng';
 import { localFrame, observerPos, toHorizontal, topocentric } from './sky';
 import { generateSystem } from './system';
+import { variantOf } from './chapters';
+import { nominalFlyby } from './probe';
 import type { Difficulty, Site, StarSystem } from './types';
 import { norm, sub } from './vec';
 
@@ -34,6 +36,7 @@ export interface BotSkill {
   diameterReading: number; // rad
   elongationReading: number; // rad
   moonTiming: number; // s, per moon-period timing
+  dopplerRel: number; // relative error of a Doppler speed reading
   repeats: number;
 }
 
@@ -47,6 +50,7 @@ export const COMPETENT: BotSkill = {
   diameterReading: 0.4 * ARCSEC,
   elongationReading: 2 * ARCSEC,
   moonTiming: 2 * HOUR,
+  dopplerRel: 0.004,
   repeats: 6,
 };
 
@@ -60,6 +64,7 @@ export const PERFECT: BotSkill = {
   diameterReading: 0,
   elongationReading: 0,
   moonTiming: 0,
+  dopplerRel: 0,
   repeats: 3,
 };
 
@@ -154,11 +159,12 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
   p.S2 = { value: t2 - t1, sigma: Math.SQRT2 * pickSigma };
   p.tOpp = { value: t2, sigma: pickSigma };
 
-  // Parallax with a rover 3000 km east, measured when planet 2 crosses the midpoint meridian.
+  // Parallax with a rover 3000 km east, measured when planet 2 crosses the midpoint meridian:
+  // at opposition, or for an inner planet near greatest elongation (it is lost in the glare at conjunction).
   const B = 3000e3;
   const rover = siteEastOf(sys, sys.site, B);
   const mid = siteEastOf(sys, sys.site, B / 2);
-  const tObs = transitNear(sys, mid, o2);
+  const tObs = transitNear(sys, mid, sys.features.inner ? o2 + 0.22 * sys.synodic : o2);
   const baseline = norm(sub(observerPos(sys, tObs, sys.site), observerPos(sys, tObs, rover)));
   const pTrue = parallaxShift(sys, tObs, sys.site, rover);
   p.dPar = { ...summarize(Array.from({ length: n }, () => baseline / (pTrue + rng.normal(0, skill.parallaxReading)))), at: tObs };
@@ -177,6 +183,16 @@ export function botMeasure(sys: StarSystem, skill: BotSkill, rng: Rng): { primar
 
   // Moon period: time three orbits.
   p.Pm = summarize(Array.from({ length: n }, () => (3 * sys.moon.period + rng.normal(0, skill.moonTiming)) / 3));
+
+  // No moon (chapter 2): a probe flyby at twice the planet's radius, tracked by Doppler.
+  if (!sys.features.moon) {
+    const fb = nominalFlyby(sys);
+    p.vInf = summarize(Array.from({ length: n }, () => fb.vInf * (1 + rng.normal(0, skill.dopplerRel))));
+    p.vPeak = summarize(Array.from({ length: n }, () => fb.vPeak * (1 + rng.normal(0, skill.dopplerRel))));
+    p.rPeri = summarize(Array.from({ length: n }, () => fb.rPeri * (1 + rng.normal(0, skill.dopplerRel * 0.75))));
+    delete p.thetaM;
+    delete p.Pm;
+  }
 
   return { primaries: p, readyAt: o2 + 5 * DAY };
 }
@@ -202,7 +218,7 @@ export function linearFit(x: number[], y: number[]) {
 export function botPlay(sys: StarSystem, skill: BotSkill, seed = 1): BotRun {
   const rng = makeRng(seed);
   const { primaries, readyAt } = botMeasure(sys, skill, rng);
-  const model = modelFromPrimaries(primaries);
+  const model = modelFromPrimaries(primaries, variantOf(sys.features));
   if (!model) return { primaries, model, readyAt };
   const windows = predictedWindows(model, readyAt, sys.lifeSupport);
   if (!windows.length) return { primaries, model, readyAt };
@@ -215,10 +231,10 @@ export function botPlay(sys: StarSystem, skill: BotSkill, seed = 1): BotRun {
  * Generate a system the bot can solve with a competent skill level. Seeds the
  * bot cannot solve are skipped (deterministically), and the count is reported.
  */
-export function generateSolvableSystem(seed: number, difficulty: Difficulty = 'navigator') {
+export function generateSolvableSystem(seed: number, difficulty: Difficulty = 'navigator', chapter = 1) {
   for (let k = 0; k < 50; k++) {
     const s = (seed + k * 7919) >>> 0;
-    const sys = generateSystem(s, difficulty);
+    const sys = generateSystem(s, difficulty, chapter);
     let ok = true;
     for (let trial = 0; trial < 3 && ok; trial++) {
       const run = botPlay(sys, COMPETENT, s * 31 + trial);

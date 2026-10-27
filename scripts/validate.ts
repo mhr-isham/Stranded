@@ -86,6 +86,25 @@ for (const diff of ['stargazer', 'cadet', 'navigator', 'astronomer', 'legend'] a
   out();
 }
 
+// 3. Campaign chapters (navigator margins).
+out('## 3. Campaign chapters (competent solver, Navigator)');
+out();
+out('| Chapter | Outcomes | Median fuel left |');
+out('|---|---|---|');
+for (const chapter of [1, 2, 3, 5]) {
+  const outcomes: Record<string, number> = {};
+  const fuelLeft: number[] = [];
+  for (let seed = 1; seed <= N; seed++) {
+    const sys = generateSystem(seed, 'navigator', chapter);
+    const run = botPlay(sys, COMPETENT, seed * 101);
+    const o = run.result?.outcome ?? 'no-plan';
+    outcomes[o] = (outcomes[o] ?? 0) + 1;
+    if (run.result) fuelLeft.push(run.result.fuelLeft / sys.fuelDv);
+  }
+  out(`| ${chapter} | ${Object.entries(outcomes).map(([k, v]) => `${k} ${v}/${N}`).join(', ')} | ${pct(median(fuelLeft))} |`);
+}
+out();
+
 mkdirSync('reports', { recursive: true });
 writeFileSync('reports/validation.md', lines.join('\n') + '\n');
 console.log('\nWrote reports/validation.md');

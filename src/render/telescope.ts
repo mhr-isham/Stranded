@@ -100,6 +100,8 @@ export interface ScopeScene {
   seeing: number; // rad (FWHM)
   realTime: number; // ms
   filter: boolean; // solar filter fitted
+  /** The planet is nearer than the star (an inner planet): through the filter it shows as a black dot in transit. */
+  targetInFront?: boolean;
   shimmer?: { x: number; y: number }; // tip-tilt offset in rad
 }
 
@@ -156,6 +158,17 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
       ctx.fillStyle = 'rgba(255,255,255,0.97)';
       ctx.fillRect(0, 0, w, h);
       return P;
+    }
+  }
+
+  // A transit: the planet's silhouette against the filtered star.
+  if (sc.filter && sc.targetInFront && sc.targetDir) {
+    const p = P.project(sc.targetDir);
+    if (p) {
+      ctx.fillStyle = '#050403';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(1.6 * dpr, sc.targetRadius * P.k), 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 

@@ -2,7 +2,7 @@
 // next act. Continue goes straight on; nothing forces a stop.
 
 import { useEffect, useState } from 'react';
-import { ACTS, completedActs } from '../game/acts';
+import { actsFor, completedActs } from '../game/acts';
 import { sfx } from '../game/audio';
 import { clock } from '../game/clock';
 import { useGame } from '../game/store';
@@ -14,8 +14,9 @@ export function ActCard() {
   const s = useGame();
   const [showLearned, setShowLearned] = useState(false);
   const pending = completedActs(s).find((n) => !s.actsSeen.includes(n));
-  const act = pending ? ACTS.find((a) => a.n === pending)! : null;
-  const next = act ? ACTS.find((a) => a.n === act.n + 1) : null;
+  const acts = actsFor(s.chapter);
+  const act = pending ? acts.find((a) => a.n === pending)! : null;
+  const next = act ? acts.find((a) => a.n === act.n + 1) : null;
 
   useEffect(() => {
     if (!act) return;

@@ -69,7 +69,47 @@ export const ACTS: Act[] = [
 const done = (s: GameState, id: string) => s.missionsDone.includes(id);
 
 /** Acts whose missions are all complete. */
-export const completedActs = (s: GameState) => ACTS.filter((a) => a.missions.every((m) => done(s, m))).map((a) => a.n);
+export const completedActs = (s: GameState) => actsFor(s.chapter).filter((a) => a.missions.every((m) => done(s, m))).map((a) => a.n);
 
 /** The act the player is currently in. */
-export const currentAct = (s: GameState) => ACTS.find((a) => !a.missions.every((m) => done(s, m))) ?? ACTS[ACTS.length - 1];
+export const currentAct = (s: GameState) => {
+  const acts = actsFor(s.chapter);
+  return acts.find((a) => !a.missions.every((m) => done(s, m))) ?? acts[acts.length - 1];
+};
+
+/** Acts per chapter: the same five beats, with the chapter's own missions. */
+export function actsFor(chapter: number): Act[] {
+  if (chapter === 2)
+    return ACTS.map((a) =>
+      a.n === 4
+        ? {
+            ...a,
+            name: 'The probe',
+            missions: ['probeLaunch', 'probeRead', 'synodic'],
+            learned: ['A probe speeds up as it falls past a planet; the speed-up weighs it: M₂ = rₚ(vₚ² − v∞²)/(2G).', 'The time between two oppositions is the synodic period.'],
+          }
+        : a,
+    );
+  if (chapter === 3)
+    return ACTS.map((a) =>
+      a.n === 1
+        ? {
+            ...a,
+            missions: ['gravity', 'shadows', 'mass'],
+            learned: ['Thick air bends light near the horizon, so the hill gave the wrong size.', 'Noon shadows at two sites on one meridian measure the planet: R = d/Δ.', 'Gravity and size weigh the whole planet.'],
+          }
+        : a,
+    );
+  if (chapter === 5)
+    return ACTS.map((a) =>
+      a.n === 3
+        ? {
+            ...a,
+            missions: ['transit', 'parallax', 'disk'],
+            learned: ['An inner planet crosses the star’s face at inferior conjunction — a transit.', 'Its distance by parallax is measured in twilight, near greatest elongation.', 'Angle × distance = size.'],
+            hook: 'We know where it is and how big. Now its weight — and its moon is swinging around it.',
+          }
+        : a,
+    );
+  return ACTS;
+}

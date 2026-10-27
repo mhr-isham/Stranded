@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEG, HOUR } from '../../engine/constants';
 import { horizonDip } from '../../engine/measure';
+import { useMode } from '../../game/modes';
 import { starAltitude } from '../../engine/sky';
 import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
@@ -16,6 +17,7 @@ import { toast } from '../common/widgets';
 const EYE = 1.7;
 
 export function Hill() {
+  const hillMode = useMode();
   const { system: sys } = currentWorld();
   const s = useGame();
   const upgrades = s.settings.survival ? s.survival.upgrades : [];
@@ -36,7 +38,9 @@ export function Hill() {
   const keptR = s.readings.filter((r) => r.key === 'R1' && r.kept).map((r) => r.value);
   const view = useRef({ pitch: -0.3, drag: null as null | { y: number; p: number }, brace: 0, sway: 0 });
   const h = stations[at].h + EYE;
-  const dip = horizonDip(sys.home.radius, h) / DEG;
+  // Thick air (chapter 3) bends the light from the horizon down to the eye, so
+  // the horizon looks higher than it is: apparent dip ≈ true dip · √(1 − k).
+  const dip = (horizonDip(sys.home.radius, h) * Math.sqrt(1 - sys.features.refraction)) / DEG;
 
   const climb = (i: number) => {
     if (i === at || moving) return;
@@ -171,6 +175,12 @@ export function Hill() {
       </div>
       <div className="tool-side">
         <ToolHeader title="The hill" sub="Measure how far the horizon dips below level. The dip depends on your height and the planet’s radius." />
+        {sys.features.refraction > 0 && hillMode.coaching && (
+          <div className="callout warn" style={{ margin: 0 }}>
+            <b>Thick air</b>
+            The horizon shimmers and looks oddly high. Light skimming the ground bends in this dense air — readings here may be badly off.
+          </div>
+        )}
         <div className="panel panel-pad stack">
           <b>Where are you?</b>
           <div className="stack" data-tut="hill-stations">

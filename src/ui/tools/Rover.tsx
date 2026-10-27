@@ -53,6 +53,7 @@ export function Rover() {
   const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > 15 && B.alt > 15 && A.sun < -12 && B.sun < -12 && !(s.settings.survival && isCloudy(s.seed, t));
 
   const drive = () => {
+    if (s.northTrip.dist > 0 || s.northTrip.arriveAt > clock.t) return toast('The rover is out north at the shadow stick. Bring it back first.');
     const dist = Math.abs(target * 1000 - s.rover.dist);
     s.set({ rover: { dist: s.rover.dist, target: target * 1000, departAt: clock.t, arriveAt: clock.t + (dist / speed) * DAY } });
     toast(`Rover underway: ${fmt(dist / speed, 1)} days`);

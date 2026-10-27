@@ -26,6 +26,7 @@ import { useGame, type CampInfo } from '../game/store';
 import { CanvasView } from './common/CanvasView';
 import { beginPlay } from './Intro';
 import { unlockLog } from '../game/story';
+import { chapterOf } from '../game/campaign';
 
 type Stage = 'tumble' | 'stabilize' | 'deorbit' | 'entry' | 'descent' | 'landed';
 
@@ -77,11 +78,13 @@ export function Prologue() {
     return Array.from({ length: 260 }, () => ({ x: r.next(), y: r.next(), b: 0.3 + r.next() * 0.7 }));
   }, [sys]);
 
+  // Later chapters arrive by a (mostly) controlled fold: no tumble.
+  const later = s.chapter > 1;
   const sim = useRef<Sim>({
-    stage: 'tumble',
+    stage: later ? 'deorbit' : 'tumble',
     stageT: 0,
-    ang: 0.4,
-    spin: 1.9,
+    ang: later ? 0.3 : 0.4,
+    spin: later ? 0 : 1.9,
     calm: 0,
     burn: 0,
     alt: ENTRY_TOP,
@@ -95,8 +98,12 @@ export function Prologue() {
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
-  const [stage, setStage] = useState<Stage>('tumble');
-  const [line, setLine] = useState('Fold exit — irregular. Spin rate high. Navigation… not found.');
+  const [stage, setStage] = useState<Stage>(later ? 'deorbit' : 'tumble');
+  const [line, setLine] = useState(
+    later
+      ? 'Fold exit — controlled, this time. Mostly. New star, new planets, and we’re falling toward the nearest one. Turn the nose to the green retrograde marker and burn.'
+      : 'Fold exit — irregular. Spin rate high. Navigation… not found.',
+  );
   const [hud, setHud] = useState({ alt: 0, vs: 0, hs: 0, tilt: 0, fuel: 1, chute: 'stowed' as DescentState['chute'], site: 'rough' as SiteKind, q: 0, x: 1, heat: 0, gamma: 0 });
 
   const say = (id: string, text: string) => {
@@ -166,6 +173,14 @@ export function Prologue() {
 
   const finish = (camp: CampInfo) => {
     stopRumble();
+    if (later) {
+      // A new chapter: straight to camp, then the chapter's briefing.
+      useGame.setState({ camp });
+      beginPlay();
+      const b = chapterOf(s.chapter).briefing;
+      if (b) unlockLog(b);
+      return;
+    }
     unlockLog('fall', false);
     useGame.setState({ camp, phase: 'intro' });
   };
@@ -176,6 +191,8 @@ export function Prologue() {
     stopRumble();
     useGame.setState({ camp: campAt(x, 'skipped') });
     beginPlay();
+    const b = later ? chapterOf(s.chapter).briefing : null;
+    if (b) unlockLog(b);
   };
 
   const campAt = (x: number, landing: CampInfo['landing']): CampInfo => {

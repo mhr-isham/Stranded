@@ -10,7 +10,7 @@ describe('predictions', () => {
 
   it('finds the end of retrograde', () => {
     const t = sys.firstOpposition - 5 * DAY;
-    const st = nextStationary(seed, 'cadet', t)!;
+    const st = nextStationary(sys, t)!;
     expect(st).toBeGreaterThan(sys.firstOpposition);
     const lon = (tt: number) => targetLongitude(sys, tt, sys.site);
     // Backwards just before, forwards just after.
@@ -19,7 +19,7 @@ describe('predictions', () => {
   });
 
   it('finds the moon at greatest east offset', () => {
-    const e = nextMoonEast(seed, 'cadet', 10 * DAY)!;
+    const e = nextMoonEast(sys, 10 * DAY)!;
     const f = (tt: number) => moonOffset(sys, tt, sys.site);
     expect(f(e)).toBeGreaterThan(0);
     expect(f(e)).toBeGreaterThanOrEqual(f(e - 0.01 * DAY));

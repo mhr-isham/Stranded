@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PRIMARY_KEYS, QUANTITY_INFO } from '../../engine/chain';
+import { QUANTITY_INFO, keysFor, labelFor } from '../../engine/chain';
+import { variantOf } from '../../engine/chapters';
 import { DAY, DEG, G } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
 import { propagate } from '../../engine/orbits';
@@ -40,7 +41,8 @@ export function Launch() {
   const s = useGame();
   const { system: sys } = currentWorld();
   const t = useGameTime(2);
-  const model = useMemo(() => modelFromPrimaries(s.sheet), [s.sheet]);
+  const variant = variantOf(sys.features);
+  const model = useMemo(() => modelFromPrimaries(s.sheet, variant), [s.sheet, variant]);
   const end = lifeSupportEnd(s, sys);
   const budget = sys.fuelDv - s.penaltyDv;
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
@@ -92,7 +94,7 @@ export function Launch() {
       const fuelLeft: number[] = [];
       const paths: Vec3[][] = [];
       for (let i = 0; i < 36; i++) {
-        const m = sampleModel(s.sheet, rng);
+        const m = sampleModel(s.sheet, rng, variant);
         if (!m) continue;
         const u = { ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity };
         const r = simulateLaunch(u, plan.plan);
@@ -105,7 +107,7 @@ export function Launch() {
   }, [plan, model, s.sheet, sys, budget]);
 
   if (!model || !hoh) {
-    const missing = PRIMARY_KEYS.filter((k) => !s.sheet[k]);
+    const missing = keysFor(variant).filter((k) => !s.sheet[k]);
     return (
       <div className="tool">
         <div className="tool-stage" />
@@ -116,7 +118,7 @@ export function Launch() {
             <div className="muted">The planner needs every measured quantity on the progress sheet. Still missing:</div>
             {missing.map((k) => (
               <div key={k} className="row between" style={{ fontSize: 13 }}>
-                <span>{QUANTITY_INFO[k].label}</span>
+                <span>{labelFor(k, variant)}</span>
                 <span className="faint">{QUANTITY_INFO[k].symbol}</span>
               </div>
             ))}

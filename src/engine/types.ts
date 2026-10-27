@@ -1,5 +1,7 @@
 // Core data types for a generated star system. All values SI unless noted.
 
+import type { SystemFeatures } from './chapters';
+
 export type Difficulty = 'stargazer' | 'cadet' | 'navigator' | 'astronomer' | 'legend';
 
 export interface Star {
@@ -48,14 +50,17 @@ export interface HohmannInfo {
 export interface StarSystem {
   seed: number;
   difficulty: Difficulty;
+  /** Campaign chapter the system was generated for (1 for a plain expedition). */
+  chapter: number;
+  features: SystemFeatures;
   star: Star;
   home: HomePlanet;
   target: Planet;
   moon: Moon;
   site: Site;
   hillHeight: number; // summit height above the plain (m)
-  synodic: number; // planet 1 - planet 2 synodic period (s)
-  firstOpposition: number; // time of the first opposition after t = 0 (s)
+  synodic: number; // planet 1 - planet 2 synodic period (s), always positive
+  firstOpposition: number; // first time both planets share a longitude after t = 0 (opposition, or inferior conjunction for an inner planet) (s)
   hohmann: HohmannInfo;
   /** Departure times of Hohmann windows inside the life-support budget (s). */
   windows: number[];

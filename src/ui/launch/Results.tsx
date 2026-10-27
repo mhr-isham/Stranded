@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DERIVED_KEYS, PRIMARY_KEYS, QUANTITY_INFO, deriveAll, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
+import { DERIVED_KEYS, QUANTITY_INFO, deriveAll, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
+import { variantOf } from '../../engine/chapters';
 import { DAY } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
 import { modelFromPrimaries, planTransfer } from '../../engine/planner';
@@ -16,6 +17,8 @@ import { countText, modeOf } from '../../game/modes';
 import { predictionPoints } from '../../game/predictions';
 import { nameOf, type AtlasCard } from '../../game/atlas';
 import { unlockLog } from '../../game/story';
+import { chapterOf } from '../../game/campaign';
+import { probeTruth } from '../../game/probeState';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
   success: {
@@ -113,11 +116,12 @@ function Debrief() {
   const kind = outcome?.result.outcome ?? 'expired';
   const info = OUTCOME_TEXT[kind];
   const sheet: Primaries = outcome?.sheet ?? s.sheet;
-  const truth = truthValues(sys, sheet);
-  const derived = deriveAll(sheet);
-  const rows = ([...PRIMARY_KEYS, ...DERIVED_KEYS] as QuantityKey[]).map((k) => {
+  const variant = variantOf(sys.features);
+  const truth = truthValues(sys, sheet, probeTruth(s));
+  const derived = deriveAll(sheet, variant);
+  const rows = ([...keysFor(variant), ...DERIVED_KEYS] as QuantityKey[]).filter((k) => variant !== 'probe' || k !== 'aM').map((k) => {
     const e = (sheet as Record<string, { value: number; sigma: number } | undefined>)[k] ?? (derived as Record<string, { value: number; sigma: number } | undefined>)[k];
-    return { k, e, sc: e ? scoreQuantity(e.value, e.sigma, truth[k]) : null };
+    return { k, e, sc: e && Number.isFinite(truth[k]) ? scoreQuantity(e.value, e.sigma, truth[k]) : null };
   });
   const measurementPoints = rows.reduce((a, r) => a + (r.sc?.points ?? 0), 0);
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
@@ -132,10 +136,10 @@ function Debrief() {
     if (!outcome) return [];
     const base = outcome.result.correctionCost;
     const out: { k: QuantityKey; saved: number }[] = [];
-    for (const k of PRIMARY_KEYS) {
+    for (const k of keysFor(variant)) {
       if (!sheet[k]) continue;
       const alt = { ...sheet, [k]: { ...sheet[k]!, value: truth[k] } };
-      const m = modelFromPrimaries(alt);
+      const m = modelFromPrimaries(alt, variant);
       if (!m) continue;
       const p = planTransfer(m, outcome.plan.departTime, outcome.plan.tof);
       if (!p) continue;
@@ -148,8 +152,16 @@ function Debrief() {
   const earned = useMemo(() => evaluateAchievements(s, sys, kind, rows), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!s.debriefSeen) useGame.setState({ debriefSeen: true });
-    // Reaching the beacon: the Halcyon cache and the first journal pages.
-    if (kind === 'success') ['cache1', 'mira1', 'mira2'].forEach((id) => unlockLog(id));
+    const g0 = useGame.getState();
+    // Reaching the beacon: the Halcyon cache and the chapter's journal pages.
+    if (kind === 'success') chapterOf(g0.chapter).successLogs.forEach((id) => unlockLog(id));
+    // Campaign progress: chapter done, best grade per mode.
+    if (!g0.tutorial.active) {
+      const c = g0.campaign[g0.chapter] ?? { done: false, best: {} };
+      const prev = c.best[g0.settings.difficulty];
+      const best = !prev || grade.total > prev.score ? { grade: grade.letter, score: grade.total } : prev;
+      useGame.setState({ campaign: { ...g0.campaign, [g0.chapter]: { done: c.done || kind === 'success', best: { ...c.best, [g0.settings.difficulty]: best } } } });
+    }
     // Every run, success or not, becomes a finished card in the Atlas.
     const g = useGame.getState();
     if (!g.tutorial.active && !g.atlas.some((c) => c.id === g.runId)) {
@@ -233,7 +245,7 @@ function Debrief() {
             <button className="btn primary" onClick={share}>
               {copied ? 'Copied!' : 'Share result'}
             </button>
-            <button className="btn" onClick={() => useGame.getState().newGame(s.seed, s.settings)}>
+            <button className="btn" onClick={() => useGame.getState().newGame(s.seed, s.settings, s.chapter)}>
               Retry this system
             </button>
             <button className="btn" onClick={() => useGame.setState({ phase: 'title', outcome: null })}>
@@ -275,7 +287,7 @@ function Debrief() {
                 {rows.map(({ k, e, sc }) => (
                   <tr key={k}>
                     <td>
-                      {QUANTITY_INFO[k].symbol} <span className="muted">{QUANTITY_INFO[k].label}</span>
+                      {QUANTITY_INFO[k].symbol} <span className="muted">{labelFor(k, variant)}</span>
                     </td>
                     <td className="num">{e ? `${sig(toDisplay(k, e.value), 5)} ± ${sig(toDisplay(k, e.sigma), 2)}` : '—'}</td>
                     <td className="num">{sig(toDisplay(k, truth[k]), 5)}</td>

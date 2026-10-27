@@ -128,5 +128,97 @@ export const MISSIONS: Mission[] = [
 ];
 
 export function activeMission(s: GameState) {
-  return MISSIONS.find((m) => !m.done(s)) ?? null;
+  return missionsFor(s).find((m) => !m.done(s)) ?? null;
+}
+
+const byId = (id: string) => MISSIONS.find((m) => m.id === id)!;
+
+/** Chapter 2: no moon, so the probe flyby replaces the moon missions. */
+const CH2: Mission[] = [
+  ...['gravity', 'radius', 'mass', 'identify', 'year', 'track', 'opposition', 'parallax', 'disk'].map(byId),
+  {
+    id: 'probeLaunch',
+    title: 'Throw something past it',
+    short: 'Launch the probe at the blue planet.',
+    goal: 'In the probe bay, choose how close the probe should pass — in units of your measured R₂ — and launch it. It costs fuel and takes weeks to arrive.',
+    why: 'With no moon, the only way to weigh the blue planet is to watch something fall past it.',
+    screen: 'probe',
+    done: (s) => s.probesLaunched > 0,
+  },
+  {
+    id: 'probeRead',
+    title: 'Weigh it with the probe',
+    short: 'Measure v∞, vₚ and rₚ from the flyby.',
+    goal: 'After the flyby, read the probe’s far-away speed and its peak speed from the Doppler chart, and its closest approach from the altimeter. Send all three to the sheet.',
+    why: 'Falling things speed up: the heavier the planet, the bigger the speed-up. vₚ² − v∞² = 2GM₂/rₚ.',
+    screen: 'probe',
+    done: (s) => !!s.sheet.vInf && !!s.sheet.vPeak && !!s.sheet.rPeri,
+  },
+  byId('synodic'),
+  byId('plan'),
+];
+
+/** Chapter 3: thick air fools the horizon; noon shadows at two sites measure the planet. */
+const CH3: Mission[] = [
+  byId('gravity'),
+  {
+    id: 'shadows',
+    title: 'Measure the world, the old way',
+    short: 'Measure the planet’s radius R₁.',
+    goal: 'The thick air bends light near the horizon, so the hill can’t be trusted here. Log the noon shadow at camp, drive the rover due north, and log its noon shadow on the same day.',
+    why: 'Eratosthenes’ method: the difference in the noon sun’s angle between two places on one meridian, and the distance between them, give the planet’s size.',
+    screen: 'gnomon',
+    done: (s) => !!s.sheet.R1,
+  },
+  ...['mass', 'identify', 'year', 'track', 'opposition', 'parallax', 'disk', 'moon', 'synodic', 'plan'].map(byId),
+];
+
+/** Chapter 5: an inner planet — transits instead of oppositions. */
+const CH5: Mission[] = [
+  ...['gravity', 'radius', 'mass'].map(byId),
+  {
+    ...byId('identify'),
+    goal: 'In the twilight after sunset or before sunrise, find the steady light that never strays far from the star, and identify it in the telescope.',
+    why: 'An inner planet always stays near the star in our sky — an “evening star” or a “morning star”.',
+  },
+  byId('year'),
+  {
+    ...byId('track'),
+    title: 'Watch it swing',
+    goal: 'Turn on the tracker. It can only catch the planet in twilight; it logs how far the planet is from the star.',
+    why: 'An inner planet swings out from the star to its greatest elongation and back. sin ε = a₂/a₁.',
+  },
+  {
+    id: 'transit',
+    title: 'A dot on the star',
+    short: 'Time a transit.',
+    goal: 'When the planet swings in front of the star, watch through the solar filter (Sky → Transit tab) and log when it enters and leaves the star’s disk.',
+    why: 'At mid-transit the planet is exactly between us and the star. That moment fixes where both planets are.',
+    screen: 'observatory',
+    done: (s) => s.oppPicks.length >= 1,
+  },
+  {
+    ...byId('parallax'),
+    goal: 'When the planet is high in a dark twilight sky (near greatest elongation), drive the rover far east and image it from both sites at once.',
+  },
+  byId('disk'),
+  byId('moon'),
+  {
+    id: 'synodic',
+    title: 'Full circle',
+    short: 'Measure the synodic period S.',
+    goal: 'Time a second transit. The time between them is the synodic period S.',
+    why: 'The planet laps us, so 1/P₂ = 1/P₁ + 1/S. From P₂ and our year, Kepler gives its orbit size.',
+    screen: 'observatory',
+    done: (s) => !!s.sheet.S2,
+  },
+  byId('plan'),
+];
+
+/** The missions of the current chapter. */
+export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
+  if (s.chapter === 2) return CH2;
+  if (s.chapter === 3) return CH3;
+  if (s.chapter === 5) return CH5;
+  return MISSIONS;
 }

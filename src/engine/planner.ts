@@ -3,7 +3,7 @@
 
 import { G, TAU } from './constants';
 import type { Estimate, Primaries, PrimaryKey } from './chain';
-import { deriveAll } from './chain';
+import { deriveAll, keysFor, type ChainVariant } from './chain';
 import type { LaunchPlan } from './launch';
 import { captureCost, departCost, hohmannTof, hohmannVInfArrive, hohmannVInfDepart, lambert } from './orbits';
 import type { Rng } from './rng';
@@ -23,12 +23,14 @@ export interface PlayerModel {
   R1: number;
   M2: number;
   R2: number;
+  /** The target orbits inside ours. */
+  inner: boolean;
 }
 
-export const LAUNCH_KEYS: PrimaryKey[] = ['R1', 'g', 'P1', 'S2', 'tOpp', 'dPar', 'alpha2', 'thetaM', 'Pm'];
+export const LAUNCH_KEYS: PrimaryKey[] = keysFor('standard');
 
-export function modelFromPrimaries(p: Primaries): PlayerModel | null {
-  const d = deriveAll(p);
+export function modelFromPrimaries(p: Primaries, variant: ChainVariant = 'standard'): PlayerModel | null {
+  const d = deriveAll(p, variant);
   if (!d.P2 || !d.a1 || !d.a2 || !d.Mstar || !d.M1 || !d.M2 || !d.R2 || !p.tOpp || !p.R1) return null;
   return {
     P1: p.P1!.value,
@@ -42,6 +44,7 @@ export function modelFromPrimaries(p: Primaries): PlayerModel | null {
     R1: p.R1.value,
     M2: d.M2.value,
     R2: d.R2.value,
+    inner: variant === 'inner',
   };
 }
 
@@ -92,9 +95,10 @@ export function planTransfer(m: PlayerModel, departTime: number, tof: number): P
 export function hohmannFor(m: PlayerModel) {
   const mu = G * m.Mstar;
   const tof = hohmannTof(m.a1, m.a2, mu);
-  const lead = Math.PI - (TAU * tof) / m.P2;
-  const vInfD = hohmannVInfDepart(m.a1, m.a2, mu);
-  const vInfA = hohmannVInfArrive(m.a1, m.a2, mu);
+  const lead0 = Math.PI - (TAU * tof) / m.P2;
+  const lead = Math.atan2(Math.sin(lead0), Math.cos(lead0));
+  const vInfD = Math.abs(hohmannVInfDepart(m.a1, m.a2, mu));
+  const vInfA = Math.abs(hohmannVInfArrive(m.a1, m.a2, mu));
   return {
     tof,
     lead,
@@ -109,7 +113,8 @@ export function hohmannFor(m: PlayerModel) {
 export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
   const { lead } = hohmannFor(m);
   const out: number[] = [];
-  const offset = (lead / TAU) * m.S2;
+  // Outer target: the lead shrinks with time; inner target: it grows.
+  const offset = m.inner ? -((((lead / TAU) % 1) + 1) % 1) * m.S2 : (lead / TAU) * m.S2;
   const k0 = Math.ceil((t0 - m.tOpp + offset) / m.S2);
   for (let k = k0; ; k++) {
     const t = m.tOpp + k * m.S2 - offset;
@@ -162,12 +167,12 @@ export function systemFromModel(m: PlayerModel, template: StarSystem): StarSyste
 }
 
 /** Draw a random model from the player's primaries (Gaussian in each primary). */
-export function sampleModel(p: Primaries, rng: Rng): PlayerModel | null {
+export function sampleModel(p: Primaries, rng: Rng, variant: ChainVariant = 'standard'): PlayerModel | null {
   const s: Primaries = {};
-  for (const k of LAUNCH_KEYS) {
+  for (const k of keysFor(variant)) {
     const e = p[k] as Estimate | undefined;
     if (!e) return null;
     s[k] = { value: rng.normal(e.value, e.sigma), sigma: 0, at: e.at };
   }
-  return modelFromPrimaries(s);
+  return modelFromPrimaries(s, variant);
 }

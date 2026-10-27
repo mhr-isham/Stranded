@@ -1,4 +1,4 @@
-// The current star system, derived (and cached) from seed + difficulty.
+// The current star system, derived (and cached) from seed + difficulty + chapter.
 // It is never persisted: regenerating from the seed is deterministic.
 
 import { generateSolvableSystem } from '../engine/solver';
@@ -9,10 +9,10 @@ import { solarDay } from '../engine/ephemeris';
 let cacheKey = '';
 let cached: { system: StarSystem; catalog: CatalogStar[]; solarDay: number } | null = null;
 
-export function world(seed: number, difficulty: Difficulty) {
-  const key = `${seed}:${difficulty}`;
+export function world(seed: number, difficulty: Difficulty, chapter = 1) {
+  const key = `${seed}:${difficulty}:${chapter}`;
   if (key !== cacheKey || !cached) {
-    const { system } = generateSolvableSystem(seed, difficulty);
+    const { system } = generateSolvableSystem(seed, difficulty, chapter);
     cached = { system, catalog: starCatalog(system.seed), solarDay: solarDay(system) };
     cacheKey = key;
   }

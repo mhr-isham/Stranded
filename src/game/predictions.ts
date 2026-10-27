@@ -9,6 +9,7 @@ import { sfx } from './audio';
 import { modeOf } from './modes';
 import { useGame, type GameState } from './store';
 import { world } from './world';
+import type { StarSystem } from '../engine/types';
 
 export type PredictionKind = 'star' | 'retro' | 'moon' | 'pendulum';
 
@@ -54,8 +55,7 @@ export function scorePrediction(value: number, sigma: number, truth: number, sca
 }
 
 /** Day of the next end of retrograde (planet turns from backwards to forwards) after t. */
-export function nextStationary(seed: number, difficulty: GameState['settings']['difficulty'], t: number) {
-  const { system: sys } = world(seed, difficulty);
+export function nextStationary(sys: StarSystem, t: number) {
   const rate = (tt: number) => {
     let d = targetLongitude(sys, tt + 0.1 * DAY, sys.site) - targetLongitude(sys, tt - 0.1 * DAY, sys.site);
     if (d > Math.PI) d -= 2 * Math.PI;
@@ -82,8 +82,7 @@ export function nextStationary(seed: number, difficulty: GameState['settings']['
 }
 
 /** Next time after t when the moon is at its greatest offset east of the planet. */
-export function nextMoonEast(seed: number, difficulty: GameState['settings']['difficulty'], t: number) {
-  const { system: sys } = world(seed, difficulty);
+export function nextMoonEast(sys: StarSystem, t: number) {
   const step = sys.moon.period / 200;
   const f = (tt: number) => moonOffset(sys, tt, sys.site);
   let a = f(t);
@@ -128,18 +127,18 @@ export function makePrediction(p: Omit<Prediction, 'id'>) {
 
 /** True value of the predicted observable. */
 function truthOf(s: GameState, p: Prediction): number | null {
-  const { system: sys } = world(s.seed, s.settings.difficulty);
+  const { system: sys } = world(s.seed, s.settings.difficulty, s.chapter);
   if (p.kind === 'star') {
     const deg = (starLongitude(sys, (p.at ?? 0) * DAY, sys.site) * 180) / Math.PI;
     // Unwrap to the turn closest to the guess.
     return deg + 360 * Math.round((p.value - deg) / 360);
   }
   if (p.kind === 'retro') {
-    const t = nextStationary(s.seed, s.settings.difficulty, p.made);
+    const t = nextStationary(sys, p.made);
     return t === null ? null : t / DAY;
   }
   if (p.kind === 'moon') {
-    const t = nextMoonEast(s.seed, s.settings.difficulty, p.made);
+    const t = nextMoonEast(sys, p.made);
     return t === null ? null : t / DAY;
   }
   return null;

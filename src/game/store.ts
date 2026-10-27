@@ -8,9 +8,12 @@ import type { Difficulty } from '../engine/types';
 import { clock } from './clock';
 import { modeOf } from './modes';
 import type { Prediction } from './predictions';
+import type { ProbeState } from './probeState';
 import type { AtlasCard, SystemNames } from './atlas';
 
 export type Screen =
+  | 'probe'
+  | 'gnomon'
   | 'hub'
   | 'pendulum'
   | 'hill'
@@ -120,6 +123,20 @@ export interface GameState {
   tutorial: TutorialState;
   /** Identifies this run, so checkpoints from an older run are ignored. */
   runId: number;
+  /** Campaign chapter of this run (1 = the first system, also used for plain expeditions). */
+  chapter: number;
+  /** Best result per chapter and mode, kept across runs. */
+  campaign: Record<number, { done: boolean; best: Partial<Record<Difficulty, { grade: string; score: number }>> }>;
+  /** Chapter 2: the probe sent past the blue planet. */
+  probe: ProbeState | null;
+  probesLaunched: number;
+  /** Chapter 5: the solar camera that times transits. */
+  sunCamOn: boolean;
+  sunLog: TimedValue[];
+  /** Chapter 3: noon-shadow (gnomon) readings at camp and at the rover. */
+  shadows: { site: 'camp' | 'rover'; at: number; alt: number; dist: number }[];
+  /** Chapter 3: the rover's trip due north (m) for the second gnomon. */
+  northTrip: { dist: number; arriveAt: number };
   /** Where and how the ship came down in the prologue. */
   camp: CampInfo | null;
   predictions: Prediction[];
@@ -139,7 +156,7 @@ export interface GameState {
 
   set: (p: Partial<GameState>) => void;
   go: (screen: Screen) => void;
-  newGame: (seed: number, settings: Settings) => void;
+  newGame: (seed: number, settings: Settings, chapter?: number) => void;
   addReading: (r: Omit<Reading, 'id' | 'kept' | 'note'> & { note?: string }) => void;
   toggleReading: (id: string) => void;
   removeReading: (id: string) => void;
@@ -191,7 +208,15 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   runId: 0,
+  chapter: 1,
+  campaign: {} as GameState['campaign'],
   camp: null as CampInfo | null,
+  probe: null as ProbeState | null,
+  probesLaunched: 0,
+  shadows: [] as GameState['shadows'],
+  sunCamOn: false,
+  sunLog: [] as TimedValue[],
+  northTrip: { dist: 0, arriveAt: 0 },
   predictions: [] as Prediction[],
   names: {} as SystemNames,
   atlas: [] as AtlasCard[],
@@ -211,7 +236,7 @@ export const useGame = create<GameState>()(
       ...initial,
       set: (p) => set(p),
       go: (screen) => set({ screen }),
-      newGame: (seed, settings) => {
+      newGame: (seed, settings, chapter = 1) => {
         clock.t = 0;
         clock.paused = false;
         clock.warpIndex = 3;
@@ -220,6 +245,8 @@ export const useGame = create<GameState>()(
           ...initial,
           phase: 'prologue',
           runId: Date.now(),
+          chapter,
+          campaign: get().campaign ?? {},
           seed,
           settings,
           codex: get().codex,

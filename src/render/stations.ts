@@ -5,7 +5,7 @@ import { DEG } from '../engine/constants';
 import { css, mix, type RGB } from './color';
 import { dirFromAltAz, type Projector } from './projection';
 
-export type StationKind = 'ship' | 'observatory' | 'pendulum' | 'rover' | 'hill' | 'workshop';
+export type StationKind = 'ship' | 'observatory' | 'pendulum' | 'rover' | 'hill' | 'workshop' | 'probe' | 'gnomon';
 
 export interface Station {
   kind: StationKind;
@@ -144,6 +144,41 @@ export function drawStation(ctx: CanvasRenderingContext2D, P: Projector, st: Sta
       ctx.stroke();
       ctx.fillStyle = night ? 'rgba(255,200,120,0.7)' : 'rgba(0,0,0,0.4)';
       ctx.fillRect(-0.12 * s, -0.3 * s, 0.24 * s, 0.3 * s);
+      break;
+    }
+    case 'probe': {
+      // A small probe on its launch rail.
+      ctx.translate(x, y);
+      ctx.beginPath();
+      ctx.moveTo(-0.4 * s, 0);
+      ctx.lineTo(0.1 * s, -0.9 * s);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(-0.05 * s, -0.55 * s);
+      ctx.rotate(30 * DEG);
+      ctx.beginPath();
+      ctx.moveTo(-0.08 * s, 0.25 * s);
+      ctx.lineTo(0.08 * s, 0.25 * s);
+      ctx.lineTo(0.08 * s, -0.15 * s);
+      ctx.lineTo(0, -0.3 * s);
+      ctx.lineTo(-0.08 * s, -0.15 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = `rgba(108,196,255,${0.4 + 0.5 * blink})`;
+      ctx.fillRect(0.05 * s, -0.95 * s, 0.05 * s, 0.05 * s);
+      break;
+    }
+    case 'gnomon': {
+      // A shadow stick with its shadow.
+      ctx.translate(x, y);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -s);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(0, -0.02 * s, 0.7 * s, 0.04 * s);
       break;
     }
     case 'hill': {

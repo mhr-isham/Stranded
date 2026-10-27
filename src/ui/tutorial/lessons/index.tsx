@@ -5,6 +5,7 @@ import { DeltaVLesson, HonestyLesson, MeasureLesson, PropagationLesson } from '.
 import { AngularLesson, MoonLesson, ParallaxLesson } from './distance';
 import { HohmannLesson } from './flight';
 import { EstimateLesson } from './estimate';
+import { FlybyLesson, InnerLesson, RefractionLesson } from './chapters';
 import { HorizonLesson, MassLesson, PendulumLesson } from './ground';
 import { KeplerLesson, RetrogradeLesson, SynodicLesson, TwinkleLesson, YearLesson } from './sky';
 
@@ -26,6 +27,9 @@ export const LESSONS = {
   hohmann: { title: 'The Hohmann transfer', icon: '🚀', C: HohmannLesson },
   deltav: { title: 'Fuel is Δv', icon: '⛽', C: DeltaVLesson },
   estimate: { title: 'Making a good estimate', icon: '🎯', C: EstimateLesson },
+  flyby: { title: 'Weighing a planet with a flyby', icon: '🛰', C: FlybyLesson },
+  refraction: { title: 'Light bends in air · Eratosthenes', icon: '🌅', C: RefractionLesson },
+  inner: { title: 'Inner planets and transits', icon: '🌗', C: InnerLesson },
 } satisfies Record<string, { title: string; icon: string; C: ComponentType }>;
 
 export type LessonId = keyof typeof LESSONS;

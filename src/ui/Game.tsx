@@ -16,6 +16,8 @@ import { Launch } from './launch/Launch';
 import { Workshop } from './tools/Workshop';
 import { Codex } from './Codex';
 import { ActCard } from './ActCard';
+import { ProbeBay } from './tools/ProbeBay';
+import { Gnomon } from './tools/Gnomon';
 
 const NAV: { screen: Screen; label: string; ico: string }[] = [
   { screen: 'hub', label: 'Camp', ico: '⛺' },
@@ -47,6 +49,8 @@ export function Game() {
       {screen === 'launch' && <Launch />}
       {screen === 'workshop' && <Workshop />}
       {screen === 'codex' && <Codex />}
+      {screen === 'probe' && <ProbeBay />}
+      {screen === 'gnomon' && <Gnomon />}
       <Hud />
       {screen === 'hub' && !tutorial && <MissionPanel />}
       <nav className="nav panel" data-tut="nav">

@@ -12,6 +12,7 @@ import {
   hohmannVInfDepart,
 } from './orbits';
 import { makeRng } from './rng';
+import { featuresOf } from './chapters';
 import type { Difficulty, StarSystem } from './types';
 
 const SIGMA_SB = 5.670374419e-8;
@@ -33,8 +34,10 @@ export const DIFFICULTY: Record<Difficulty, DifficultyRules> = {
 
 const radiusFromDensity = (mass: number, rho: number) => Math.cbrt((3 * mass) / (4 * Math.PI * rho));
 
-export function generateSystem(seed: number, difficulty: Difficulty = 'navigator'): StarSystem {
-  const rng = makeRng(seed);
+export function generateSystem(seed: number, difficulty: Difficulty = 'navigator', chapter = 1): StarSystem {
+  const features = featuresOf(chapter);
+  // Chapter 1 keeps the original seeds; other chapters mix the chapter in.
+  const rng = makeRng(chapter === 1 ? seed : (seed ^ (chapter * 0x9e3779b1)) >>> 0);
   const rules = DIFFICULTY[difficulty];
 
   for (let attempt = 0; attempt < 1000; attempt++) {
@@ -54,10 +57,10 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     const P1 = TAU * Math.sqrt(a1 ** 3 / mu);
     if (P1 < 120 * DAY || P1 > 320 * DAY) continue;
 
-    const ratio = rng.range(1.35, 1.95);
+    const ratio = features.inner ? rng.range(0.55, 0.78) : rng.range(1.35, 1.95);
     const a2 = ratio * a1;
     const P2 = TAU * Math.sqrt(a2 ** 3 / mu);
-    const synodic = 1 / (1 / P1 - 1 / P2);
+    const synodic = 1 / Math.abs(1 / P1 - 1 / P2);
 
     const m1 = rng.range(0.6, 1.7) * M_EARTH;
     const r1 = radiusFromDensity(m1, rng.range(4300, 6100));
@@ -84,9 +87,11 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     const target = { a: a2, period: P2, phase0: phase2, mass: m2, radius: r2 };
 
     const tof = hohmannTof(a1, a2, mu);
-    const lead = Math.PI - (TAU * tof) / P2;
-    const vInfDepart = hohmannVInfDepart(a1, a2, mu);
-    const vInfArrive = hohmannVInfArrive(a1, a2, mu);
+    // Angle the target must lead us by at departure, in (-pi, pi].
+    let lead = Math.PI - (TAU * tof) / P2;
+    lead = Math.atan2(Math.sin(lead), Math.cos(lead));
+    const vInfDepart = Math.abs(hohmannVInfDepart(a1, a2, mu));
+    const vInfArrive = Math.abs(hohmannVInfArrive(a1, a2, mu));
     const parkingRadius = 1.3 * r2;
     const hohmann = {
       tof,
@@ -97,9 +102,13 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       captureCost: captureCost(vInfArrive, G * m2, parkingRadius),
     };
 
-    // Window k happens when the lead angle (which shrinks over time) equals `lead`:
-    // lead(t) = (firstOpposition - t) * 2pi / synodic  (mod 2pi).
-    const windowAt = (k: number) => firstOpposition + k * synodic - (lead / TAU) * synodic;
+    // Window k happens when the target's lead angle equals `lead`. For an outer
+    // target the lead shrinks over time, lead(t) = (firstOpposition - t)·2π/S;
+    // for an inner one it grows, lead(t) = (t - firstOpposition)·2π/S (mod 2π).
+    const windowAt = (k: number) =>
+      features.inner
+        ? firstOpposition + k * synodic + ((((lead / TAU) % 1) + 1) % 1) * synodic
+        : firstOpposition + k * synodic - (lead / TAU) * synodic;
     const secondOpposition = firstOpposition + synodic;
     let k = 0;
     while (windowAt(k) < secondOpposition + 10 * DAY) k++;
@@ -114,6 +123,8 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     return {
       seed,
       difficulty,
+      chapter,
+      features,
       star,
       home,
       target,

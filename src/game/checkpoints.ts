@@ -22,7 +22,7 @@ interface Store {
   prelaunch: Snapshot | null;
 }
 
-const KEEP: (keyof GameState)[] = ['codex', 'achievements', 'atlas', 'logs', 'tutorial', 'checkpointsUsed', 'rewindsUsed', 'debriefSeen', 'runId'];
+const KEEP: (keyof GameState)[] = ['codex', 'achievements', 'atlas', 'logs', 'campaign', 'tutorial', 'checkpointsUsed', 'rewindsUsed', 'debriefSeen', 'runId'];
 
 function read(): Store {
   const runId = useGame.getState().runId;

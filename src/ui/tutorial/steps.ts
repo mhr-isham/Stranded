@@ -892,7 +892,7 @@ export const STEPS: TutStep[] = [
     title: 'You graduated from Flight School! 🎓',
     body: [
       'You measured a planet, a star and a moon with your own hands and flew between worlds on your own numbers. That is how astronomers actually worked out the size of our solar system.',
-      'Ready for the real thing? Start a **New expedition** from the title screen: new systems, real life-support pressure, and an optional **survival mode**. All lessons stay available in the **Codex**.',
+      'Ready for the real thing? Start the **Campaign** from the title screen — or a **Single expedition** — with new systems, real life-support pressure, and an optional **survival mode**. All lessons stay available in the **Codex**.',
     ],
   },
 ];

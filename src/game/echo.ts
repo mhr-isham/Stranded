@@ -98,6 +98,11 @@ export const ECHO: Record<string, EchoLine> = {
     id: 'relayHint',
     text: 'One more thing from the night sky: just after dusk I keep catching a faint light that moves while the stars stand still. If you see it in the Sky view, tap it.',
   },
+  transitSoon: {
+    id: 'transitSoon',
+    coach: true,
+    text: 'The planet is closing in on the star. A transit is due within a few days — make sure the solar camera is on.',
+  },
   nameIt: {
     id: 'nameIt',
     text: 'Nobody has ever named that blue world. If you’d like to, the progress sheet has a “Name this system” button. Only we will know.',

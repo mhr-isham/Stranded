@@ -52,6 +52,9 @@ export const TOOL_OF: Record<PrimaryKey, string> = {
   alpha2: 'Micrometer',
   thetaM: 'Moon (elongation)',
   Pm: 'Moon (period)',
+  vInf: 'Probe (Doppler)',
+  vPeak: 'Probe (Doppler)',
+  rPeri: 'Probe (altimeter)',
 };
 
 export interface Calibration {

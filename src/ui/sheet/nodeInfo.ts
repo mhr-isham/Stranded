@@ -1,6 +1,6 @@
 // Descriptions and graded hints for every node on the progress sheet.
 
-import type { QuantityKey } from '../../engine/chain';
+import type { ChainVariant, QuantityKey } from '../../engine/chain';
 
 export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; tool?: string; toolName?: string }> = {
   g: { what: 'How strongly this planet pulls on things at its surface.', formula: 'g = 4π² L / T²', tool: 'pendulum', toolName: 'the pendulum rig' },
@@ -21,6 +21,9 @@ export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; to
   R2: { what: 'Radius of the blue planet: where we will park our orbit.', formula: 'R₂ = d(t) · tan(α₂/2)' },
   aM: { what: 'Radius of the moon’s orbit around the blue planet.', formula: 'aₘ = d(t) · tan θₘ' },
   M2: { what: 'Mass of the blue planet. Sets how hard we must brake to stay in orbit.', formula: 'M₂ = 4π² aₘ³ / (G Pₘ²)' },
+  vInf: { what: 'The probe’s speed relative to the blue planet while still far away, before it starts to fall in.', tool: 'probe', toolName: 'the probe tracker' },
+  vPeak: { what: 'The probe’s speed at closest approach — the fastest it goes, having fallen into the planet’s gravity.', tool: 'probe', toolName: 'the probe tracker' },
+  rPeri: { what: 'How close the probe passed: its distance from the planet’s centre at closest approach.', tool: 'probe', toolName: 'the probe tracker' },
 };
 
 export const HINTS: Record<QuantityKey, string[]> = {
@@ -42,4 +45,28 @@ export const HINTS: Record<QuantityKey, string[]> = {
   R2: ['Angle × distance = size.', 'R₂ = d·tan(α/2), with d at the time you measured α.', '—'],
   aM: ['Angle × distance again.', 'aₘ = d·tan θₘ.', '—'],
   M2: ['Moons are scales for planets.', 'Kepler’s third law around the blue planet: M₂ = 4π²aₘ³/(GPₘ²).', '—'],
+  vInf: ['How fast is the probe going before the planet pulls on it?', 'Read the flat part of the Doppler curve, far from closest approach.', 'Average the speed over the first and last hours of the chart.'],
+  vPeak: ['Things speed up as they fall.', 'Read the top of the Doppler curve — the moment of closest approach.', 'Zoom into the peak; its height is vₚ.'],
+  rPeri: ['How close did it pass?', 'The probe’s radar altimeter reports its height above the cloud tops at closest approach; add the planet’s radius.', 'rₚ = R₂ + altitude.'],
 };
+
+/** Node text for a chain variant: an inner planet has transits; chapter 2 weighs the planet with a probe. */
+export function nodeInfoFor(k: QuantityKey, variant: ChainVariant = 'standard') {
+  if (variant === 'inner') {
+    if (k === 'S2') return { ...NODE_INFO.S2, what: 'Time between two transits of the blue planet across the star — how often it laps us.', formula: 'S = t(transit 2) − t(transit 1)', toolName: 'the transit timer' };
+    if (k === 'tOpp') return { ...NODE_INFO.tOpp, what: 'The moment of a transit: the blue planet passes between us and the star, exactly in line. It fixes where the planets are.', toolName: 'the transit timer' };
+    if (k === 'P2') return { ...NODE_INFO.P2, what: 'The blue planet’s year — shorter than ours, it orbits inside us.', formula: '1/P₂ = 1/P₁ + 1/S' };
+  }
+  if (variant === 'probe' && k === 'M2') return { ...NODE_INFO.M2, formula: 'M₂ = rₚ (vₚ² − v∞²) / (2G)' };
+  return NODE_INFO[k];
+}
+
+export function hintsFor(k: QuantityKey, variant: ChainVariant = 'standard') {
+  if (variant === 'inner') {
+    if (k === 'S2') return ['How often does the blue planet lap us?', 'Time from one transit to the next.', 'Log the middle of two transits in the transit timer; their separation is S.'];
+    if (k === 'tOpp') return ['When is the blue planet exactly between us and the star?', 'During a transit you see it as a black dot crossing the star’s disk.', 'Log the time the dot is midway across.'];
+    if (k === 'P2') return ['It laps us, so its year is shorter.', '1/S = 1/P₂ − 1/P₁.', 'Rearranged: 1/P₂ = 1/P₁ + 1/S.'];
+  }
+  if (variant === 'probe' && k === 'M2') return ['Falling things speed up — more for heavier planets.', 'Energy: ½vₚ² − GM/rₚ = ½v∞².', 'Rearranged: M₂ = rₚ(vₚ² − v∞²)/(2G).'];
+  return HINTS[k];
+}
