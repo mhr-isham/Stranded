@@ -25,6 +25,7 @@ import { modeOf } from '../game/modes';
 import { currentWorld } from '../game/sim';
 import { useGame, type CampInfo } from '../game/store';
 import { CanvasView } from './common/CanvasView';
+import { drawStarship } from '../render/ship';
 import { beginPlay } from './Intro';
 import { unlockLog } from '../game/story';
 import { chapterOf } from '../game/campaign';
@@ -60,6 +61,10 @@ interface Sim {
   rescued: boolean;
   said: Set<string>;
   dust: { x: number; y: number; vx: number; vy: number; life: number }[];
+  /** Entry sparks (screen space), the dropped heat shield (world), and a camera jolt 0..1. */
+  sparks: { x: number; y: number; vx: number; vy: number; life: number }[];
+  shieldDrop: { x: number; y: number; vx: number; vy: number; rot: number } | null;
+  shake: number;
   result: { touch: 'clean' | 'rough' | 'rescued'; site: SiteKind } | null;
 }
 
@@ -82,8 +87,46 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   );
   const stars = useMemo(() => {
     const r = makeRng(sys.seed ^ 0x77);
-    return Array.from({ length: 260 }, () => ({ x: r.next(), y: r.next(), b: 0.3 + r.next() * 0.7 }));
+    const tints = ['rgba(255,255,255,A)', 'rgba(255,255,255,A)', 'rgba(255,255,255,A)', 'rgba(190,215,255,A)', 'rgba(255,222,190,A)'];
+    return Array.from({ length: 320 }, () => ({ x: r.next(), y: r.next(), b: 0.25 + r.next() * 0.75, c: tints[Math.floor(r.next() * tints.length)] }));
   }, [sys]);
+  // Seeded scenery: nebula wash, the planet's colours and markings, distant ridges, clouds.
+  const scenery = useMemo(() => {
+    const r = makeRng(sys.seed ^ 0x5ce);
+    const planet: [string, string, string] = sys.features.real
+      ? ['#d0875a', '#9a4f2c', '#2a140c']
+      : sys.features.locked
+        ? ['#9a6a58', '#5a3a32', '#1a100e']
+        : ['#a8916a', '#6b5a42', '#1d1a14'];
+    // Surface markings: long faint streaks near the limb (foreshortened), and small craters.
+    const marks = Array.from({ length: 70 }, () => {
+      const crater = r.next() < 0.35;
+      const rx = crater ? r.range(0.004, 0.012) : r.range(0.01, 0.06);
+      return {
+        x: r.range(-0.55, 0.55),
+        y: r.range(0, 1),
+        rx,
+        ry: crater ? rx * 0.35 : r.range(0.002, 0.008),
+        rot: crater ? 0 : r.range(-0.25, 0.25),
+        c: crater ? 'rgba(25,18,12,0.22)' : r.next() < 0.5 ? 'rgba(40,30,20,0.13)' : 'rgba(255,240,215,0.08)',
+      };
+    });
+    const nebula = [
+      { x: r.range(0.55, 0.95), y: r.range(0.05, 0.35), r: r.range(0.25, 0.4), c: 'rgba(120,70,160,0.10)' },
+      { x: r.range(0.2, 0.6), y: r.range(0.0, 0.25), r: r.range(0.2, 0.35), c: 'rgba(60,130,170,0.08)' },
+    ];
+    const ridge = (base: number, amp: number, par: number, c: string) => ({
+      base,
+      par,
+      c,
+      h: Array.from({ length: 4 }, (_, i) => ({ a: amp / (i + 1), k: 1 + i * 1.7 + r.next(), p: r.range(0, 6.28) })),
+    });
+    const ridges = arrival
+      ? [ridge(46, 22, 0.05, 'rgba(120,160,190,0.55)'), ridge(22, 14, 0.12, 'rgba(80,120,110,0.75)')]
+      : [ridge(52, 26, 0.05, 'rgba(150,130,140,0.5)'), ridge(24, 16, 0.12, 'rgba(110,88,70,0.8)')];
+    const clouds = Array.from({ length: 14 }, () => ({ x: r.range(-9000, 9000), y: r.range(1800, 6500), w: r.range(400, 1400) }));
+    return { planet, marks, nebula, ridges, clouds };
+  }, [sys, arrival]);
 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
   const later = s.chapter > 1 && !arrival && !hop;
@@ -105,6 +148,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     rescued: false,
     said: new Set(),
     dust: [],
+    sparks: [],
+    shieldDrop: null,
+    shake: 0,
     result: null,
   });
   const input = useRef({ left: false, right: false, thrust: false });
@@ -241,6 +287,31 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const u = input.current;
     const turn = (u.right ? 1 : 0) - (u.left ? 1 : 0);
     S.stageT += dt;
+    // Effects: sparks fade, the jolt settles, the dropped shield falls.
+    for (const p of S.sparks) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+    }
+    S.sparks = S.sparks.filter((p) => p.life > 0);
+    for (const p of S.dust) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 3 * dt;
+      p.vx *= Math.exp(-1.2 * dt);
+      p.life -= dt;
+    }
+    S.dust = S.dust.filter((p) => p.life > 0);
+    S.shake = Math.max(0, S.shake - dt * 1.8);
+    if (S.shieldDrop) {
+      const q = S.shieldDrop;
+      q.vy -= g * dt;
+      q.vx *= Math.exp(-0.3 * dt);
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      q.rot += 2.2 * dt;
+      if (q.y < terrain.height(q.x) - 50) S.shieldDrop = null;
+    }
 
     if (S.stage === 'tumble') {
       S.ang += S.spin * dt;
@@ -313,6 +384,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       setRumble(0.35 + 0.4 * Math.min(1, S.heat / 80 + 0.4), 0.8);
       if (S.alt <= ENTRY_BOTTOM) {
         goStage('descent');
+        // The heat shield drops away under us.
+        S.shieldDrop = { x: S.d.x, y: S.d.y - 3, vx: S.d.vx * 0.9, vy: S.d.vy - 6, rot: 0 };
+        S.shake = 0.5;
         sfx('click');
         setLine(arrival ? 'Heat shield away. The beacon is on the flat ground I’ve marked. Bring us down gently — this is the last landing of the chapter.' : 'Heat shield away. You have the thrusters: tilt to steer, BURN to slow down. Pick somewhere to set down — I’ve marked what I can see.');
       }
@@ -343,13 +417,6 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       if (uu.throttle > 0 && h < 40) {
         for (let i = 0; i < 3; i++) S.dust.push({ x: S.d.x + (Math.random() - 0.5) * 6, y: ground + 1, vx: (Math.random() - 0.5) * 30, vy: Math.random() * 6, life: 1.5 });
       }
-      for (const p of S.dust) {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy -= 3 * dt;
-        p.life -= dt;
-      }
-      S.dust = S.dust.filter((p) => p.life > 0);
       const v = Math.hypot(S.d.vx, S.d.vy);
       if (S.d.chute === 'stowed' && dynPressure(params, S.d) < params.chuteMaxQ * 0.8 && h > 1200)
         say('chute', 'We’re slow enough for the parachute now. It saves fuel — but it won’t land us on its own.');
@@ -357,6 +424,14 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       if (h < 120 && Math.abs(S.d.vy) < 8 && !S.rescued) say('steady', `Steady… keep the descent under ${assist ? 5 : 4} m/s and the ship upright.`);
       if (S.d.fuel < 0.2 * mode.landingDv && S.d.fuel > 0) say('lowfuel', 'Descent tank under 20%. Use the parachute if you still have it.');
       if (S.d.y <= ground) {
+        // Touchdown: a burst of dust and a jolt, harder for a harder landing.
+        const impact = Math.min(1, Math.hypot(S.d.vx, S.d.vy) / 12);
+        S.shake = 0.35 + 0.65 * impact;
+        for (let i = 0; i < 40 + 60 * impact; i++) {
+          const a = Math.random() * Math.PI;
+          const v = (6 + 22 * Math.random()) * (0.6 + impact);
+          S.dust.push({ x: S.d.x + (Math.random() - 0.5) * 4, y: ground + 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.35, life: 1.2 + Math.random() * 0.8 });
+        }
         S.d = { ...S.d, y: ground };
         const judged = judgeTouchdown(terrain, S.d, assist);
         const touch = S.rescued ? 'rescued' : judged === 'crash' ? 'rough' : judged;
@@ -384,40 +459,94 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   }
 
   function drawSpace(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number, now: number, S: Sim) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, w, h);
-    for (const st of stars) {
-      ctx.fillStyle = `rgba(255,255,255,${st.b * 0.8})`;
-      ctx.fillRect(st.x * w, st.y * h, 1.4 * dpr, 1.4 * dpr);
+    const tumbling = S.stage === 'tumble';
+    ctx.save();
+    // The fold exit shakes everything.
+    if (tumbling) {
+      const k = (S.stageT < 1.5 ? 10 : 3) * dpr;
+      ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     }
-    // The planet below, lit from the left.
+    ctx.fillStyle = '#02030a';
+    ctx.fillRect(-20, -20, w + 40, h + 40);
+    // Nebula wash and stars.
+    for (const n of scenery.nebula) {
+      const g = ctx.createRadialGradient(n.x * w, n.y * h, 0, n.x * w, n.y * h, n.r * Math.max(w, h));
+      g.addColorStop(0, n.c);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    stars.forEach((st, i) => {
+      const tw = 0.75 + 0.25 * Math.sin(now / 600 + i * 1.7);
+      ctx.fillStyle = st.c.replace('A', String(st.b * tw));
+      const r = (st.b > 0.9 ? 1.9 : 1.3) * dpr;
+      ctx.fillRect(st.x * w, st.y * h, r, r);
+    });
+    // The system's star, with a little lens flare.
+    const sxs = w * 0.1;
+    const sys0 = h * 0.12;
+    const sg = ctx.createRadialGradient(sxs, sys0, 0, sxs, sys0, 140 * dpr);
+    sg.addColorStop(0, 'rgba(255,248,225,1)');
+    sg.addColorStop(0.08, 'rgba(255,225,170,0.9)');
+    sg.addColorStop(0.35, 'rgba(255,190,120,0.18)');
+    sg.addColorStop(1, 'rgba(255,170,100,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(sxs - 140 * dpr, sys0 - 140 * dpr, 280 * dpr, 280 * dpr);
+    for (const [f, r, a] of [[0.35, 10, 0.12], [0.6, 22, 0.08], [0.85, 6, 0.18], [1.2, 34, 0.05]] as const) {
+      ctx.fillStyle = `rgba(160,200,255,${a})`;
+      ctx.beginPath();
+      ctx.arc(sxs + (w / 2 - sxs) * f, sys0 + (h / 2 - sys0) * f, r * dpr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // The planet below: lit towards the star, with surface markings and a glowing limb.
     const R = Math.max(w, h) * 1.6;
     const cx = w / 2;
     const cy = h + R * 0.72;
-    const grd = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.6, R * 0.1, cx, cy, R);
-    grd.addColorStop(0, arrival ? '#4f7fa8' : '#8a7a5c');
-    grd.addColorStop(0.6, '#5b5240');
-    grd.addColorStop(1, '#1d1a14');
-    ctx.fillStyle = grd;
+    ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(140,190,255,0.55)';
-    ctx.lineWidth = 6 * dpr;
+    ctx.clip();
+    const pal = scenery.planet;
+    const base = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.75, R * 0.05, cx, cy, R);
+    base.addColorStop(0, pal[0]);
+    base.addColorStop(0.55, pal[1]);
+    base.addColorStop(1, pal[2]);
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, w, h);
+    for (const m of scenery.marks) {
+      ctx.fillStyle = m.c;
+      ctx.beginPath();
+      ctx.ellipse(cx + m.x * R, cy - R * 0.98 + m.y * R * 0.3, m.rx * R, m.ry * R, m.rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const term = ctx.createLinearGradient(w * 0.15, 0, w * 1.05, h * 0.6);
+    term.addColorStop(0, 'rgba(0,0,0,0)');
+    term.addColorStop(0.55, 'rgba(0,0,0,0.25)');
+    term.addColorStop(1, 'rgba(0,0,6,0.75)');
+    ctx.fillStyle = term;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+    const atm = ctx.createRadialGradient(cx, cy, R * 0.985, cx, cy, R * 1.05);
+    atm.addColorStop(0, 'rgba(120,180,255,0)');
+    atm.addColorStop(0.28, 'rgba(140,200,255,0.55)');
+    atm.addColorStop(0.45, 'rgba(110,160,255,0.22)');
+    atm.addColorStop(1, 'rgba(80,120,255,0)');
+    ctx.fillStyle = atm;
     ctx.beginPath();
-    ctx.arc(cx, cy, R + 3 * dpr, Math.PI * 1.1, Math.PI * 1.9);
-    ctx.stroke();
+    ctx.arc(cx, cy, R * 1.05, 0, Math.PI * 2);
+    ctx.fill();
     // The blue planet, a small steady dot.
     ctx.fillStyle = '#9fd0ff';
     ctx.beginPath();
-    ctx.arc(w * 0.82, h * 0.16, 2.2 * dpr, 0, Math.PI * 2);
+    ctx.arc(w * 0.82, h * 0.16, 2.4 * dpr, 0, Math.PI * 2);
     ctx.fill();
 
     const sx = w / 2;
-    const sy = h * 0.4;
+    const sy = h * 0.42;
+    const size = Math.min(70 * dpr, Math.min(w, h) * 0.14);
     // Markers for the deorbit burn.
     if (S.stage === 'deorbit') {
-      const r = 110 * dpr;
+      const r = 130 * dpr;
       ctx.lineWidth = 2 * dpr;
       ctx.strokeStyle = '#5be3a4';
       ctx.beginPath();
@@ -435,7 +564,6 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ctx.fillText('retrograde', sx - r, sy + 30 * dpr);
       ctx.fillStyle = 'rgba(232,238,252,0.5)';
       ctx.fillText('direction of travel →', sx + r, sy + 30 * dpr);
-      // Where the nose points.
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.setLineDash([4 * dpr, 4 * dpr]);
       ctx.beginPath();
@@ -444,8 +572,33 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    drawShip(ctx, sx, sy, S.ang, 34 * dpr, S.stage === 'deorbit' && input.current.thrust ? 1 : 0, now, 'space');
-    if (S.stage === 'tumble') {
+    const turn = (input.current.right ? 1 : 0) - (input.current.left ? 1 : 0);
+    drawStarship(ctx, sx, sy, S.ang, size, {
+      now,
+      thrust: S.stage === 'deorbit' && input.current.thrust ? 1 : 0,
+      rcs: S.stage === 'tumble' ? 0 : turn,
+      shield: true,
+      light: 1,
+      lights: !(tumbling && Math.sin(now / 90) > 0.3),
+    });
+    ctx.restore();
+    if (tumbling) {
+      // The fold exit: a white flash and streaks rushing outwards.
+      if (S.stageT < 1.8) {
+        const k = 1 - S.stageT / 1.8;
+        ctx.strokeStyle = `rgba(200,225,255,${0.5 * k})`;
+        ctx.lineWidth = 1.5 * dpr;
+        for (let i = 0; i < 70; i++) {
+          const a = (i / 70) * Math.PI * 2 + i;
+          const r0 = (0.1 + ((S.stageT * 1.4 + i * 0.137) % 1)) * Math.max(w, h) * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(w / 2 + Math.cos(a) * r0, h / 2 + Math.sin(a) * r0);
+          ctx.lineTo(w / 2 + Math.cos(a) * r0 * 1.25, h / 2 + Math.sin(a) * r0 * 1.25);
+          ctx.stroke();
+        }
+        ctx.fillStyle = `rgba(235,245,255,${k * k * 0.95})`;
+        ctx.fillRect(0, 0, w, h);
+      }
       const a = 0.18 + 0.12 * Math.sin(now / 160);
       const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
       vg.addColorStop(0, 'rgba(255,40,60,0)');
@@ -457,63 +610,184 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
 
   function drawEntry(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number, now: number, S: Sim) {
     const f = Math.max(0, Math.min(1, (S.alt - ENTRY_BOTTOM) / (ENTRY_TOP - ENTRY_BOTTOM)));
+    // How hard the air is pushing back: strongest in the middle of the entry, and when steep.
+    const band = Math.pow(Math.sin(Math.PI * (1 - f)), 0.6);
+    const I = Math.min(1, (0.3 + 0.7 * band) * (0.55 + S.heat / 140));
+    ctx.save();
+    const k = I * 5 * dpr;
+    ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, f > 0.5 ? '#050814' : '#0d1a3a');
-    sky.addColorStop(1, f > 0.5 ? '#1a2850' : '#4f6f9f');
+    const top = arrival ? [8, 16, 40] : [6, 9, 22];
+    const bot = arrival ? [70, 130, 200] : [90, 110, 160];
+    const mixc = (a: number[], b: number[], t: number) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+    sky.addColorStop(0, mixc([2, 3, 10], top, 1 - f));
+    sky.addColorStop(1, mixc([12, 18, 40], bot, 1 - f));
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h);
-    // Curved horizon far below.
-    const hy = h * (0.72 + 0.2 * (1 - f));
-    ctx.fillStyle = arrival ? '#2f5a7a' : '#3d3528';
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    ctx.quadraticCurveTo(w / 2, hy - h * 0.12 * f, w, h);
-    ctx.lineTo(w, h);
-    ctx.fill();
-    // Speed streaks.
-    ctx.strokeStyle = 'rgba(255,200,150,0.18)';
-    ctx.lineWidth = 1.5 * dpr;
-    for (let i = 0; i < 26; i++) {
-      const y = ((i * 97 + now * 0.6) % (h * 1.2)) - h * 0.1;
-      const x = ((i * 211 + now * 1.4) % (w * 1.3)) - w * 0.15;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - 80 * dpr, y - 80 * dpr * Math.tan(-S.gamma * DEG * 3));
-      ctx.stroke();
+    ctx.fillRect(-20, -20, w + 40, h + 40);
+    if (f > 0.4) {
+      stars.forEach((st) => {
+        ctx.fillStyle = `rgba(255,255,255,${st.b * (f - 0.4)})`;
+        ctx.fillRect(st.x * w, st.y * h * 0.7, 1.2 * dpr, 1.2 * dpr);
+      });
     }
+    // The planet's curved limb below, with its glowing air.
+    const Rr = w * (1.2 + 3 * (1 - f));
+    const hy = h * (0.78 + 0.1 * (1 - f));
+    const pcx = w / 2;
+    const pcy = hy + Rr;
+    const glowR = ctx.createRadialGradient(pcx, pcy, Rr * 0.99, pcx, pcy, Rr * 1.06);
+    glowR.addColorStop(0, 'rgba(150,200,255,0.6)');
+    glowR.addColorStop(1, 'rgba(120,170,255,0)');
+    ctx.fillStyle = glowR;
+    ctx.beginPath();
+    ctx.arc(pcx, pcy, Rr * 1.06, 0, Math.PI * 2);
+    ctx.fill();
+    const surf = ctx.createLinearGradient(0, hy, 0, h);
+    surf.addColorStop(0, arrival ? '#4f86b0' : scenery.planet[0]);
+    surf.addColorStop(1, arrival ? '#1d3550' : scenery.planet[2]);
+    ctx.fillStyle = surf;
+    ctx.beginPath();
+    ctx.arc(pcx, pcy, Rr, 0, Math.PI * 2);
+    ctx.fill();
+
     const sx = w * 0.45;
     const sy = h * 0.42;
-    // Heat shield faces the direction of travel (right and down by gamma).
-    const ang = -(Math.PI / 2 - Math.abs(S.gamma) * DEG);
-    const glow = 0.35 + Math.min(0.65, S.heat / 100 + 0.25 * Math.sin(now / 50) * 0.3);
-    const gx = sx + Math.cos(-S.gamma * DEG) * 26 * dpr;
-    const gy = sy + Math.sin(-S.gamma * DEG) * 26 * dpr;
-    const pg = ctx.createRadialGradient(gx, gy, 4 * dpr, gx, gy, 120 * dpr);
-    pg.addColorStop(0, `rgba(255,240,200,${glow})`);
-    pg.addColorStop(0.3, `rgba(255,140,60,${glow * 0.7})`);
-    pg.addColorStop(1, 'rgba(255,80,40,0)');
-    ctx.fillStyle = pg;
+    const size = Math.min(70 * dpr, Math.min(w, h) * 0.14);
+    // Direction of travel on screen, and the ship turned so its shield leads.
+    const gr = S.gamma * DEG;
+    const vx = Math.cos(gr);
+    const vy = -Math.sin(gr);
+    const ang = Math.atan2(-vx, vy);
+    // Speed streaks flowing past, against the travel direction.
+    ctx.strokeStyle = `rgba(255,210,170,${0.08 + 0.18 * I})`;
+    ctx.lineWidth = 1.5 * dpr;
+    for (let i = 0; i < 34; i++) {
+      const L = (60 + 80 * I) * dpr;
+      const ox = ((i * 211 - now * 1.6 * vx) % (w * 1.3) + w * 1.3) % (w * 1.3) - w * 0.15;
+      const oy = ((i * 97 - now * 1.6 * vy) % (h * 1.2) + h * 1.2) % (h * 1.2) - h * 0.1;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ox - vx * L, oy - vy * L);
+      ctx.stroke();
+    }
+    // Plasma: trailing streamers, then the ship, then the bow shock in front of the shield.
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(ang);
+    for (let i = 0; i < 7; i++) {
+      const side = i % 2 ? 1 : -1;
+      const off = (0.18 + 0.03 * i) * side * size;
+      const L = size * (1.4 + 0.9 * I + 0.3 * Math.sin(now / 60 + i));
+      const g = ctx.createLinearGradient(0, 0.35 * size, 0, 0.35 * size - L);
+      g.addColorStop(0, `rgba(255,200,130,${0.55 * I})`);
+      g.addColorStop(0.4, `rgba(255,110,60,${0.25 * I})`);
+      g.addColorStop(1, 'rgba(255,80,60,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(off - 0.05 * size, 0.33 * size);
+      ctx.quadraticCurveTo(off * 1.8, 0.35 * size - L * 0.5, off * 1.4 + Math.sin(now / 90 + i) * 0.08 * size, 0.35 * size - L);
+      ctx.quadraticCurveTo(off * 1.2, 0.35 * size - L * 0.4, off + 0.05 * size, 0.33 * size);
+      ctx.fill();
+    }
+    ctx.restore();
+    drawStarship(ctx, sx, sy, ang, size, { now, shield: true, heat: Math.min(1, 0.35 + S.heat / 110), light: 1 });
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(ang);
+    const bow = ctx.createRadialGradient(0, 0.3 * size, 0.1 * size, 0, 0.42 * size, 0.75 * size);
+    bow.addColorStop(0, `rgba(255,250,230,${0.95 * I})`);
+    bow.addColorStop(0.35, `rgba(255,190,110,${0.6 * I})`);
+    bow.addColorStop(1, 'rgba(255,90,50,0)');
+    ctx.fillStyle = bow;
+    ctx.beginPath();
+    ctx.ellipse(0, 0.5 * size, 0.62 * size, 0.32 * size, 0, 0, Math.PI);
+    ctx.ellipse(0, 0.36 * size, 0.42 * size, 0.08 * size, 0, Math.PI, 0, true);
+    ctx.fill();
+    ctx.restore();
+    // Sparks shed from the shield.
+    for (let i = 0; i < 2 + I * 6; i++)
+      S.sparks.push({ x: sx + vx * 0.4 * size + (Math.random() - 0.5) * size * 0.6, y: sy + vy * 0.4 * size, vx: -vx * (300 + 400 * Math.random()) * dpr + (Math.random() - 0.5) * 80 * dpr, vy: -vy * (300 + 400 * Math.random()) * dpr + (Math.random() - 0.5) * 80 * dpr, life: 0.6 });
+    ctx.lineWidth = 1.6 * dpr;
+    for (const p of S.sparks) {
+      ctx.strokeStyle = `rgba(255,${180 + Math.floor(70 * p.life)},120,${p.life * 1.4})`;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
+      ctx.stroke();
+    }
+    // A warm wash over the whole view at peak heating.
+    const wash = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(w, h) * 0.8);
+    wash.addColorStop(0, `rgba(255,150,80,${0.18 * I})`);
+    wash.addColorStop(1, 'rgba(255,120,60,0)');
+    ctx.fillStyle = wash;
     ctx.fillRect(0, 0, w, h);
-    drawShip(ctx, sx, sy, ang, 34 * dpr, 0, now, 'space');
+    ctx.restore();
   }
 
   function drawDescent(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number, now: number, S: Sim) {
     const d = S.d;
     const ground = terrain.height(d.x);
     const hAlt = Math.max(0, d.y - ground);
-    const mpp = Math.max(0.22 / dpr, (hAlt + 60) / (0.45 * h)); // metres per device pixel
+    // Metres per device pixel: the camera closes right in for the last few dozen metres.
+    const mpp = Math.max(0.085 / dpr, (hAlt + 22) / (0.45 * h));
     // Near the ground the camera drops so the landing site fills the view.
     const shipY = h * (0.38 + 0.2 * (1 - Math.min(1, hAlt / 400)));
     const X = (wx: number) => w / 2 + (wx - d.x) / mpp;
     const Y = (wy: number) => shipY - (wy - d.y) / mpp;
-    // Sky: darker high up, hazy near the ground; late afternoon.
+    ctx.save();
+    if (S.shake > 0) ctx.translate((Math.random() - 0.5) * S.shake * 14 * dpr, (Math.random() - 0.5) * S.shake * 14 * dpr);
+    // Sky: deep blue high up, warm haze near the ground, and a low sun.
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     const hi = Math.min(1, d.y / 10000);
-    sky.addColorStop(0, hi > 0.5 ? '#16244a' : '#2b4a7e');
-    sky.addColorStop(1, '#c9a27a');
+    sky.addColorStop(0, arrival ? (hi > 0.5 ? '#0f2c5a' : '#2a5ea0') : hi > 0.5 ? '#14224a' : '#29467a');
+    sky.addColorStop(0.6, arrival ? '#7fb0dc' : '#7b8fb0');
+    sky.addColorStop(1, arrival ? '#d7ecf5' : '#e3b585');
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h);
-    // Terrain.
+    ctx.fillRect(-20, -20, w + 40, h + 40);
+    const sunX = w * 0.82;
+    const sunY = h * 0.22;
+    const sun = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 160 * dpr);
+    sun.addColorStop(0, 'rgba(255,250,232,1)');
+    sun.addColorStop(0.1, 'rgba(255,236,190,0.95)');
+    sun.addColorStop(0.3, 'rgba(255,210,150,0.25)');
+    sun.addColorStop(1, 'rgba(255,200,140,0)');
+    ctx.fillStyle = sun;
+    ctx.fillRect(sunX - 160 * dpr, sunY - 160 * dpr, 320 * dpr, 320 * dpr);
+    // Distant ridges, hazy, sliding slowly by.
+    const horizonY = Y(ground) + 4 * dpr;
+    for (const [li, layer] of scenery.ridges.entries()) {
+      ctx.fillStyle = layer.c;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      const shift = (d.x / mpp) * layer.par;
+      for (let px = 0; px <= w + 8; px += 8 * dpr) {
+        const u = (px + shift) / (w * 0.5);
+        let yy = 0;
+        for (const hm of layer.h) yy += hm.a * Math.sin(u * hm.k + hm.p);
+        ctx.lineTo(px, Math.min(horizonY, horizonY - (layer.base + yy) * dpr * (li === 0 ? 1 : 0.7)));
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Clouds we drop through.
+    for (const c of scenery.clouds) {
+      const cx = X(c.x + d.x * 0.0);
+      const cy = Y(c.y);
+      const rx = c.w / mpp;
+      if (cx + rx < -50 || cx - rx > w + 50 || cy < -100 || cy > h + 100) continue;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+      g.addColorStop(0, 'rgba(255,250,245,0.55)');
+      g.addColorStop(1, 'rgba(255,245,240,0)');
+      ctx.fillStyle = g;
+      // Three overlapping puffs make a cloud.
+      for (const [ox, oy, k] of [[-0.35, 0.02, 0.6], [0, -0.06, 0.75], [0.35, 0.03, 0.55]] as const) {
+        ctx.beginPath();
+        ctx.ellipse(cx + ox * rx, cy + oy * rx, rx * k, rx * 0.2 * (1 + k * 0.4), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Terrain with a lit rim and scattered rocks.
     const step = 3 * dpr;
     ctx.beginPath();
     ctx.moveTo(0, h);
@@ -524,10 +798,34 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.lineTo(w, h);
     ctx.closePath();
     const tg = ctx.createLinearGradient(0, Y(ground) - 50 * dpr, 0, h);
-    tg.addColorStop(0, arrival ? '#4d6a45' : '#6b5a41');
+    tg.addColorStop(0, arrival ? '#5a7d4f' : '#7b6649');
     tg.addColorStop(1, arrival ? '#1f2d1c' : '#2c241a');
     ctx.fillStyle = tg;
     ctx.fill();
+    ctx.strokeStyle = arrival ? 'rgba(200,240,190,0.35)' : 'rgba(255,215,160,0.35)';
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath();
+    for (let px = 0; px <= w + step; px += step) {
+      const wx = d.x + (px - w / 2) * mpp;
+      if (px) ctx.lineTo(px, Y(terrain.height(wx)));
+      else ctx.moveTo(px, Y(terrain.height(wx)));
+    }
+    ctx.stroke();
+    if (mpp < 4) {
+      const cell = 6;
+      const i0 = Math.floor((d.x - (w / 2) * mpp) / cell);
+      const i1 = Math.ceil((d.x + (w / 2) * mpp) / cell);
+      for (let i = i0; i <= i1; i++) {
+        const r = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        if (Math.abs(r) < 0.55) continue;
+        const wx = i * cell + Math.abs(r) * cell;
+        const rr = (0.3 + Math.abs(r) * 0.9) / mpp;
+        ctx.fillStyle = 'rgba(30,24,18,0.55)';
+        ctx.beginPath();
+        ctx.ellipse(X(wx), Y(terrain.height(wx)) + rr * 0.3, rr, rr * 0.55, 0, Math.PI, 0);
+        ctx.fill();
+      }
+    }
     // Ice field tint and feature labels.
     ctx.font = `${12 * dpr}px Inter, sans-serif`;
     ctx.textAlign = 'center';
@@ -536,7 +834,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       const x1 = X(f.x1);
       if (x1 < 0 || x0 > w) continue;
       if (f.kind === 'ice') {
-        ctx.fillStyle = 'rgba(220,240,255,0.65)';
+        ctx.fillStyle = 'rgba(220,240,255,0.7)';
         for (let px = Math.max(0, x0); px < Math.min(w, x1); px += step) {
           const wx = d.x + (px - w / 2) * mpp;
           ctx.fillRect(px, Y(terrain.height(wx)) - 1, step + 1, 4 * dpr);
@@ -575,37 +873,69 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         ctx.fillRect(X(p.x) - dpr, Y(p.y) - dpr, 2 * dpr, 2 * dpr);
       }
     }
+    // The jettisoned heat shield, tumbling away below us.
+    if (S.shieldDrop) {
+      const q = S.shieldDrop;
+      if (q.y > terrain.height(q.x)) {
+        ctx.save();
+        ctx.translate(X(q.x), Y(q.y));
+        ctx.rotate(q.rot);
+        const r = Math.max(6 * dpr, 2.6 / mpp);
+        ctx.fillStyle = '#5b3f2c';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, r * 0.28, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,140,70,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(0, r * 0.08, r * 0.8, r * 0.16, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
     // Dust.
     for (const p of S.dust) {
-      ctx.fillStyle = `rgba(200,170,130,${Math.max(0, p.life / 1.5) * 0.5})`;
+      const a = Math.max(0, p.life / 1.5);
+      ctx.fillStyle = arrival ? `rgba(225,232,240,${a * 0.5})` : `rgba(205,175,135,${a * 0.55})`;
       ctx.beginPath();
-      ctx.arc(X(p.x), Y(p.y), 3 * dpr, 0, Math.PI * 2);
+      ctx.arc(X(p.x), Y(p.y), (3 + (1.5 - p.life) * 5) * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Parachute.
-    const size = Math.max(26 * dpr, 7 / mpp);
+    // Parachute: a striped canopy that breathes.
+    const size = Math.max(30 * dpr, 7 / mpp);
     const sx = X(d.x);
-    const sy = Y(d.y) - size * 0.5;
+    const sy = Y(d.y) - size * 0.55;
     if (d.chute === 'open' || d.chute === 'torn') {
-      const cx = sx - Math.sin(d.th) * size * 2.6;
-      const cy = sy - size * 2.6;
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      const cx = sx - Math.sin(d.th) * size * 2.8;
+      const cy = sy - size * 2.8;
+      const br = 1 + 0.04 * Math.sin(now / 240);
+      const cw = size * 1.35 * br;
+      const ch = size * 0.75 / br;
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
       ctx.lineWidth = dpr;
       ctx.beginPath();
-      ctx.moveTo(sx, sy - size * 0.4);
-      ctx.lineTo(cx - size, cy);
-      ctx.moveTo(sx, sy - size * 0.4);
-      ctx.lineTo(cx + size, cy);
+      for (let i = 0; i <= 4; i++) {
+        ctx.moveTo(sx, sy - size * 0.55);
+        ctx.lineTo(cx - cw + (2 * cw * i) / 4, cy);
+      }
       ctx.stroke();
       if (d.chute === 'open') {
-        ctx.fillStyle = '#ff9a4a';
+        const gores = 8;
+        for (let i = 0; i < gores; i++) {
+          const a0 = Math.PI + (Math.PI * i) / gores;
+          const a1 = Math.PI + (Math.PI * (i + 1)) / gores;
+          ctx.fillStyle = i % 2 ? '#fff4ea' : '#ff8a3d';
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.ellipse(cx, cy, cw, ch, 0, a0, a1);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
         ctx.beginPath();
-        ctx.ellipse(cx, cy, size * 1.2, size * 0.7, 0, Math.PI, 0);
+        ctx.ellipse(cx, cy, cw, ch * 0.18, 0, 0, Math.PI);
         ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(cx - size * 0.15, cy - size * 0.68, size * 0.3, size * 0.68);
       } else {
-        ctx.strokeStyle = '#ff9a4a';
+        ctx.strokeStyle = '#ff8a3d';
         ctx.lineWidth = 2 * dpr;
         for (let i = 0; i < 4; i++) {
           ctx.beginPath();
@@ -616,7 +946,20 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       }
     }
     const thr = S.stage === 'descent' && (input.current.thrust || S.rescued) && d.fuel > 0 ? 1 : 0;
-    drawShip(ctx, sx, sy, d.th, size, thr, now, 'lander');
+    const turn = (input.current.right ? 1 : 0) - (input.current.left ? 1 : 0);
+    const legs = Math.max(0, Math.min(1, (450 - hAlt) / 250));
+    // Light falling on the ground under a firing engine.
+    if (thr && hAlt < 150) {
+      const gx = sx;
+      const gy = Y(ground);
+      const lg = ctx.createRadialGradient(gx, gy, 0, gx, gy, 90 * dpr);
+      lg.addColorStop(0, `rgba(255,190,120,${0.45 * (1 - hAlt / 150)})`);
+      lg.addColorStop(1, 'rgba(255,170,100,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(gx - 90 * dpr, gy - 90 * dpr, 180 * dpr, 180 * dpr);
+    }
+    drawStarship(ctx, sx, sy, d.th, size, { now, thrust: thr, rcs: S.stage === 'descent' ? turn : 0, shield: false, legs, light: -1 });
+    ctx.restore();
   }
 
   return (
@@ -761,66 +1104,4 @@ function HoldButton({ label, aria, on, big }: { label: string; aria: string; on:
       {label}
     </button>
   );
-}
-
-/** A small capsule lander: nose up at angle 0, engine at the bottom. */
-function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, size: number, thrust: number, now: number, kind: 'space' | 'lander') {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(ang);
-  const s = size;
-  if (thrust > 0) {
-    const fl = s * (0.9 + 0.25 * Math.sin(now / 30) + 0.15 * Math.random());
-    const fg = ctx.createLinearGradient(0, s * 0.45, 0, s * 0.45 + fl);
-    fg.addColorStop(0, 'rgba(255,240,200,0.95)');
-    fg.addColorStop(0.4, 'rgba(255,160,70,0.8)');
-    fg.addColorStop(1, 'rgba(255,80,40,0)');
-    ctx.fillStyle = fg;
-    ctx.beginPath();
-    ctx.moveTo(-s * 0.18, s * 0.45);
-    ctx.lineTo(s * 0.18, s * 0.45);
-    ctx.lineTo(0, s * 0.45 + fl);
-    ctx.closePath();
-    ctx.fill();
-  }
-  // Body.
-  ctx.fillStyle = '#c9ced8';
-  ctx.strokeStyle = '#59606e';
-  ctx.lineWidth = Math.max(1, s * 0.04);
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.18, -s * 0.5);
-  ctx.lineTo(s * 0.18, -s * 0.5);
-  ctx.lineTo(s * 0.42, s * 0.32);
-  ctx.lineTo(-s * 0.42, s * 0.32);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // Window.
-  ctx.fillStyle = '#6cc4ff';
-  ctx.beginPath();
-  ctx.arc(0, -s * 0.12, s * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-  // Base / heat shield.
-  ctx.fillStyle = kind === 'space' ? '#8a5a3a' : '#3b3f48';
-  ctx.fillRect(-s * 0.46, s * 0.3, s * 0.92, s * 0.12);
-  // Engine bell.
-  ctx.fillStyle = '#2a2d33';
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.1, s * 0.42);
-  ctx.lineTo(s * 0.1, s * 0.42);
-  ctx.lineTo(s * 0.17, s * 0.5);
-  ctx.lineTo(-s * 0.17, s * 0.5);
-  ctx.closePath();
-  ctx.fill();
-  if (kind === 'lander') {
-    ctx.strokeStyle = '#9aa1ad';
-    ctx.lineWidth = Math.max(1, s * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(-s * 0.36, s * 0.36);
-    ctx.lineTo(-s * 0.55, s * 0.62);
-    ctx.moveTo(s * 0.36, s * 0.36);
-    ctx.lineTo(s * 0.55, s * 0.62);
-    ctx.stroke();
-  }
-  ctx.restore();
 }

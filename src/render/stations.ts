@@ -4,6 +4,7 @@
 import { DEG } from '../engine/constants';
 import { css, mix, type RGB } from './color';
 import { dirFromAltAz, type Projector } from './projection';
+import { drawStarship } from './ship';
 
 export type StationKind = 'ship' | 'observatory' | 'pendulum' | 'rover' | 'hill' | 'workshop' | 'probe' | 'gnomon';
 
@@ -31,46 +32,9 @@ export function drawStation(ctx: CanvasRenderingContext2D, P: Projector, st: Sta
 
   switch (st.kind) {
     case 'ship': {
-      ctx.translate(x, y);
-      ctx.rotate(-8 * DEG);
-      // legs
-      ctx.beginPath();
-      ctx.moveTo(-0.42 * s, 0);
-      ctx.lineTo(-0.25 * s, -0.32 * s);
-      ctx.moveTo(0.42 * s, 0.04 * s);
-      ctx.lineTo(0.25 * s, -0.32 * s);
-      ctx.stroke();
-      // hull
-      ctx.beginPath();
-      ctx.moveTo(-0.32 * s, -0.3 * s);
-      ctx.lineTo(0.32 * s, -0.3 * s);
-      ctx.lineTo(0.2 * s, -0.78 * s);
-      ctx.quadraticCurveTo(0, -1.02 * s, -0.2 * s, -0.78 * s);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      // panel seams and a lit rim on the star-facing side
-      ctx.strokeStyle = css(mix(ground, [255, 255, 255], night ? 0.1 : 0.3));
-      ctx.beginPath();
-      ctx.moveTo(-0.26 * s, -0.5 * s);
-      ctx.lineTo(0.26 * s, -0.5 * s);
-      ctx.moveTo(-0.22 * s, -0.66 * s);
-      ctx.lineTo(0.22 * s, -0.66 * s);
-      ctx.stroke();
-      // engine bell
-      ctx.beginPath();
-      ctx.moveTo(-0.12 * s, -0.3 * s);
-      ctx.lineTo(-0.17 * s, -0.18 * s);
-      ctx.lineTo(0.17 * s, -0.18 * s);
-      ctx.lineTo(0.12 * s, -0.3 * s);
-      ctx.fill();
-      // cockpit window
-      ctx.fillStyle = night ? 'rgba(140,210,255,0.85)' : 'rgba(140,200,240,0.4)';
-      ctx.beginPath();
-      ctx.ellipse(0, -0.7 * s, 0.05 * s, 0.028 * s, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // beacon
-      glow(ctx, 0, -0.97 * s, Math.max(2, s * 0.02), [255, 70, 70], blink);
+      // The same ship you flew down, standing on its legs and leaning a little on uneven ground.
+      const k = Math.max(0, Math.min(1, (6 - sunAlt) / 18));
+      drawStarship(ctx, x, y - 0.47 * s, -6 * DEG, s * 1.05, { now, legs: 1, shield: false, lights: sunAlt < 3, shade: 0.15 + 0.7 * k, light: 1 });
       break;
     }
     case 'observatory': {

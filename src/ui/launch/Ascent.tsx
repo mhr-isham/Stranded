@@ -11,6 +11,7 @@ import { fmt } from '../../game/format';
 import { useMode } from '../../game/modes';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
+import { drawStarship } from '../../render/ship';
 import { CanvasView } from '../common/CanvasView';
 
 const SPEED = 20; // simulated seconds per real second
@@ -162,27 +163,8 @@ export function Ascent() {
           ctx.stroke();
           // Ship: pointing along pitch (above local horizontal, prograde to the right).
           const dir = x.th + Math.PI / 2 - x.pitch; // angle from "up" of the screen
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(dir);
-          ctx.fillStyle = '#e8eefc';
-          ctx.beginPath();
-          ctx.moveTo(0, -10 * dpr);
-          ctx.lineTo(5 * dpr, 7 * dpr);
-          ctx.lineTo(-5 * dpr, 7 * dpr);
-          ctx.closePath();
-          ctx.fill();
           const thr = auto ? autopilot(params, x).throttle : input.current.thrust ? 1 : 0;
-          if (thr > 0 && !done) {
-            ctx.fillStyle = 'rgba(255,170,80,0.9)';
-            ctx.beginPath();
-            ctx.moveTo(-3 * dpr, 7 * dpr);
-            ctx.lineTo(3 * dpr, 7 * dpr);
-            ctx.lineTo(0, (18 + Math.random() * 6) * dpr);
-            ctx.closePath();
-            ctx.fill();
-          }
-          ctx.restore();
+          drawStarship(ctx, cx, cy, dir, 30 * dpr, { now: performance.now(), thrust: thr > 0 && !done ? thr : 0, shield: false, light: 1 });
         }}
       />
       <div className="prologue-echo panel">
