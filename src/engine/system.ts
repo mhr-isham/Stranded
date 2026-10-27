@@ -32,6 +32,15 @@ export const DIFFICULTY: Record<Difficulty, DifficultyRules> = {
   legend: { fuelAllowance: 0.15, lifeSlack: [0.08, 0.14] },
 };
 
+/** The real Solar System, circular-orbit version (NASA fact sheets). */
+export const REAL = {
+  mars: { a: 1.52368 * AU, mass: 0.10745 * M_EARTH, radius: 3389.5e3, siderealDay: 24.6229 * HOUR, obliquity: 25.19 * DEG },
+  earth: { a: 1.0 * AU, mass: M_EARTH, radius: 6371e3 },
+  moon: { a: 384400e3, radius: 1737.4e3 },
+  /** Jezero crater, where Mira made her last camp. */
+  siteLat: 18.4 * DEG,
+};
+
 const radiusFromDensity = (mass: number, rho: number) => Math.cbrt((3 * mass) / (4 * Math.PI * rho));
 
 export function generateSystem(seed: number, difficulty: Difficulty = 'navigator', chapter = 1): StarSystem {
@@ -40,9 +49,10 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
   const rng = makeRng(chapter === 1 ? seed : (seed ^ (chapter * 0x9e3779b1)) >>> 0);
   const rules = DIFFICULTY[difficulty];
 
+  const real = !!features.real;
   for (let attempt = 0; attempt < 1000; attempt++) {
     // Star: main-sequence-ish scalings.
-    const mSol = rng.range(0.72, 1.12);
+    const mSol = real ? 1 : rng.range(0.72, 1.12);
     const star = {
       mass: mSol * M_SUN,
       radius: mSol ** 0.85 * R_SUN,
@@ -53,21 +63,21 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
     const mu = G * star.mass;
 
     // Home planet in the temperate zone.
-    const a1 = Math.sqrt(star.luminosity / L_SUN) * rng.range(0.92, 1.12) * AU;
+    const a1 = real ? REAL.mars.a : Math.sqrt(star.luminosity / L_SUN) * rng.range(0.92, 1.12) * AU;
     const P1 = TAU * Math.sqrt(a1 ** 3 / mu);
-    if (P1 < 120 * DAY || P1 > 320 * DAY) continue;
+    if (!real && (P1 < 120 * DAY || P1 > 320 * DAY)) continue;
 
     const ratio = features.inner ? rng.range(0.55, 0.78) : rng.range(1.35, 1.95);
-    const a2 = ratio * a1;
+    const a2 = real ? REAL.earth.a : ratio * a1;
     const P2 = TAU * Math.sqrt(a2 ** 3 / mu);
     const synodic = 1 / Math.abs(1 / P1 - 1 / P2);
 
-    const m1 = rng.range(0.6, 1.7) * M_EARTH;
-    const r1 = radiusFromDensity(m1, rng.range(4300, 6100));
-    const m2 = rng.range(0.4, 1.4) * M_EARTH;
-    const r2 = radiusFromDensity(m2, rng.range(3800, 5600));
+    const m1 = real ? REAL.mars.mass : rng.range(0.6, 1.7) * M_EARTH;
+    const r1 = real ? REAL.mars.radius : radiusFromDensity(m1, rng.range(4300, 6100));
+    const m2 = real ? REAL.earth.mass : rng.range(0.4, 1.4) * M_EARTH;
+    const r2 = real ? REAL.earth.radius : radiusFromDensity(m2, rng.range(3800, 5600));
 
-    const moonA = rng.range(18, 55) * r2;
+    const moonA = real ? REAL.moon.a : rng.range(18, 55) * r2;
     const moonP = TAU * Math.sqrt(moonA ** 3 / (G * m2));
 
     // Phases: the first opposition happens a little after landing.
@@ -78,9 +88,9 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       phase0: rng.range(0, TAU),
       mass: m1,
       radius: r1,
-      siderealDay: rng.range(17, 36) * HOUR,
+      siderealDay: real ? REAL.mars.siderealDay : rng.range(17, 36) * HOUR,
       rotPhase0: rng.range(0, TAU),
-      obliquity: rng.range(6, 26) * DEG,
+      obliquity: real ? REAL.mars.obliquity : rng.range(6, 26) * DEG,
     };
     // At t = firstOpposition both planets share a heliocentric longitude.
     const phase2 = orbitAngle(home, firstOpposition) - (TAU * firstOpposition) / P2;
@@ -128,8 +138,8 @@ export function generateSystem(seed: number, difficulty: Difficulty = 'navigator
       star,
       home,
       target,
-      moon: { a: moonA, period: moonP, phase0: rng.range(0, TAU), radius: r2 * rng.range(0.15, 0.3) },
-      site: { lat: rng.range(8, 36) * DEG, lon: 0 },
+      moon: { a: moonA, period: moonP, phase0: rng.range(0, TAU), radius: real ? REAL.moon.radius : r2 * rng.range(0.15, 0.3) },
+      site: { lat: real ? REAL.siteLat : rng.range(8, 36) * DEG, lon: 0 },
       hillHeight: Math.round(rng.range(700, 1500) / 10) * 10,
       synodic,
       firstOpposition,

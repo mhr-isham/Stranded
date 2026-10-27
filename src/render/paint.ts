@@ -27,6 +27,7 @@ export function paintSky(
     realTime: now,
     starColor: starRGB(sys),
     starAngularRadius: Math.asin(sys.star.radius / scene.sunDist),
+    mars: !!sys.features.real,
     dpr,
     eclipticDirs: extra.showEcliptic ? eclipticCircle(scene) : undefined,
     ...extra,

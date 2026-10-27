@@ -9,6 +9,8 @@ export interface SystemFeatures {
   refraction: number;
   /** The blue planet orbits inside ours (chapter 5). */
   inner: boolean;
+  /** The real Solar System: Mars to Earth (chapter 9). */
+  real?: boolean;
 }
 
 /** Which version of the solve chain a system needs. */
@@ -19,6 +21,7 @@ export const CHAPTER_FEATURES: Record<number, SystemFeatures> = {
   2: { moon: false, refraction: 0, inner: false },
   3: { moon: true, refraction: 0.55, inner: false },
   5: { moon: true, refraction: 0, inner: true },
+  9: { moon: true, refraction: 0, inner: true, real: true },
 };
 
 export const featuresOf = (chapter: number): SystemFeatures => CHAPTER_FEATURES[chapter] ?? CHAPTER_FEATURES[1];

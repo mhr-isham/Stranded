@@ -16,6 +16,8 @@ export interface SkyOptions {
   showEcliptic?: boolean;
   eclipticDirs?: [number, number, number][];
   highlightTarget?: boolean;
+  /** Martian sky colours (chapter 9). */
+  mars?: boolean;
   dpr: number;
 }
 
@@ -23,7 +25,7 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
   const P = makeProjector(cam);
   const { w, h } = cam;
   const sunAlt = scene.sunAltDeg;
-  const col = skyColors(sunAlt);
+  const col = skyColors(sunAlt, o.mars);
 
   // Atmosphere: vertical gradient keyed to projected altitudes.
   const yH = P.project(dirFromAltAz(0, cam.az))?.y ?? h;

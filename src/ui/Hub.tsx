@@ -57,7 +57,7 @@ export function Hub() {
           const camera = { az: cam.current.az, alt: (portrait ? 14 : 9) * DEG, fov: (portrait ? 75 : 100) * DEG, w, h };
           const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr);
           cam.current.scale = P.scale;
-          const ground = skyColors(scene.sunAltDeg).ground;
+          const ground = skyColors(scene.sunAltDeg, !!sys.features.real).ground;
           drawRocks(ctx, P, sys.seed, ground, scene.sunAltDeg);
           drawCampLight(ctx, P, 166 * DEG, scene.sunAltDeg);
           stations.forEach((st, i) => {

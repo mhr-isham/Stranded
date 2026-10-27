@@ -280,6 +280,8 @@ export const useGame = create<GameState>()(
           phase: 'prologue',
           runId: Date.now(),
           chapter,
+          // Chapter 9 is the real Solar System: the sky has its names already.
+          names: chapter === 9 ? { star: 'the Sun', home: 'Mars', target: 'Earth', moon: 'the Moon' } : {},
           campaign: get().campaign ?? {},
           seed,
           settings,

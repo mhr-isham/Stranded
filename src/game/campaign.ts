@@ -75,7 +75,16 @@ export const CHAPTERS: ChapterSpec[] = [
   { n: 6, title: 'Red Dwarf', idea: 'Tidal locking, a dim star and flares.', twist: 'No normal day and night.', lessons: [], briefing: null, successLogs: [], ready: false },
   { n: 7, title: 'Slingshot', idea: 'Gravity assist from a third planet.', twist: 'The target is too far for the fuel.', lessons: [], briefing: null, successLogs: [], ready: false },
   { n: 8, title: 'Lost Among Stars', idea: 'Stellar parallax: finding where we are.', twist: 'The question is no longer where the planet is, but where we are.', lessons: [], briefing: null, successLogs: [], ready: false },
-  { n: 9, title: 'Home', idea: 'The real Solar System: Mars to Earth.', twist: 'The final exam.', lessons: [], briefing: null, successLogs: [], ready: false },
+  {
+    n: 9,
+    title: 'Home',
+    idea: 'The real Solar System: Mars to Earth. Every value has a true answer — NASA’s.',
+    twist: 'The final exam: nothing new, and nothing invented.',
+    lessons: [],
+    briefing: 'brief9',
+    successLogs: ['cache9', 'mira9'],
+    ready: true,
+  },
 ];
 
 export const chapterOf = (n: number) => CHAPTERS.find((c) => c.n === n) ?? CHAPTERS[0];

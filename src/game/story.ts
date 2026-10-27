@@ -173,6 +173,42 @@ export const LOGS: Record<string, StoryLog> = {
     kind: 'journal',
     lines: [{ who: 'mira', text: 'Inner planets never stand opposite the sun. You have to catch them at the edge, in the half-light, and wait for them to cross the sun’s face. Patience is a measuring instrument too.' }],
   },
+  brief9: {
+    title: 'Home',
+    chapter: 9,
+    kind: 'scene',
+    lines: [
+      { who: 'echo', text: 'Navigator. My memory is whole again. I know this sky — every star in it.' },
+      { who: 'echo', text: 'The ground is red. The air is thin. The star is the Sun. We are on Mars, in Jezero crater, a few hundred metres from Mira Sato’s last camp.' },
+      { who: 'echo', text: 'The blue planet is Earth. It is inside our orbit: an evening and morning star, like the one in the Inward system.' },
+      { who: 'note', text: 'Her notebook lies open on a flat rock. The last page is a table of numbers with a column left empty: the transfer to Earth. She ran out of air before the window.' },
+      { who: 'echo', text: 'Same physics, same tools. Every number you measure here has a real value — NASA’s. Finish her table.' },
+    ],
+  },
+  cache9: {
+    title: 'Earth',
+    chapter: 9,
+    kind: 'scene',
+    lines: [
+      { who: 'note', text: 'Blue limb. White cloud. The heat shield glows orange across the Pacific, and the parachutes open over land.' },
+      { who: 'note', text: 'The cryo-pod hisses open in a gravity that feels exactly right.' },
+      { who: 'vale', text: 'Is that Earth?' },
+      { who: 'navigator', text: 'Within my error bars.' },
+      { who: 'vale', text: '…Good enough for me.' },
+      { who: 'echo', text: 'Navigator’s report. Halcyon journal: delivered. Crew of the second ship: home. Sky: named.' },
+      { who: 'echo', text: 'Error bars: honest. That was the only thing out there that didn’t run out.' },
+    ],
+  },
+  mira9: {
+    title: 'Halcyon journal · last entry',
+    chapter: 9,
+    kind: 'journal',
+    lines: [
+      { who: 'mira', text: 'To whoever reads this next, Navigator.' },
+      { who: 'mira', text: 'I measured everything twice and wrote down how wrong I might be. The window is in two years; my air is not. The numbers are good. Use them, check them, and go home for both of us.' },
+      { who: 'mira', text: 'Look up when you get there. The sky will have names again.' },
+    ],
+  },
   cache1: {
     title: 'The beacon',
     chapter: 1,

@@ -202,7 +202,7 @@ function Debrief() {
         <div className="panel panel-pad" style={{ textAlign: 'center' }} data-tut="results-grade">
           <div className="meter-label">
             {s.settings.freeRoam ? 'Free Roam · not scored · ' : 'Mission debrief · '}
-            {s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
+            {sys.features.real ? 'the Solar System' : s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
           </div>
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}
@@ -295,7 +295,7 @@ function Debrief() {
         )}
 
         <div className="panel panel-pad" data-tut="results-table">
-          <h2 style={{ fontSize: 18, marginBottom: 8 }}>Your numbers vs the truth</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 8 }}>{sys.features.real ? 'Your numbers vs NASA’s' : 'Your numbers vs the truth'}</h2>
           <div className="scroll">
             <table className="log">
               <thead>

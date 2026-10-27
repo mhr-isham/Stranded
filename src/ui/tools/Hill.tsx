@@ -101,7 +101,7 @@ export function Hill() {
             const eff = V.pitch + V.sway;
             const yOf = (elev: number) => hp / 2 - (elev - eff) * ppd;
             const sun = starAltitude(sys, clock.t, sys.site) / DEG;
-            const col = skyColors(sun);
+            const col = skyColors(sun, !!sys.features.real);
             const yH = yOf(-dip);
             // Sky.
             const g = ctx.createLinearGradient(0, yH - hp, 0, yH);
