@@ -68,6 +68,48 @@ export const CODEX: CodexCard[] = [
     year: '1925',
     text: 'Walter Hohmann, a German engineer, showed that the cheapest way between two circular orbits is half an ellipse touching both. It only works when the target sits at the right angle ahead — which is why missions to Mars launch every 26 months.',
   },
+  {
+    id: 'ellipse',
+    title: 'Kepler gives up the circle',
+    year: '1609',
+    text: 'For six years Kepler fitted circles to Tycho Brahe’s observations of Mars. The best one missed by 8 arcminutes — small, but Tycho never erred that much. In Astronomia Nova he replaced the circle with an ellipse, the Sun at one focus, and the planet sweeping equal areas in equal times.',
+  },
+  {
+    id: 'reddwarf',
+    title: 'Red dwarfs and their worlds',
+    year: '1990s – today',
+    text: 'Three stars in four are red dwarfs. Their temperate planets orbit so close that tides lock one face towards the star, as the Moon faces Earth. The TRAPPIST-1 system has seven Earth-sized planets, several in the temperate zone — and a star that flares often.',
+  },
+  {
+    id: 'voyager',
+    title: 'The Grand Tour',
+    year: '1977 – 1989',
+    text: 'In the late 1970s the outer planets lined up in a way that happens every 175 years. Voyager 2 swung past Jupiter, Saturn, Uranus and Neptune, each giant bending its path towards the next. Without the gravity assists the trip to Neptune would have taken 30 years instead of 12.',
+  },
+  {
+    id: 'bessel',
+    title: 'The first stellar parallax',
+    year: '1838',
+    text: 'Friedrich Bessel watched the star 61 Cygni for a year against fainter, more distant stars. It swung to and fro by 0.31 arcseconds: the first measured distance to a star, about 10 light-years. The search had lasted since antiquity; its failure had once been taken as proof that the Earth stood still.',
+  },
+  {
+    id: 'windAnom',
+    title: 'Wind on the pendulum',
+    year: 'anomaly',
+    text: 'A steady wind pushes the bob sideways. The pendulum then swings about a tilted line, and faster, as if gravity were a little stronger — so g reads high. Gravity surveyors timed their pendulums in sheltered huts, and on calm days.',
+  },
+  {
+    id: 'humidAnom',
+    title: 'Looming horizons',
+    year: 'anomaly',
+    text: 'Damp or cold air near the ground bends light from the horizon downwards, lifting distant objects into view — sailors call it looming. A horizon that looks higher dips less, and the planet seems bigger than it is. Al-Bīrūnī’s method works best in dry, still air.',
+  },
+  {
+    id: 'seeingAnom',
+    title: 'Bad seeing',
+    year: 'anomaly',
+    text: 'On some nights the air is turbulent and star images boil and smear. Observatories are built on high, dry mountains to escape it; modern telescopes measure the turbulence and flex their mirrors to cancel it (adaptive optics). On a bad night, a careful observer measures less, or not at all.',
+  },
 ];
 
 /** Which card each mission unlocks. */
@@ -81,4 +123,10 @@ export const MISSION_CODEX: Record<string, string> = {
   moon: 'moons',
   synodic: 'kepler',
   plan: 'hohmann',
+  ellipse: 'ellipse',
+  giantOrbit: 'voyager',
+  starPar: 'bessel',
 };
+
+/** Cards unlocked on finishing a chapter. */
+export const CHAPTER_CODEX: Record<number, string> = { 6: 'reddwarf' };

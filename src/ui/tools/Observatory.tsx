@@ -65,6 +65,10 @@ export function Observatory() {
   const calip = useRef({ x1: -15 * ARCSEC, x2: 15 * ARCSEC, dragging: 0 as 0 | 1 | 2 | 3, start: { x: 0, a: 0, b: 0 } });
   const scopeK = useRef(1);
   const fov = Math.pow(10, fovLog) * DEG;
+  // A rough night seen through the eyepiece earns the Codex card on seeing.
+  useEffect(() => {
+    if (mode === 'scope' && seeingFactor(useGame.getState(), clock.t) > 1.5) useGame.getState().unlock('codex', 'seeingAnom');
+  }, [mode, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Point the telescope at an object (used by the "point at" buttons and Flight School). */
   const pointAt = (kind: 'star' | 'target', fovDeg: number, tabId?: Tab) => {

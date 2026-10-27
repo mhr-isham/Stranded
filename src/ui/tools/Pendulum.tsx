@@ -10,17 +10,34 @@ import { paintSky } from '../../render/paint';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
-import { Modal } from '../common/widgets';
+import { Modal, useGameTime } from '../common/widgets';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { explain, makePrediction, resolveNow } from '../../game/predictions';
 import { hasChallenge } from '../../game/challenges';
 import { useMode } from '../../game/modes';
 import { pendulumPeriod } from '../../engine/measure';
+import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
 import { PredictCard } from '../common/Predict';
 import { toast } from '../common/widgets';
 
 const BOB_R = 0.025; // m
+
+/** The wind gauge by the rig: a careful player checks it before timing. */
+function WindGauge() {
+  const s = useGame();
+  const t = useGameTime(1);
+  const v = windAt(s, t);
+  const corrected = ANOMALIES[s.settings.difficulty].announce === 'corrected';
+  return (
+    <div className="row between" style={{ fontSize: 13 }}>
+      <span className="muted">Wind gauge</span>
+      <span className={v > 6 ? 'amber' : ''}>
+        {fmt(v, 1)} m/s {v > 6 ? (corrected ? '— ECHO is steadying the rig for you' : '— strong') : '— calm'}
+      </span>
+    </div>
+  );
+}
 
 export function Pendulum() {
   const { system: sys, catalog } = currentWorld();
@@ -162,7 +179,13 @@ export function Pendulum() {
             if (P.swinging) {
               const n = Math.max(1, Math.ceil(dt * 600));
               const hstep = dt / n;
-              const f = (th: number) => (-g / trueL) * Math.sin(th);
+              // A strong steady wind pushes the bob sideways: the swing centres off vertical and
+              // quickens, as if gravity were a little stronger (anomaly, harder modes only).
+              const tw = clock.t;
+              const push = windBiases(useGame.getState(), tw) ? windPush(windAt(useGame.getState(), tw)) : 0;
+              const gEff = g * Math.sqrt(1 + push * push);
+              const tilt = Math.atan(push);
+              const f = (th: number) => (-gEff / trueL) * Math.sin(th - tilt);
               for (let i = 0; i < n; i++) {
                 const k1t = P.om;
                 const k1o = f(P.th);
@@ -314,6 +337,7 @@ export function Pendulum() {
             release angles make the swing slower than the simple formula predicts.
           </div>
           <Formula>g = 4π² L / T²,  T = time / N</Formula>
+          <WindGauge />
         </div>
 
         {result && (

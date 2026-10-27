@@ -7,6 +7,7 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
+import { humidK } from '../../game/anomalies';
 import { css, skyColors } from '../../render/color';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
@@ -40,7 +41,9 @@ export function Hill() {
   const h = stations[at].h + EYE;
   // Thick air (chapter 3) bends the light from the horizon down to the eye, so
   // the horizon looks higher than it is: apparent dip ≈ true dip · √(1 − k).
-  const dip = (horizonDip(sys.home.radius, h) * Math.sqrt(1 - sys.features.refraction)) / DEG;
+  // Humid mornings add some refraction anywhere (anomaly, harder modes only).
+  const k = Math.min(0.9, sys.features.refraction + humidK(s, clock.t));
+  const dip = (horizonDip(sys.home.radius, h) * Math.sqrt(1 - k)) / DEG;
 
   const climb = (i: number) => {
     if (i === at || moving) return;
@@ -177,6 +180,11 @@ export function Hill() {
       </div>
       <div className="tool-side">
         <ToolHeader title="The hill" sub="Measure how far the horizon dips below level. The dip depends on your height and the planet’s radius." />
+        {humidK(s, clock.t) > 0 && (
+          <div className="muted" style={{ fontSize: 13 }}>
+            🌫 The air is damp and hazy this morning; the distant horizon shimmers.
+          </div>
+        )}
         {sys.features.refraction > 0 && hillMode.coaching && (
           <div className="callout warn" style={{ margin: 0 }}>
             <b>Thick air</b>

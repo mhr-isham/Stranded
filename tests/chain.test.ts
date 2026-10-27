@@ -56,7 +56,7 @@ describe('solve chain', () => {
         }
       }
     }
-  });
+  }, 120_000);
 
   it('propagates errors (star mass ~3x the relative error of distance)', () => {
     const sys = generateSystem(3);

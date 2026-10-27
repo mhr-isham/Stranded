@@ -7,7 +7,7 @@
 
 import { ARCSEC, TAU } from './constants';
 import { orbitAngle } from './ephemeris';
-import { hash32 } from './rng';
+import { unitHash } from './rng';
 import { starCatalog } from './sky';
 import type { StarSystem } from './types';
 
@@ -36,7 +36,7 @@ export function nearStarsOf(sys: StarSystem): NearStar[] {
   out = [];
   if (sys.features.stars) {
     const cat = starCatalog(sys.seed);
-    const u = (i: number, k: number) => hash32(sys.seed, i, k) / 4294967296;
+    const u = (i: number, k: number) => unitHash(sys.seed, i, k);
     // Bright-ish stars close to the ecliptic, well apart in longitude.
     const cand = cat
       .map((c, i) => ({ i, lon: Math.atan2(c.dir[1], c.dir[0]), z: c.dir[2], mag: c.mag }))
@@ -68,7 +68,7 @@ export function parallaxOffset(sys: StarSystem, s: NearStar, t: number) {
 /** The Halcyon's catalogue: four candidate places, each with distances (ly) to the three stars. One is right. */
 export function catalogueOf(sys: StarSystem): { label: string; ly: number[]; truth: boolean }[] {
   const stars = nearStarsOf(sys);
-  const u = (i: number, k: number) => hash32(sys.seed, i, k) / 4294967296;
+  const u = (i: number, k: number) => unitHash(sys.seed, i, k);
   const truthAt = Math.floor(u(0, 0xca7) * 4);
   const labels = ['Sector 7 · Ashfall', 'Sector 9 · Lantern', 'Sector 12 · Tern Reach', 'Sector 4 · Cinder'];
   return labels.map((label, c) => ({

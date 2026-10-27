@@ -54,3 +54,18 @@ export function hash32(...parts: number[]): number {
   }
   return h >>> 0;
 }
+
+/**
+ * hash32 with MurmurHash3's final mix, mapped to [0, 1). hash32 alone mixes
+ * poorly for small consecutive inputs (day numbers); use this where the values
+ * must look independent from one input to the next.
+ */
+export function unitHash(...parts: number[]): number {
+  let h = hash32(...parts);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}

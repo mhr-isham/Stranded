@@ -18,6 +18,8 @@ import { predictionPoints } from '../../game/predictions';
 import { nameOf, type AtlasCard } from '../../game/atlas';
 import { unlockLog } from '../../game/story';
 import { chapterOf } from '../../game/campaign';
+import { CHAPTER_CODEX } from '../../game/codex';
+import { ANOMALIES, affectedReadings, sharpEyePoints } from '../../game/anomalies';
 import { CHALLENGES, challengeBonus } from '../../game/challenges';
 import { probeTruth } from '../../game/probeState';
 
@@ -128,8 +130,9 @@ function Debrief() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - sharpEyePoints(s), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
+  const affected = affectedReadings(s);
 
   // Error budget: how much correction fuel each measurement cost, found by
   // replacing it with the truth and flying the same departure again.
@@ -156,6 +159,9 @@ function Debrief() {
     const g0 = useGame.getState();
     // Reaching the beacon: the Halcyon cache and the chapter's journal pages.
     if (kind === 'success') chapterOf(g0.chapter).successLogs.forEach((id) => unlockLog(id));
+    if (kind === 'success' && CHAPTER_CODEX[g0.chapter]) g0.unlock('codex', CHAPTER_CODEX[g0.chapter]);
+    // Anomalies met in this run get their Codex cards.
+    for (const r of affectedReadings(g0)) g0.unlock('codex', r.key === 'g' ? 'windAnom' : 'humidAnom');
     // Campaign progress: chapter done, best grade per mode.
     if (!g0.tutorial.active && !g0.settings.freeRoam) {
       const c = g0.campaign[g0.chapter] ?? { done: false, best: {} };
@@ -291,6 +297,28 @@ function Debrief() {
                 <span className="mono" style={{ width: 80, textAlign: 'right', fontSize: 13 }}>{fmt(Math.max(0, b.saved), 0)} m/s</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {affected.length > 0 && ANOMALIES[s.settings.difficulty].announce !== 'corrected' && (
+          <div className="panel panel-pad stack">
+            <h2 style={{ fontSize: 18 }}>Anomalies in your data</h2>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Real effects bent some readings the same way every time. A careful observer spots them — by the wind gauge, by the haze, by readings that
+              disagree with the rest — and leaves them out.
+            </div>
+            {affected.map((r) => (
+              <div key={r.id} className="row between" style={{ fontSize: 13 }}>
+                <span>
+                  {r.key === 'g' ? '🌬 Pendulum on a windy day' : '🌫 Horizon dip on a humid morning'} · day {fmt(r.at / DAY, 1)}
+                </span>
+                <span className={r.kept ? 'amber' : 'green'}>{r.kept ? 'kept' : 'left out · Sharp Eye +15'}</span>
+              </div>
+            ))}
+            <div className="faint" style={{ fontSize: 12 }}>
+              Wind pushes the bob sideways, so it swings faster and g reads high. Humid air bends light from the horizon, so the dip reads small and the
+              radius large. Both are in the Codex.
+            </div>
           </div>
         )}
 

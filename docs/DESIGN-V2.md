@@ -621,16 +621,16 @@ Players who need to stop can stop at any act boundary with nothing lost; players
 | ✅ | **Mode rules in the game:** mission list, ECHO coaching, sanity warnings, hints, verify limits, formula lock, survival lock, storm forecast (§4) | M |
 | ✅ | **Checkpoints** (3 slots) and the **rewind** offer before the debrief (§11) | M |
 | ✅ | **Story bible** ([`STORY.md`](STORY.md)); the new opening ship log; ECHO lines on every ending | M |
-| 1 | Predictions with the estimate helper + the "Making a good estimate" module (§6) | M |
-| 2 | Readiness meter in the HUD (from your own error bars; the launch planner already has a version) | S |
-| 3 | Prologue: tumble, control returns, entry, descent, site choice, parachute, camp (§9.1) | L |
-| 4 | Acts with hooks (§12.9, §13) | M |
-| 5 | Atlas cards, calibration profile, naming (private) | M |
-| 6 | Story: full prologue script, Mira's journal entries, Vale's wake-ups ([`STORY.md`](STORY.md) §7) | M (writing) |
-| 7 | Chapters 2, 3 and 5 with their optional Flight School modules | L each |
-| 8 | Manual flight phases: ascent, corrections with optical navigation, arrival choice, landing (§9.2) | L |
-| 9 | Rover free driving, camp towing, the hop tank, ice-to-fuel (§10) | L |
-| 10 | Free Roam | M |
-| 11 | Chapters 4, 6, 7, 8, 9; Astronomer Challenges; anomalies; competing hypotheses | L |
+| ✅ | Predictions with the estimate helper + the "Making a good estimate" module (§6) | M |
+| ✅ | Readiness meter in the HUD (from your own error bars; the launch planner already has a version) | S |
+| ✅ | Prologue: tumble, control returns, entry, descent, site choice, parachute, camp (§9.1) | L |
+| ✅ | Acts with hooks (§12.9, §13) | M |
+| ✅ | Atlas cards, calibration profile, naming (private) | M |
+| ✅ | Story: full prologue script, Mira's journal entries, Vale's wake-ups ([`STORY.md`](STORY.md) §7) | M (writing) |
+| ✅ | Chapters 2, 3 and 5 with their optional Flight School modules | L each |
+| ✅ | Manual flight phases: ascent, corrections with optical navigation, arrival choice, landing (§9.2) | L |
+| ✅ | Rover free driving, camp towing, the hop tank, ice-to-fuel (§10) | L |
+| ✅ | Free Roam | M |
+| ✅ | Chapters 4, 6, 7, 8, 9; Astronomer Challenges; anomalies; competing hypotheses | L |
 | Later | Social features, co-op, real-sky events, the connection layer: after we have servers (your decision) | — |
 | Dropped | Earth missions with phone sensors (your decision); "Short expedition" with known values (§13.8) | — |

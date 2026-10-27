@@ -3,8 +3,9 @@
 // Each is something real expeditions have had to cope with.
 
 import { DAY } from '../engine/constants';
-import { hash32 } from '../engine/rng';
+import { unitHash } from '../engine/rng';
 import type { GameState } from './store';
+import { ANOMALIES } from './anomalies';
 
 export type ChallengeId = 'stopwatch' | 'seeing' | 'rover' | 'noFormula' | 'survival' | 'handFit' | 'noSanity' | 'shortAir';
 
@@ -33,7 +34,7 @@ export const challengeBonus = (s: Pick<GameState, 'settings'>) => 1 + 0.05 * (s.
 export function seeingFactor(s: Pick<GameState, 'settings' | 'seed'>, t: number) {
   const night = Math.floor(t / DAY);
   const base = hasChallenge(s, 'seeing') ? 3 : 1;
-  // Real nights vary: about one night in five the air is rough.
-  const rough = hash32(s.seed, night, 0x5ee) / 4294967296 < 0.2 ? 2.2 : 1;
+  // Real nights vary: in the harder modes some nights the air is rough (anomalies, §12.2).
+  const rough = unitHash(s.seed, night, 0x5ee) < ANOMALIES[s.settings.difficulty].rough ? 2.2 : 1;
   return base * rough;
 }

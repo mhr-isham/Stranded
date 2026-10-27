@@ -3,7 +3,7 @@
 // the rate. While one burns, the sky is washed out and the instruments are blind.
 
 import { DAY, HOUR } from './constants';
-import { hash32 } from './rng';
+import { unitHash } from './rng';
 import type { StarSystem } from './types';
 
 export const FLARE_RATE = 1 / (2.5 * DAY); // mean flares per second
@@ -23,7 +23,7 @@ export function flaresOf(sys: StarSystem): Flare[] {
   if (f) return f;
   f = [];
   if (sys.features.locked) {
-    const u = (i: number, k: number) => (hash32(sys.seed, i, k) + 0.5) / 4294967296;
+    const u = (i: number, k: number) => unitHash(sys.seed, i, k) + 0.5 / 4294967296;
     let t = 0;
     for (let i = 0; t < sys.lifeSupport + 30 * DAY && i < 5000; i++) {
       t += -Math.log(u(i, 0xf1a)) / FLARE_RATE;
