@@ -90,8 +90,12 @@ export function hopEstimate(p: DescentParams, d: number) {
   return best;
 }
 
-/** Fuel to load for a hop flown by hand: room for a less-than-perfect flight and a long, careful hover. */
-export const hopBudget = (p: DescentParams, d: number) => 1.5 * hopEstimate(p, d).cost + 60 * p.g;
+/**
+ * Fuel to load for a hop flown by hand. A human-style test pilot (reading the
+ * screen, keys with reaction time) used about 2.1x the estimate; this covers it,
+ * plus a minute of careful hovering. You pay only for what you burn.
+ */
+export const hopBudget = (p: DescentParams, d: number) => 2.2 * hopEstimate(p, d).cost + 60 * p.g;
 
 /** The ship's flight model near the ground (the same as for the landing). */
 export const hopParams = (g: number, assist = true): DescentParams => ({

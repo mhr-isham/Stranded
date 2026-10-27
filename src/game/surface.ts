@@ -64,8 +64,8 @@ export interface SurfaceRules {
 
 export const SURFACE_RULES: Record<Difficulty, SurfaceRules> = {
   // Sized from flown hops (engine/hop.ts): a well-flown 5 km hop at 1 g takes about 1.3 km/s.
-  stargazer: { hopTank: 4000, hopRefill: 'nightly', isruDays: 1, isruCap: 0.4 },
-  cadet: { hopTank: 3000, hopRefill: 'nightly', isruDays: 2, isruCap: 0.4 },
+  stargazer: { hopTank: 6000, hopRefill: 'nightly', isruDays: 1, isruCap: 0.4 },
+  cadet: { hopTank: 4000, hopRefill: 'nightly', isruDays: 2, isruCap: 0.4 },
   navigator: { hopTank: 2200, hopRefill: 'slow', isruDays: 3, isruCap: 0.25 },
   astronomer: { hopTank: 1400, hopRefill: 'ice', isruDays: 4, isruCap: 0.15 },
   legend: { hopTank: 0, hopRefill: 'none', isruDays: 5, isruCap: 0.1 },

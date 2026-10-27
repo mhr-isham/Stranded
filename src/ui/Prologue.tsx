@@ -421,16 +421,21 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       // Rescue: the prologue can't kill you.
       // Rescue only when the engine really can't stop us in time (a late, hard
       // braking burn is fine), or when skidding in sideways, or falling with an empty tank.
-      // Already burning: the engine brakes as it points now. Coasting: allow for
-      // swinging upright first, about √(2|tilt|/turn rate) seconds of falling.
+      // Could we still stop? Either as we point now (if burning), or after swinging
+      // upright first (about √(2|tilt|/turn rate) seconds of falling). Doomed only if neither works.
       const burning = u.thrust && S.d.fuel > 0;
-      const tUp = burning ? 0 : Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3;
-      const hLeft = h - 2 - Math.max(0, -S.d.vy) * tUp;
-      const brakeNeed = S.d.vy < 0 ? (S.d.vy * S.d.vy) / (2 * Math.max(1, hLeft)) : 0;
-      const brakeHave = (params.thrust * (burning ? Math.max(0.2, Math.cos(S.d.th)) : 1) - g) * (S.d.fuel > 0 ? 1 : 0);
+      const canStop = (tDelay: number, accel: number) => {
+        const hLeft = h - 2 - Math.max(0, -S.d.vy) * tDelay;
+        const need = S.d.vy < 0 ? (S.d.vy * S.d.vy) / (2 * Math.max(1, hLeft)) : 0;
+        return need <= 1.05 * Math.max(0.1, accel);
+      };
+      const fuelOk = S.d.fuel > 0;
+      const stoppable =
+        fuelOk &&
+        ((burning && canStop(0, params.thrust * Math.cos(S.d.th) - g)) || canStop(Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3, params.thrust - g));
       const doomed =
         !(hop && S.echoFly) &&
-        ((h < 2500 && brakeNeed > 1.05 * Math.max(0.1, brakeHave)) || (h < 35 && Math.abs(S.d.vx) > 12) || (S.d.fuel <= 0 && S.d.vy < -8 && h < 400));
+        ((h < 2500 && S.d.vy < 0 && !stoppable && fuelOk) || (h < 35 && Math.abs(S.d.vx) > 12) || (!fuelOk && S.d.vy < -8 && h < 400));
       if (S.launched && !S.rescued && doomed) {
         S.rescued = true;
         sfx('bad');
