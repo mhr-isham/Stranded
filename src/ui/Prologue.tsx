@@ -30,6 +30,7 @@ import { hopEstimate, hopPilot, type HopPhase } from '../engine/hop';
 import { beginPlay } from './Intro';
 import { unlockLog } from '../game/story';
 import { chapterOf } from '../game/campaign';
+import { STRIP } from '../game/surface';
 
 type Stage = 'tumble' | 'stabilize' | 'deorbit' | 'entry' | 'descent' | 'landed';
 
@@ -296,7 +297,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     if (b) unlockLog(b);
   };
 
-  const campAt = (x: number, landing: CampInfo['landing']): CampInfo => {
+  const campAt = (x0: number, landing: CampInfo['landing']): CampInfo => {
+    // A hop can overshoot the mapped strip; the camp stays on it.
+    const x = Math.max(-STRIP + 100, Math.min(STRIP - 100, x0));
     const ice = terrain.features.find((q) => q.kind === 'ice')!;
     return {
       site: siteAt(terrain, x),
@@ -453,7 +456,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         };
         S.d.fuel = Math.max(S.d.fuel, 200); // emergency reserve
       }
-      const speedUp = h > 2500 && !S.rescued ? 3 : 1;
+      // ECHO's hops run at 4x (2x for the final settle) so a long one doesn't drag.
+      const speedUp = hop && S.echoFly && !S.rescued ? (h > 60 ? 4 : 2) : h > 2500 && !S.rescued ? 3 : 1;
       const n = Math.ceil((dt * speedUp) / 0.02);
       for (let i = 0; i < n; i++) S.d = stepDescent(params, S.d, uu, (dt * speedUp) / n);
       S.thr = S.d.fuel > 0 ? uu.throttle : 0;

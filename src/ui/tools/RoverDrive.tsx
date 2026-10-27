@@ -42,7 +42,7 @@ export function RoverDrive() {
   // (the rocker-bogie rides over those).
   const climbSlope = (x: number) => Math.atan((tr.height(x + 1.5) - tr.height(x - 1.5)) / 3);
   const st = useRef({
-    x: s.surface.roverX ?? campX + 12,
+    x: Math.max(-STRIP, Math.min(STRIP, s.surface.roverX ?? campX + 12)),
     v: 0,
     face: 1,
     wheel: 0,
@@ -122,6 +122,7 @@ export function RoverDrive() {
       S.v = Math.max(-vmax, Math.min(vmax, S.v + a * h));
       const dx = S.v * h;
       const nx = Math.max(-STRIP, Math.min(STRIP, S.x + dx));
+      if (nx !== S.x + dx) S.v = 0; // the end of the mapped strip
       const moved = Math.abs(nx - S.x);
       S.x = nx;
       S.wheel += dx / WHEEL_R;
@@ -328,7 +329,11 @@ export function RoverDrive() {
           <dt>{sunAltNow > 0 ? '☀️ Day' : '🌙 Night'}</dt>
           <dd>{fmt(clock.t / (24 * HOUR), 1)} d</dd>
         </dl>
-        {hud.battery < Math.abs(hud.x - campX) * 1.2 && <div className="red" style={{ fontSize: 12 }}>Turn back soon: the charge left barely covers the way home.</div>}
+        {hud.battery <= 0 ? (
+          <div className="red" style={{ fontSize: 12 }}>Battery flat. Leave the drive and bring the rover home from the map: its solar wing trickles it back.</div>
+        ) : (
+          hud.battery < Math.abs(hud.x - campX) * 1.2 && <div className="red" style={{ fontSize: 12 }}>Turn back soon: the charge left barely covers the way home.</div>
+        )}
       </div>
       {nearFind && (
         <div className="drive-find panel">

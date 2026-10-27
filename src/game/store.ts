@@ -149,7 +149,7 @@ export interface GameState {
     roverX: number | null; // null = parked at camp
     roverBattery: number; // m of range left
     busyUntil: number; // rover/camp busy (driving, towing, hauling) until this time
-    task: null | { kind: 'drive' | 'tow' | 'haul' | 'process'; toX?: number; done: number };
+    task: null | { kind: 'drive' | 'tow' | 'haul' | 'process'; toX?: number; start?: number; done: number };
     found: string[];
     collected: string[];
     hopTank: number;

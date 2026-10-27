@@ -86,6 +86,8 @@ export function Gnomon() {
 
   const drive = (dist: number) => {
     if (s.rover.dist > 0 || s.rover.arriveAt > t) return toast('The rover is out east. Bring it back first (Rover screen).');
+    if (dist > 0 && (s.surface.roverX !== null || (s.surface.task && s.surface.task.done > t && s.surface.task.kind !== 'process')))
+      return toast('The rover is out on the surface map. Bring it home first.');
     const legs = Math.abs(dist - trip.dist);
     useGame.setState({ northTrip: { dist, arriveAt: clock.t + (legs / SPEED) * DAY } });
     toast(dist ? `Rover heading north: ${fmt(legs / SPEED, 1)} days` : 'Rover returning to camp');

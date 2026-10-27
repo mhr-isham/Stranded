@@ -16,6 +16,7 @@ interface Props {
   onPointerDown?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   onPointerMove?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   onPointerUp?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  onPointerCancel?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   onWheel?: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   style?: React.CSSProperties;
 }

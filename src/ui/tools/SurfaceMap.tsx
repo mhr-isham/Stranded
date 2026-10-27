@@ -40,7 +40,13 @@ export function SurfaceMap() {
   const tr = useMemo(() => terrainFor(sys), [sys]);
   const finds = useMemo(() => findsFor(sys.seed), [sys]);
   const [target, setTarget] = useState<number | null>(null);
-  const view = useRef({ cx: s.camp?.x ?? 0, span: 30e3, drag: null as null | { x: number; cx: number; moved: boolean } });
+  const view = useRef({
+    cx: s.camp?.x ?? 0,
+    span: 30e3,
+    drag: null as null | { x: number; cx: number; moved: boolean },
+    pts: new Map<number, number>(),
+    pinch: null as null | { d: number; span: number },
+  });
   const sf = s.surface;
   const campX = s.camp?.x ?? 0;
   const roverX = sf.roverX ?? campX;
@@ -52,13 +58,38 @@ export function SurfaceMap() {
   const nearIce = (s.camp?.iceKm ?? 99) < 1;
   const atFind = finds.find((f) => sf.found.includes(f.id) && !sf.collected.includes(f.id) && Math.abs(f.x - roverX) < 300);
 
+  // Ice goes to the hop tank in modes where only ice refills it; otherwise to launch fuel (capped).
+  const iceToHop = rules.hopRefill === 'ice' && hopTank < rules.hopTank;
+  const iceCapped = !iceToHop && sf.fuelMade >= iceCap;
+  const haulCharge = 2 * (s.camp?.iceKm ?? 0) * 1000;
+  // The other rover job (the long trips north and east) uses the same rover.
+  const longTrip = s.northTrip.dist > 0 || s.northTrip.arriveAt > t || s.rover.dist > 0 || s.rover.arriveAt > t;
+
+  /** Where to draw the rover now: moving along during a drive or haul. */
+  const roverShownAt = (now: number): number | null => {
+    const task = sf.task;
+    if (task && task.done > now && (task.kind === 'drive' || task.kind === 'haul')) {
+      const from = sf.roverX ?? campX;
+      const to = task.kind === 'drive' ? (task.toX ?? campX) : null;
+      const start = task.start ?? now;
+      const f = Math.max(0, Math.min(1, (now - start) / Math.max(1, task.done - start)));
+      if (to !== null) return from + (to - from) * f;
+      // A haul: out to the ice and back.
+      const ice = tr.features.find((q) => q.kind === 'ice')!;
+      const iceX = campX < ice.x0 ? ice.x0 : campX > ice.x1 ? ice.x1 : campX;
+      return campX + (iceX - campX) * (1 - Math.abs(1 - 2 * f));
+    }
+    return sf.roverX;
+  };
+
   const startTask = (kind: 'drive' | 'tow' | 'haul' | 'process', hours: number, toX?: number) => {
-    useGame.setState({ surface: { ...sf, hopTank, task: { kind, toX, done: clock.t + hours * HOUR } } });
+    useGame.setState({ surface: { ...sf, hopTank, task: { kind, toX, start: clock.t, done: clock.t + hours * HOUR } } });
     sfx('click');
   };
 
   const drive = () => {
     if (target === null) return;
+    if (longTrip) return toast('The rover is away on the long trip (shadow stick or parallax). Bring it back first.');
     const dist = Math.abs(target - roverX);
     const backHome = Math.abs(target - campX);
     if (dist + backHome > sf.roverBattery && Math.abs(target - campX) > 200) return toast('Not enough charge to get there and back. Recharge at camp first.');
@@ -84,19 +115,30 @@ export function SurfaceMap() {
     if (target === null || !hopInfo) return;
     const { est, budget } = hopInfo;
     const fromLaunch = Math.max(0, budget - hopTank);
+    // Ask only when even a decent flight may dip into the launch fuel.
+    const likely = hopTank < 1.5 * est;
     if (
       fromLaunch > 0 &&
+      likely &&
       !confirm(
         `Flown well, this hop takes about ${fmt(est, 0)} m/s. ${hopTank > 0 ? `The hop tank has ${fmt(hopTank, 0)} m/s; anything` : 'Anything'} more you burn comes out of the launch fuel (up to ${fmt(fromLaunch, 0)} m/s). Go?`,
       )
     )
       return;
+    if (sf.roverX !== null) toast('The rover stays where it is parked. Drive it to the new camp, or bring it home from the map.');
     useGame.setState({
-      surface: { ...sf, hopTank, roverX: null },
+      surface: { ...sf, hopTank },
       hop: { toX: target, cost: est, fromX: campX, budget },
       phase: 'hop',
     });
     sfx('launch');
+  };
+
+  // With too little charge the rover still gets home: it waits for its solar wing on the way (about 1 h per km short).
+  const bringHome = () => {
+    const dist = Math.abs(roverX - campX);
+    const short = Math.max(0, dist - sf.roverBattery);
+    startTask('drive', dist / 1000 / kmh + short / 1000, campX);
   };
 
   const collect = collectFind;
@@ -107,19 +149,45 @@ export function SurfaceMap() {
         <CanvasView
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture(e.pointerId);
-            view.current.drag = { x: e.clientX, cx: view.current.cx, moved: false };
+            const v = view.current;
+            v.pts.set(e.pointerId, e.clientX);
+            if (v.pts.size === 2) {
+              // Two fingers: pinch to zoom (and no tap or pan from this gesture).
+              const [a, b] = [...v.pts.values()];
+              v.pinch = { d: Math.max(10, Math.abs(a - b)), span: v.span };
+              v.drag = null;
+            } else if (v.pts.size === 1) v.drag = { x: e.clientX, cx: v.cx, moved: false };
           }}
           onPointerMove={(e) => {
-            const d = view.current.drag;
+            const v = view.current;
+            if (v.pts.has(e.pointerId)) v.pts.set(e.pointerId, e.clientX);
+            if (v.pinch && v.pts.size >= 2) {
+              const [a, b] = [...v.pts.values()];
+              v.span = Math.max(4e3, Math.min(80e3, (v.pinch.span * v.pinch.d) / Math.max(10, Math.abs(a - b))));
+              return;
+            }
+            const d = v.drag;
             if (!d) return;
             const c = e.currentTarget;
             const mpp = view.current.span / c.clientWidth;
             if (Math.abs(e.clientX - d.x) > 4) d.moved = true;
             view.current.cx = Math.max(-STRIP, Math.min(STRIP, d.cx - (e.clientX - d.x) * mpp));
           }}
-          onPointerUp={(e) => {
-            const d = view.current.drag;
+          onPointerCancel={(e) => {
+            view.current.pts.delete(e.pointerId);
+            if (view.current.pts.size < 2) view.current.pinch = null;
             view.current.drag = null;
+          }}
+          onPointerUp={(e) => {
+            const v = view.current;
+            v.pts.delete(e.pointerId);
+            if (v.pinch) {
+              if (v.pts.size < 2) v.pinch = null;
+              v.drag = null;
+              return;
+            }
+            const d = v.drag;
+            v.drag = null;
             if (d && !d.moved) {
               const c = e.currentTarget;
               const p = canvasPoint(e);
@@ -135,7 +203,11 @@ export function SurfaceMap() {
             const hmax = 2500;
             const base = h * 0.78;
             const Y = (z: number) => base - (z / hmax) * h * 0.4;
-            ctx.clearRect(0, 0, w, h);
+            const sky = ctx.createLinearGradient(0, 0, 0, h);
+            sky.addColorStop(0, '#1b2a4a');
+            sky.addColorStop(1, '#3d4560');
+            ctx.fillStyle = sky;
+            ctx.fillRect(0, 0, w, h);
             // Terrain profile.
             ctx.beginPath();
             ctx.moveTo(0, h);
@@ -171,15 +243,22 @@ export function SurfaceMap() {
             }
             // Camp and rover.
             drawStarship(ctx, X(campX), Y(tr.height(campX)) - 13 * dpr, 0, 28 * dpr, { now, legs: 1, shield: false, light: 1 });
-            if (sf.roverX !== null) drawRover(ctx, X(sf.roverX), Y(tr.height(sf.roverX)), 30 * dpr, { now, lights: true });
-            // Rover range from camp.
-            ctx.strokeStyle = 'rgba(108,196,255,0.4)';
-            ctx.setLineDash([4 * dpr, 4 * dpr]);
-            ctx.beginPath();
-            ctx.moveTo(X(campX - sf.roverBattery / 2), base + 14 * dpr);
-            ctx.lineTo(X(campX + sf.roverBattery / 2), base + 14 * dpr);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            const rx = roverShownAt(t);
+            if (rx !== null) drawRover(ctx, X(rx), Y(tr.height(rx)), 30 * dpr, { now, lights: true, flip: busy && (sf.task!.toX ?? campX) < (sf.roverX ?? campX) });
+            // Where the rover can reach and still get back to camp on this charge.
+            const r0 = sf.roverX ?? campX;
+            const lo = Math.min(r0, campX);
+            const hi = Math.max(r0, campX);
+            const spare = (sf.roverBattery - (hi - lo)) / 2;
+            if (spare > 0) {
+              ctx.strokeStyle = 'rgba(108,196,255,0.4)';
+              ctx.setLineDash([4 * dpr, 4 * dpr]);
+              ctx.beginPath();
+              ctx.moveTo(X(lo - spare), base + 14 * dpr);
+              ctx.lineTo(X(hi + spare), base + 14 * dpr);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
             if (target !== null) {
               ctx.strokeStyle = '#6cc4ff';
               ctx.lineWidth = 2 * dpr;
@@ -234,7 +313,7 @@ export function SurfaceMap() {
               <button className="btn" disabled={busy} onClick={drive}>
                 🚙 Let it drive itself ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
               </button>
-              <button className="btn" disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
+              <button className="btn" style={{ whiteSpace: 'normal', height: 'auto' }} disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
                 🚀 Hop the ship there (≈{fmt(hopInfo?.est ?? 0, 0)} m/s flown well{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
               </button>
             </div>
@@ -250,8 +329,8 @@ export function SurfaceMap() {
             </button>
           )}
           {sf.roverX !== null && !busy && (
-            <button className="btn ghost" onClick={() => startTask('drive', Math.abs(roverX - campX) / 1000 / kmh, campX)}>
-              Bring the rover home
+            <button className="btn ghost" onClick={bringHome}>
+              Bring the rover home{sf.roverBattery < Math.abs(roverX - campX) ? ' (battery low: it waits for the sun on the way)' : ''}
             </button>
           )}
           {atFind && (
@@ -280,14 +359,27 @@ export function SurfaceMap() {
             <dd>{nearIce ? 'camp is at the ice' : sf.iceLoads}</dd>
           </dl>
           {!nearIce && (
-            <button className="btn" disabled={busy || sf.roverX !== null} onClick={() => startTask('haul', (2 * (s.camp?.iceKm ?? 0)) / kmh + 2)}>
+            <button
+              className="btn"
+              disabled={busy || sf.roverX !== null || longTrip || sf.roverBattery < haulCharge}
+              onClick={() => startTask('haul', (2 * (s.camp?.iceKm ?? 0)) / kmh + 2)}
+            >
               Haul a load of ice with the rover ({fmt((2 * (s.camp?.iceKm ?? 0)) / kmh + 2, 1)} h)
             </button>
           )}
-          <button className="btn primary" disabled={busy || sf.fuelMade >= iceCap || (!nearIce && sf.iceLoads < 1)} onClick={() => startTask('process', rules.isruDays * 24)}>
-            Process a load ({rules.isruDays} day{rules.isruDays > 1 ? 's' : ''})
+          {!nearIce && sf.roverX === null && !busy && sf.roverBattery < haulCharge && (
+            <div className="faint" style={{ fontSize: 12 }}>
+              Not enough charge for the round trip ({fmt(haulCharge / 1000, 1)} km). Let the rover charge at camp.
+            </div>
+          )}
+          <button className="btn primary" disabled={busy || iceCapped || (!nearIce && sf.iceLoads < 1)} onClick={() => startTask('process', rules.isruDays * 24)}>
+            Process a load ({rules.isruDays} day{rules.isruDays > 1 ? 's' : ''}{iceToHop ? ', into the hop tank' : ''})
           </button>
-          {sf.fuelMade >= iceCap && <div className="faint" style={{ fontSize: 12 }}>The usable ice here is used up.</div>}
+          {iceCapped && (
+            <div className="faint" style={{ fontSize: 12 }}>
+              The launch tanks hold all the ice fuel this mission allows{rules.hopRefill === 'ice' ? '; ice will go to the hop tank once it has room' : ''}.
+            </div>
+          )}
           <div className="faint" style={{ fontSize: 12 }}>Life support keeps running while you work — that is the real price of fuel.</div>
         </div>
       </div>

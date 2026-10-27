@@ -58,6 +58,8 @@ export function Rover() {
 
   const drive = () => {
     if (s.northTrip.dist > 0 || s.northTrip.arriveAt > clock.t) return toast('The rover is out north at the shadow stick. Bring it back first.');
+    if (target > 0 && (s.surface.roverX !== null || (s.surface.task && s.surface.task.done > clock.t && s.surface.task.kind !== 'process')))
+      return toast('The rover is out on the surface map. Bring it home first.');
     const dist = Math.abs(target * 1000 - s.rover.dist);
     s.set({ rover: { dist: s.rover.dist, target: target * 1000, departAt: clock.t, arriveAt: clock.t + (dist / speed) * DAY } });
     toast(`Rover underway: ${fmt(dist / speed, 1)} days`);
