@@ -21,7 +21,7 @@ export function Hud() {
   const { system: sys } = currentWorld();
   const [menu, setMenu] = useState(false);
   const end = lifeSupportEnd(s, sys);
-  const lifeFrac = Math.max(0, Math.min(1, (end - t) / sys.lifeSupport));
+  const lifeFrac = s.tutorial.active ? 1 : Math.max(0, Math.min(1, (end - t) / sys.lifeSupport));
   const daysLeft = Math.max(0, (end - t) / DAY);
   const fuel = sys.fuelDv - s.penaltyDv;
   const sol = localSolarHours(sys, t);
@@ -73,14 +73,27 @@ export function Hud() {
               <i style={{ width: `${lifeFrac * 100}%`, background: lifeFrac < 0.15 ? 'var(--red)' : lifeFrac < 0.35 ? 'var(--amber)' : 'var(--green)' }} />
             </div>
           </div>
-          <span className="mono" style={{ fontSize: 13 }}>{s.settings.freeRoam ? '∞' : `${fmt(daysLeft, 0)} d`}</span>
+          <span className="mono" style={{ fontSize: 13 }}>{s.settings.freeRoam || s.tutorial.active ? '∞' : `${fmt(daysLeft, 0)} d`}</span>
         </div>
         {s.settings.survival && (
           <button className="panel hud-block btn hide-phone" style={{ gap: 10 }} onClick={() => s.go('workshop')} title="Camp supplies">
-            <span className="mono" style={{ fontSize: 12 }}>O₂ {fmt(s.survival.o2, 0)}</span>
+            <span className="mono" style={{ fontSize: 12 }}>O₂ {fmt(Math.max(0, s.survival.o2), 0)}</span>
             <span className="mono" style={{ fontSize: 12 }}>🍲 {fmt(s.survival.food, 0)}</span>
             <span className={`mono ${s.survival.power < 15 ? 'red' : ''}`} style={{ fontSize: 12 }}>⚡{fmt(s.survival.power, 0)}%</span>
             {s.survival.leak && <span className="red">⚠</span>}
+          </button>
+        )}
+        {s.settings.survival && (
+          // Phones: a compact supplies button, red when something needs attention.
+          <button
+            className={`panel hud-block btn show-phone ${s.survival.leak || s.survival.power < 15 || s.survival.o2 < 30 ? 'red' : ''}`}
+            onClick={() => s.go('workshop')}
+            aria-label="Camp supplies"
+          >
+            <span className="mono" style={{ fontSize: 12 }}>
+              O₂ {fmt(Math.max(0, s.survival.o2), 0)}
+              {s.survival.leak || s.survival.power < 15 ? ' ⚠' : ''}
+            </span>
           </button>
         )}
         {!s.tutorial.active && <ReadinessBlock t={t} end={end} budget={fuel} />}

@@ -7,7 +7,7 @@ import { unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
-import { sineFit } from '../../game/fits';
+import { moonFit, trackedPhase } from '../../game/fits';
 import { fmt } from '../../game/format';
 import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
@@ -482,6 +482,8 @@ export function Observatory() {
             onLog={() => {
               // The reference star's hour angle: how far the sky has turned (with a small reading error).
               const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+              const lastObs = useGame.getState().starObs.at(-1);
+              if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v }] }));
               toast('Sky position logged');
               sfx('log');
@@ -496,6 +498,8 @@ export function Observatory() {
             onLog={() => {
               const c = pointing(clock.t);
               if (!c) return;
+              const lastObs = useGame.getState().starObs.at(-1);
+              if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v: eclLon(c) }] }));
               toast('Star position logged');
               sfx('log');
@@ -522,6 +526,10 @@ export function Observatory() {
               disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified)}
               onClick={() => {
                 const a = Math.abs(calip.current.x2 - calip.current.x1);
+                const { system: sysNow } = currentWorld();
+                const altNow = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site)).alt;
+                if (altNow < 0) return toast('The blue planet is below the horizon — wait for it to rise.');
+                if (a < 0.3 * ARCSEC) return toast('The wires are on top of each other. Set them on opposite edges of the disk.');
                 s.addReading({ key: 'alpha2', value: a, at: clock.t, note: `day ${fmt(clock.t / DAY, 1)}` });
                 const warn = outlierNote(a, s.readings.filter((r) => r.key === 'alpha2' && r.kept).map((r) => r.value), 0.15);
                 toast(warn ? `Logged ${fmt(a / ARCSEC, 2)}″ — but it is far from your other readings. Check the wires.` : `Diameter ${fmt(a / ARCSEC, 2)}″ logged`);
@@ -856,7 +864,9 @@ function MoonPanel() {
   const span = used.length ? used[used.length - 1].x - used[0].x : 0;
   // The swing looks bigger when the planet is closer, so a fit over months is meaningless.
   const tooLong = span > 50;
-  const fit = used.length >= 8 && !tooLong ? sineFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60) : null;
+  // The swing is seen across our line of sight, which turns as the planet moves in our
+  // sky; the fit takes that from the tracker's log, so it finds the moon's true period.
+  const fit = used.length >= 8 && !tooLong ? moonFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60, trackedPhase(s.track), true) : null;
   const mid = used.length ? (used[0].x + used[used.length - 1].x) / 2 : 0;
   // Two hypotheses (period aliasing): draw both, extended a few days ahead, so a new night can decide.
   const alt = fit?.alternative && !hasChallenge(s, 'handFit') ? fit.alternative : null;

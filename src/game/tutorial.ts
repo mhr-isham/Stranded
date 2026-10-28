@@ -28,7 +28,13 @@ export function startTutorial() {
 }
 
 export function exitTutorial() {
-  useGame.setState((s) => ({ tutorial: { ...s.tutorial, active: false } }));
+  // Flight School never runs out of air; leaving it late must not end the run at once.
+  // Keep at least 200 days to carry on with.
+  const { system: sys } = currentWorld();
+  useGame.setState((s) => ({
+    tutorial: { ...s.tutorial, active: false },
+    lifeExtra: Math.max(s.lifeExtra ?? 0, clock.t + 200 * DAY - sys.lifeSupport),
+  }));
 }
 
 /** Tell the tutorial the player just did something. Cheap no-op outside the tutorial. */
@@ -184,6 +190,7 @@ export function sendYearFromLogs() {
   let d = b.v - a.v;
   while (d < 0) d += 2 * Math.PI;
   const P1 = ((b.at - a.at) * 2 * Math.PI) / d;
+  if (!Number.isFinite(P1) || b.at - a.at < DAY) return;
   s.setSheet('P1', { value: P1, sigma: P1 * 0.002 });
 }
 
@@ -216,7 +223,7 @@ export function preflightCheck(): string[] {
     const rel = e ? Math.abs(e.value - tv) / scale : Infinity;
     const z = e ? Math.abs(e.value - tv) / Math.max(e.sigma, 1e-30) : Infinity;
     const limit = k === 'tOpp' ? 0.01 : k === 'P1' || k === 'S2' || k === 'Pm' ? 0.01 : 0.04;
-    if (!e || rel > limit || z > 4) {
+    if (!e || !Number.isFinite(e.value) || !(rel <= limit) || !(z <= 4)) {
       const goodRel = k === 'tOpp' ? 0.002 : 0.004;
       const value = k === 'tOpp' ? tv + rng.normal(0, 0.5 * DAY) : tv * (1 + rng.normal(0, goodRel / 2));
       sheet[k] = { value, sigma: k === 'tOpp' ? DAY : Math.abs(tv) * goodRel, at: e?.at ?? (k === 'tOpp' ? undefined : clock.t) };

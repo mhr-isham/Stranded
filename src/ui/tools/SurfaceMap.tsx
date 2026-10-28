@@ -15,7 +15,7 @@ import { FIND_TEXT, collectFind } from '../../game/finds';
 import {
   ICE_LOAD_DV,
   ROVER_KMH,
-  ROVER_RANGE,
+  roverRange,
   STRIP,
   SURFACE_RULES,
   TOW_KMH,
@@ -292,7 +292,7 @@ export function SurfaceMap() {
             <dd>{sf.roverX === null ? 'at camp' : `${fmt((sf.roverX - campX) / 1000, 1)} km from camp`}</dd>
             <dt>Rover charge</dt>
             <dd>
-              {fmt(sf.roverBattery / 1000, 0)} / {fmt(ROVER_RANGE / 1000, 0)} km
+              {fmt(sf.roverBattery / 1000, 0)} / {fmt(roverRange(s) / 1000, 0)} km
             </dd>
             {rules.hopTank > 0 && (
               <>

@@ -127,66 +127,138 @@ export function sineFit(t: number[], y: number[], pMin: number, pMax: number, ph
 }
 
 /**
- * The swing of a moon seen from a moving planet (chapter 7's giant). Two real
- * effects bend the plain sine: the line of sight turns as the giant moves in our
- * sky (the phase φ(t), from the giant's own tracked longitude), and the giant's
- * distance changes, so the swing grows and shrinks. Model:
- *   y = (A + A₁τ + A₂τ²) sin(2πt/P − φ) + (B + B₁τ + B₂τ²) cos(2πt/P − φ) + C,
- * with τ measured from the middle of the stretch. The amplitude reported is the
- * swing at the middle (√(A² + B²)), which is when the reading is dated.
+ * A planet's tracked longitude as a smooth function of time (days): the tracker's
+ * nightly log, unwrapped across 0/360° and interpolated. Used as the line-of-sight
+ * phase when fitting its moon's swing.
+ */
+export function trackedPhase(track: { at: number; v: number }[], dayS = 86400): ((d: number) => number) | undefined {
+  if (track.length < 2) return undefined;
+  const ts = track.map((o) => o.at / dayS);
+  const vs: number[] = [track[0].v];
+  for (let i = 1; i < track.length; i++) {
+    let d = track[i].v - track[i - 1].v;
+    if (d > Math.PI) d -= 2 * Math.PI;
+    if (d < -Math.PI) d += 2 * Math.PI;
+    vs.push(vs[i - 1] + d);
+  }
+  return (d: number) => {
+    let lo = 0;
+    let hi = ts.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (ts[m] < d) lo = m + 1;
+      else hi = m;
+    }
+    const i = Math.min(ts.length - 1, Math.max(1, lo));
+    const f = (d - ts[i - 1]) / Math.max(1e-9, ts[i] - ts[i - 1]);
+    return vs[i - 1] + (vs[i] - vs[i - 1]) * f;
+  };
+}
+
+/** Fit a moon's swing with the line-of-sight phase, trying both senses of orbit. */
+export function moonFit(t: number[], y: number[], pMin: number, pMax: number, phase: ((d: number) => number) | undefined, envelope = false) {
+  if (!phase) return sineFit(t, y, pMin, pMax);
+  const f = envelope ? moonSwingFit : sineFit;
+  const fits = [f(t, y, pMin, pMax, phase), f(t, y, pMin, pMax, (d) => -phase(d))].filter((q): q is SineFit => q !== null);
+  return fits.sort((a, b) => a.rms - b.rms)[0] ?? null;
+}
+
+/**
+ * The swing of a moon seen from a moving planet. Two real effects bend the plain
+ * sine: the line of sight turns as the planet moves in our sky (the phase φ(t), from
+ * its tracked longitude), and the planet's distance changes, so the swing grows and
+ * shrinks. Model, with τ measured from the middle of the stretch:
+ *   y = (1 + e₁τ + e₂τ²) · (A sin(2πt/P − φ) + B cos(2πt/P − φ)) + C.
+ * One envelope shared by sin and cos (it can't fake a drifting phase, so the period
+ * stays honest). The amplitude reported is the swing at the middle, √(A² + B²),
+ * which is when the reading is dated.
  */
 export function moonSwingFit(t: number[], y: number[], pMin: number, pMax: number, phase: (t: number) => number): SineFit | null {
   const n = t.length;
   if (n < 12) return null;
+  const base = sineFit(t, y, pMin, pMax, phase);
+  if (!base) return null;
   const mid = 0.5 * (t[0] + t[n - 1]);
   const half = Math.max(1e-9, 0.5 * (t[n - 1] - t[0]));
   const ph0 = phase(mid);
   const phs = t.map((tt) => phase(tt) - ph0);
-  const basis = (w: number, tt: number, ph: number) => {
-    const a = w * (tt - mid) - ph;
-    const sn = Math.sin(a);
-    const cs = Math.cos(a);
-    const u = (tt - mid) / half;
-    return [sn, cs, sn * u, cs * u, sn * u * u, cs * u * u, 1];
-  };
-  const solve = (P: number) => {
+  const us = t.map((tt) => (tt - mid) / half);
+  // For one period: alternate the linear solves for (A, B, C) and for the envelope (e₁, e₂).
+  const solveAt = (P: number) => {
     const w = (2 * Math.PI) / P;
-    const k = 7;
-    const M = Array.from({ length: k }, () => new Array(k).fill(0));
-    const v = new Array(k).fill(0);
-    const rows = t.map((tt, i) => basis(w, tt, phs[i]));
-    for (let i = 0; i < n; i++) {
-      const f = rows[i];
-      for (let a = 0; a < k; a++) {
-        v[a] += f[a] * y[i];
-        for (let b = 0; b < k; b++) M[a][b] += f[a] * f[b];
+    const sn = t.map((tt, i) => Math.sin(w * (tt - mid) - phs[i]));
+    const cs = t.map((tt, i) => Math.cos(w * (tt - mid) - phs[i]));
+    let e1 = 0;
+    let e2 = 0;
+    let abc = [0, 0, 0];
+    for (let it = 0; it < 8; it++) {
+      const env = us.map((u) => 1 + e1 * u + e2 * u * u);
+      const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      const v = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        const f = [env[i] * sn[i], env[i] * cs[i], 1];
+        for (let a = 0; a < 3; a++) {
+          v[a] += f[a] * y[i];
+          for (let b = 0; b < 3; b++) M[a][b] += f[a] * f[b];
+        }
       }
+      const sol = solveN(M, v);
+      if (!sol) return { rss: Infinity, abc, e1, e2 };
+      abc = sol;
+      // y − C − g = g·(e₁u + e₂u²), with g = A sin + B cos.
+      const M2 = [[0, 0], [0, 0]];
+      const v2 = [0, 0];
+      for (let i = 0; i < n; i++) {
+        const g = abc[0] * sn[i] + abc[1] * cs[i];
+        const f = [g * us[i], g * us[i] * us[i]];
+        const r = y[i] - abc[2] - g;
+        for (let a = 0; a < 2; a++) {
+          v2[a] += f[a] * r;
+          for (let b = 0; b < 2; b++) M2[a][b] += f[a] * f[b];
+        }
+      }
+      const e = solveN(M2, v2);
+      if (!e) break;
+      [e1, e2] = [Math.max(-0.8, Math.min(0.8, e[0])), Math.max(-0.8, Math.min(0.8, e[1]))];
     }
-    const sol = solveN(M, v);
-    if (!sol) return { rss: Infinity, sol: new Array(k).fill(0) };
     let rss = 0;
-    for (let i = 0; i < n; i++) rss += (y[i] - rows[i].reduce((acc, f, j) => acc + f * sol[j], 0)) ** 2;
-    return { rss, sol };
+    for (let i = 0; i < n; i++) {
+      const g = abc[0] * sn[i] + abc[1] * cs[i];
+      rss += (y[i] - abc[2] - g * (1 + e1 * us[i] + e2 * us[i] * us[i])) ** 2;
+    }
+    return { rss, abc, e1, e2 };
   };
-  // Step 1, the period: the line-of-sight fit gets it right (letting the swing size
-  // vary too would let the fit trade period for envelope). Step 2, the swing size at
-  // that period, with the envelope.
-  const base = sineFit(t, y, pMin, pMax, phase);
-  if (!base) return null;
-  const P = base.period;
-  const { rss, sol } = solve(P);
-  const A = Math.hypot(sol[0], sol[1]);
-  const rms = Math.sqrt(rss / Math.max(1, n - 8));
+  // Refine the period near the line-of-sight fit's value.
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let a = base.period * 0.9;
+  let b = base.period * 1.1;
+  for (let i = 0; i < 50; i++) {
+    const c = b - gr * (b - a);
+    const d = a + gr * (b - a);
+    if (solveAt(c).rss < solveAt(d).rss) b = d;
+    else a = c;
+  }
+  const P = 0.5 * (a + b);
+  const fit = solveAt(P);
+  const A = Math.hypot(fit.abc[0], fit.abc[1]);
+  const rms = Math.sqrt(fit.rss / Math.max(1, n - 6));
+  const sigmaF = (Math.sqrt(6) * rms) / (Math.PI * Math.max(A, 1e-30) * 2 * half * Math.sqrt(n));
   const w = (2 * Math.PI) / P;
   return {
     amplitude: A,
     period: P,
-    // The envelope terms widen the amplitude's error bar (about 1.5x a plain fit), and a
-    // smooth envelope only approximates the changing distance: no better than ~0.6%.
+    // The envelope widens the amplitude's error bar, and a smooth envelope only
+    // approximates the changing distance: no better than ~0.6%.
     sigmaAmplitude: Math.max(1.5 * rms * Math.sqrt(2 / n), 0.006 * A),
-    sigmaPeriod: base.sigmaPeriod,
+    // The period's error bar includes the envelope's pull on it (no better than ~0.3%).
+    sigmaPeriod: Math.max(P * P * sigmaF, 0.003 * P),
     rms,
-    model: (tt) => basis(w, tt, phase(tt) - ph0).reduce((acc, f, j) => acc + f * sol[j], 0),
+    model: (tt) => {
+      const u = (tt - mid) / half;
+      const arg = w * (tt - mid) - (phase(tt) - ph0);
+      return (1 + fit.e1 * u + fit.e2 * u * u) * (fit.abc[0] * Math.sin(arg) + fit.abc[1] * Math.cos(arg)) + fit.abc[2];
+    },
+    alternative: base.alternative,
   };
 }
 

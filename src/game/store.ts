@@ -128,6 +128,10 @@ export interface GameState {
   rover: { dist: number; target: number; departAt: number; arriveAt: number };
   missionsDone: string[];
   hintsUsed: number;
+  /** How many hint levels each sheet quantity has opened (kept, so a hint is paid once). */
+  hintsSeen: Partial<Record<string, number>>;
+  /** Extra life support (s), e.g. when leaving Flight School late with the air already spent. */
+  lifeExtra: number;
   checksUsed: number;
   penaltyDv: number; // fuel spent on "is it right?" checks
   codex: string[];
@@ -245,6 +249,8 @@ const initial = {
   rover: { dist: 0, target: 0, departAt: 0, arriveAt: 0 },
   missionsDone: [],
   hintsUsed: 0,
+  hintsSeen: {},
+  lifeExtra: 0,
   checksUsed: 0,
   penaltyDv: 0,
   codex: [],
@@ -320,6 +326,8 @@ export const useGame = create<GameState>()(
       setSheet: (k, e) =>
         set((s) => {
           const sheet = { ...s.sheet };
+          // Never store a value that isn't a number (e.g. a fit over logs taken at one instant).
+          if (e && !(Number.isFinite(e.value) && Number.isFinite(e.sigma))) return {};
           if (e) sheet[k] = e;
           else delete sheet[k];
           return { sheet };

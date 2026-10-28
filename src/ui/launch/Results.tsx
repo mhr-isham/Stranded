@@ -201,8 +201,16 @@ function Debrief() {
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
     const text = `STRANDED · system #${s.seed} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · grade ${grade.letter} · ${grade.total} pts\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
-    void navigator.clipboard?.writeText(text).then(() => setCopied(true));
-    toast('Result copied — share it!');
+    // Say "copied" only if it was; otherwise offer the text to copy by hand.
+    const fallback = () => window.prompt('Copy your result:', text);
+    if (!navigator.clipboard) return void fallback();
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        toast('Result copied — share it!');
+      },
+      fallback,
+    );
   };
 
   return (

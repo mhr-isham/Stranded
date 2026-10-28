@@ -117,7 +117,7 @@ export function Launch() {
   }, [plan, model, s.sheet, sys, budget]);
 
   if (!model || !hoh) {
-    const missing = keysFor(variant).filter((k) => !s.sheet[k]);
+    const missing = keysFor(variant).filter((k) => !s.sheet[k] || !Number.isFinite(s.sheet[k]!.value));
     return (
       <div className="tool">
         <div className="tool-stage" />

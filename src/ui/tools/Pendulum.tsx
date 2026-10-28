@@ -79,6 +79,8 @@ export function Pendulum() {
     return () => clearInterval(id);
   }, [running]);
 
+  const lastFrame = useRef<number | null>(null);
+
   const toggleWatch = () => {
     // Worn stopwatch challenge: the button registers up to 0.2 s late.
     const lag = hasChallenge(useGame.getState(), 'stopwatch') ? Math.random() * 200 : 0;
@@ -170,7 +172,11 @@ export function Pendulum() {
               flag('pend-released');
             }
           }}
-          draw={({ ctx, w, h, dpr, now, dt }) => {
+          draw={({ ctx, w, h, dpr, now, dt: frameDt }) => {
+            // The swing keeps real time, like the stopwatch: a slow frame must not slow it
+            // down (the canvas caps each frame at 0.1 s, which made g come out low).
+            const dt = lastFrame.current === null ? frameDt : Math.min(2, Math.max(0, (now - lastFrame.current) / 1000));
+            lastFrame.current = now;
             paintSky(ctx, { az: 143 * DEG, alt: 25 * DEG, fov: 80 * DEG, w, h }, sys, catalog, land, clock.t, now, dpr);
             ctx.fillStyle = 'rgba(4,6,12,0.35)';
             ctx.fillRect(0, 0, w, h);

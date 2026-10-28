@@ -13,7 +13,7 @@ import { FIND_TEXT, collectFind } from '../../game/finds';
 import { fmt } from '../../game/format';
 import { currentWorld, fastForward } from '../../game/sim';
 import { useGame } from '../../game/store';
-import { ROVER_KMH, ROVER_RANGE, SCAN_RANGE, STRIP, findsFor, terrainFor } from '../../game/surface';
+import { ROVER_KMH, SCAN_RANGE, roverRange, STRIP, findsFor, terrainFor } from '../../game/surface';
 import { skyColors } from '../../render/color';
 import { drawRover } from '../../render/rover';
 import { drawStarship } from '../../render/ship';
@@ -316,7 +316,7 @@ export function RoverDrive() {
           <dd className={Math.abs(hud.slope) > 12 * DEG ? 'amber' : ''}>{fmt(hud.slope / DEG, 0)}°</dd>
           <dt>Battery</dt>
           <dd className={hud.battery < Math.abs(hud.x - campX) * 1.2 ? 'red' : ''}>
-            {fmt(hud.battery / 1000, 1)} / {fmt(ROVER_RANGE / 1000, 0)} km
+            {fmt(hud.battery / 1000, 1)} / {fmt(roverRange(s) / 1000, 0)} km
           </dd>
           <dt>From camp</dt>
           <dd>{fmt((hud.x - campX) / 1000, 2)} km</dd>

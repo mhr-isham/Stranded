@@ -21,7 +21,7 @@ export const UPGRADES: Upgrade[] = [
   { id: 'panels', name: 'Extra solar panels', cost: 2, text: '+40% power from the star.' },
   { id: 'recycler', name: 'O₂ recycler', cost: 3, text: 'Uses 20% less oxygen per day.' },
   { id: 'greenhouse', name: 'Hydroponic greenhouse', cost: 3, text: 'After 30 days it grows 0.35 days of food per day (needs power).' },
-  { id: 'rover', name: 'Rover battery pack', cost: 3, text: 'Rover drives 700 km/day instead of 400.' },
+  { id: 'rover', name: 'Rover battery pack', cost: 3, text: 'Rover drives 700 km/day instead of 400 on long trips, with half again the range on the surface map.' },
 ];
 
 const rand = (seed: number, day: number, salt: number) => hash32(seed, day, salt) / 4294967296;
@@ -51,7 +51,7 @@ export function lifeSupportEnd(s: GameState, sys: StarSystem) {
   if (s.settings.freeRoam) return clock.t + 3 * sys.synodic;
   // Short supplies challenge: a quarter less of the slack after the second opposition.
   const short = s.settings.challenges?.includes('shortAir') ? 0.25 * Math.max(0, sys.lifeSupport - (sys.firstOpposition + sys.synodic)) : 0;
-  if (!s.settings.survival) return sys.lifeSupport - short;
+  if (!s.settings.survival) return sys.lifeSupport - short + (s.lifeExtra ?? 0);
   const sv = s.survival;
   const days = Math.min(sv.o2 / o2Rate(sv), sv.food / foodRate());
   return clock.t + Math.max(0, days) * DAY;

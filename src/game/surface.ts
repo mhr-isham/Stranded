@@ -13,6 +13,10 @@ export const STRIP = 40e3; // the map runs from −40 km to +40 km
 export const ROVER_KMH = 15;
 export const TOW_KMH = 2;
 export const ROVER_RANGE = 120e3; // m per charge
+
+/** Range on a full charge: the survival-mode battery pack adds half again. */
+export const roverRange = (s: Pick<GameState, 'settings' | 'survival'>) =>
+  ROVER_RANGE * (s.settings.survival && s.survival.upgrades.includes('rover') ? 1.5 : 1);
 export const ICE_LOAD_DV = 100; // m/s of launch fuel per processed load
 
 export type FindKind = 'parts' | 'meteorite' | 'clue';
@@ -93,8 +97,8 @@ export function advanceSurface(s: GameState, sys: StarSystem, t0: number, t1: nu
   const patch: Partial<GameState> = {};
   if (sf.hopTank < 0) sf = { ...sf, hopTank: rules.hopTank };
   // Rover charging at camp.
-  if (sf.roverX === null && sf.roverBattery < ROVER_RANGE && !sf.task) {
-    sf = { ...sf, roverBattery: Math.min(ROVER_RANGE, sf.roverBattery + ((t1 - t0) / HOUR) * 10e3) };
+  if (sf.roverX === null && sf.roverBattery < roverRange(s) && !sf.task) {
+    sf = { ...sf, roverBattery: Math.min(roverRange(s), sf.roverBattery + ((t1 - t0) / HOUR) * 10e3) };
   }
   // Hop tank refill.
   const d0 = Math.floor(t0 / DAY);

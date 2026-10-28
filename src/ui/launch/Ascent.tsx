@@ -15,6 +15,8 @@ import { drawStarship } from '../../render/ship';
 import { CanvasView } from '../common/CanvasView';
 
 const SPEED = 20; // simulated seconds per real second
+/** Pitch change while a control is held (rad per simulated second): ~23° per real second. */
+const PITCH_RATE = 0.4 / SPEED;
 
 export function Ascent() {
   const s = useGame();
@@ -40,8 +42,9 @@ export function Ascent() {
   useEffect(() => {
     const set = (e: KeyboardEvent, v: boolean) => {
       const k = e.key.toLowerCase();
-      if (k === 'arrowleft' || k === 'a') input.current.down = v;
-      else if (k === 'arrowright' || k === 'd') input.current.up = v;
+      // The ship climbs out heading east (to the right): → / D tips the nose over that way.
+      if (k === 'arrowleft' || k === 'a') input.current.up = v;
+      else if (k === 'arrowright' || k === 'd') input.current.down = v;
       else if (k === 'arrowup' || k === 'w' || k === ' ') input.current.thrust = v;
       else return;
       e.preventDefault();
@@ -86,7 +89,7 @@ export function Ascent() {
     for (let i = 0; i < n; i++) {
       const u = autoRef.current
         ? autopilot(params, x)
-        : { pitchRate: (input.current.up ? 0.35 : 0) - (input.current.down ? 0.35 : 0), throttle: input.current.thrust ? 1 : 0 };
+        : { pitchRate: (input.current.up ? PITCH_RATE : 0) - (input.current.down ? PITCH_RATE : 0), throttle: input.current.thrust ? 1 : 0 };
       x = stepAscent(params, x, u, (dt * SPEED) / n);
       if (inOrbit(params, x)) break;
     }
@@ -203,8 +206,8 @@ export function Ascent() {
       {!done && (
         <div className="prologue-controls">
           <div className="row" style={{ gap: 10 }}>
-            <HoldBtn label="⤴" aria="Pitch up" on={(v) => (input.current.down = v)} />
-            <HoldBtn label="⤵" aria="Pitch over" on={(v) => (input.current.up = v)} />
+            <HoldBtn label="⤴" aria="Pitch up" on={(v) => (input.current.up = v)} />
+            <HoldBtn label="⤵" aria="Pitch over" on={(v) => (input.current.down = v)} />
           </div>
           <div className="row" style={{ gap: 10 }}>
             {!auto && (

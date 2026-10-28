@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { fitOrbit, type OrbitFit } from '../../engine/orbitfit';
-import { moonSwingFit, sineFit } from '../../game/fits';
+import { moonFit, trackedPhase } from '../../game/fits';
 import { fmt } from '../../game/format';
 import { checkMissions, giantObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
@@ -39,42 +39,10 @@ export function GiantPanel() {
   const used = mpts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
   const span = used.length ? used[used.length - 1].x - used[0].x : 0;
   // The line of sight turns as the giant moves in our sky: the fit uses the giant's own
-  // tracked longitude (interpolated, unwrapped) so it finds the moon's true period.
-  const lonAt = (d: number) => {
-    const tg = s.trackG;
-    if (tg.length < 2) return 0;
-    // First log at or after d (binary search; the log is in time order).
-    let lo = 0;
-    let hi = tg.length;
-    while (lo < hi) {
-      const m = (lo + hi) >> 1;
-      if (tg[m].at / DAY < d) lo = m + 1;
-      else hi = m;
-    }
-    const i = Math.min(tg.length - 1, Math.max(1, lo));
-    const a = tg[i - 1];
-    const b = tg[i];
-    let dl = b.v - a.v;
-    if (dl > Math.PI) dl -= 2 * Math.PI;
-    if (dl < -Math.PI) dl += 2 * Math.PI;
-    const f = (d - a.at / DAY) / Math.max(1e-9, (b.at - a.at) / DAY);
-    return a.v + dl * f;
-  };
-  const unwrapFrom = (d0: number) => (d: number) => {
-    let x = lonAt(d) - lonAt(d0);
-    while (x > Math.PI) x -= 2 * Math.PI;
-    while (x < -Math.PI) x += 2 * Math.PI;
-    return x;
-  };
+  // tracked longitude so it finds the moon's true period.
   const mfit = useMemo(() => {
     if (used.length < 12 || span >= 120) return null;
-    const xs = used.map((p) => p.x);
-    const ys = used.map((p) => p.y);
-    if (s.trackG.length < 2) return sineFit(xs, ys, 2, 200);
-    const ph = unwrapFrom(xs[0]);
-    // The moon may orbit either way round: keep the better fit.
-    const fits = [moonSwingFit(xs, ys, 2, 200, ph), moonSwingFit(xs, ys, 2, 200, (d) => -ph(d))].filter((f) => f !== null);
-    return fits.sort((a, b) => a!.rms - b!.rms)[0] ?? null;
+    return moonFit(used.map((p) => p.x), used.map((p) => p.y), 2, 200, trackedPhase(s.trackG), true);
     // Refit only when the data or the chosen stretch changes.
   }, [band, s.moonTrackG.length, s.trackG.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const mid = used.length ? 0.5 * (used[0].x + used[used.length - 1].x) : 0;

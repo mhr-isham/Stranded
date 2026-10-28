@@ -154,7 +154,7 @@ export function Sheet() {
             </button>
           </div>
         ) : (
-          <NodePanel k={sel} derivedEst={derived} />
+          <NodePanel key={sel} k={sel} derivedEst={derived} />
         )}
         <Checks />
         <button className="btn small ghost show-phone-block" onClick={() => setNaming(true)}>
@@ -175,7 +175,8 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   const HINTS_K = hintsFor(k, variant);
   const isPrimary = (PRIMARY_KEYS as readonly string[]).includes(k);
   const e = isPrimary ? s.sheet[k as PrimaryKey] : derivedEst[k as keyof typeof derivedEst];
-  const [hintLevel, setHintLevel] = useState(0);
+  const hintLevel = s.hintsSeen?.[k] ?? 0;
+  const setHintLevel = (n: number) => s.set({ hintsSeen: { ...(s.hintsSeen ?? {}), [k]: n } });
   const [verdict, setVerdict] = useState<string | null>(null);
   const mode = useMode();
   const maxHints = Math.min(HINTS_K.length, mode.hints);
