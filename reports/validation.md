@@ -1,6 +1,6 @@
 # Stranded: validation report
 
-Generated 2026-10-27T08:58:05.877Z with 40 systems per difficulty.
+Generated 2026-10-28T04:38:08.057Z with 40 systems per difficulty.
 
 ## 1. Known-value recovery (noise-free solver)
 
