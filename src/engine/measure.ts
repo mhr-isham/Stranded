@@ -2,7 +2,7 @@
 // error comes from how they aim, read and time. These functions give the exact
 // quantity the instrument is pointed at.
 
-import { G } from './constants';
+import { DEG, G } from './constants';
 import { eclLon, topocentric } from './sky';
 import type { Site, StarSystem } from './types';
 import { angleBetween, norm } from './vec';
@@ -82,3 +82,11 @@ export const siteEastOf = (sys: StarSystem, site: Site, dist: number): Site => (
   lat: site.lat,
   lon: site.lon + dist / (sys.home.radius * Math.cos(site.lat)),
 });
+
+/**
+ * Sky limits for observing the blue planet. An inner planet is bright and never
+ * far from the star, so (as with Venus) it is observed in twilight and lower down.
+ */
+export function targetSkyLimits(sys: StarSystem) {
+  return sys.target.a < sys.home.a ? { sun: -6 * DEG, track: 8 * DEG, par: 10 * DEG } : { sun: -12 * DEG, track: 12 * DEG, par: 15 * DEG };
+}

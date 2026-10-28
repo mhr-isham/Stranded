@@ -9,7 +9,7 @@ import { useGame, type Settings } from '../game/store';
 import { dailySeed, randomSeed } from '../game/world';
 import { startTutorial } from '../game/tutorial';
 import { CanvasView } from './common/CanvasView';
-import { Modal, Toggle } from './common/widgets';
+import { Modal, Toggle, startRun } from './common/widgets';
 import { AtlasGrid, CalibrationPanel } from './Atlas';
 import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId, challengeRedundant } from '../game/challenges';
 import { CHAPTERS, chapterOf, chapterUnlocked } from '../game/campaign';
@@ -42,7 +42,7 @@ export function Title() {
   const inTutorial = s.tutorial.active;
 
   const start = (seed: number) => {
-    if (okToReplace()) useGame.getState().newGame(seed, settings);
+    if (okToReplace()) startRun(seed, settings);
   };
 
   return (
@@ -337,7 +337,7 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
           )}
           <ModeSettings settings={settings} setSettings={setSettings} />
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-            <button className="btn primary big" onClick={() => okToReplace() && useGame.getState().newGame(randomSeed(), settings, ch.n)}>
+            <button className="btn primary big" onClick={() => okToReplace() && startRun(randomSeed(), settings, ch.n)}>
               Start chapter {ch.n}
             </button>
           </div>
@@ -373,7 +373,7 @@ function FreeRoamModal({ onClose }: { onClose: () => void }) {
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
         <button
           className="btn primary big"
-          onClick={() => okToReplace() && useGame.getState().newGame(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
+          onClick={() => okToReplace() && startRun(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
         >
           Start exploring
         </button>

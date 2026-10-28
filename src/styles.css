@@ -398,3 +398,6 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .drive .drive-find { top: calc(120px + var(--safe-top, 0px)); width: calc(100% - 32px); }
   .drive .drive-warp .faint { display: none; }
 }
+
+/* Shown while a new star system is generated. */
+.charting { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(2, 4, 10, 0.82); color: var(--amber); font-weight: 600; letter-spacing: 0.04em; animation: fade 0.2s; }

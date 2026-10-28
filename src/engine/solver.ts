@@ -5,7 +5,7 @@
 
 import { ARCSEC, DAY, DEG, HOUR } from './constants';
 import type { Estimate, Primaries } from './chain';
-import { leadAngle, oppositions, oppositionsOf, orbitAngle } from './ephemeris';
+import { leadAngle, oppositions, oppositionsOf, orbitAngle, solarDay } from './ephemeris';
 import { fitParallax, nearStarsOf, parallaxOffset } from './nearstars';
 import { fitOrbit, type OrbitObs } from './orbitfit';
 
@@ -26,10 +26,11 @@ import {
   targetLongitude,
   surfaceGravity,
   targetAngularDiameter,
+  targetSkyLimits,
 } from './measure';
 import { bestTransfer, modelFromPrimaries, predictedWindows, type PlayerModel } from './planner';
 import { makeRng, type Rng } from './rng';
-import { localFrame, observerPos, toHorizontal, topocentric } from './sky';
+import { eclLon, localFrame, observerPos, toHorizontal, topocentric } from './sky';
 import { generateSystem } from './system';
 import { variantOf } from './chapters';
 import { nominalFlyby } from './probe';
@@ -314,11 +315,63 @@ export function botPlay(sys: StarSystem, skill: BotSkill, seed = 1): BotRun {
  * Generate a system the bot can solve with a competent skill level. Seeds the
  * bot cannot solve are skipped (deterministically), and the count is reported.
  */
+/**
+ * Can a player actually watch the blue planet? An inner planet can stay low in
+ * twilight for a whole mission; such a system can't be measured with the tools.
+ * Needs enough nights for the tracker and a few for the rover parallax.
+ */
+export function targetWatchable(sys: StarSystem) {
+  if (sys.target.a >= sys.home.a) return true;
+  const lim = targetSkyLimits(sys);
+  const sd = Number.isFinite(solarDay(sys)) ? solarDay(sys) : DAY;
+  const track = new Set<number>();
+  const par = new Set<number>();
+  for (let t = sd / 8; t < sys.lifeSupport; t += sd / 8) {
+    const f = localFrame(sys, t, sys.site);
+    if (toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt >= lim.sun) continue;
+    const alt = toHorizontal(topocentric(sys, 'target', t, sys.site), f).alt;
+    const night = Math.floor(t / sd);
+    if (alt > lim.track) track.add(night);
+    if (alt > lim.par) par.add(night);
+  }
+  return track.size >= 40 && par.size >= 10;
+}
+
+/**
+ * Inner-planet chapters time transits with the solar camera (hourly, star above
+ * 3°, as in game/sim.ts). A transit in local night can't be seen, so require two
+ * catchable ones (3+ logs each) before the last launch window.
+ */
+export function transitsCatchable(sys: StarSystem) {
+  if (!sys.features.inner || !sys.windows.length) return true;
+  const lastWin = Math.max(...sys.windows) - 5 * DAY;
+  let good = 0;
+  for (let j = 0; ; j++) {
+    const conj = sys.firstOpposition + j * sys.synodic;
+    if (conj > lastWin) break;
+    let logs = 0;
+    for (let t = Math.floor((conj - 2 * DAY) / HOUR) * HOUR; t < conj + 2 * DAY; t += HOUR) {
+      const sv = topocentric(sys, 'star', t, sys.site);
+      const tv = topocentric(sys, 'target', t, sys.site);
+      if (norm(tv) > norm(sv)) continue;
+      if (toHorizontal(sv, localFrame(sys, t, sys.site)).alt < 3 * DEG) continue;
+      let off = eclLon(tv) - eclLon(sv);
+      if (off > Math.PI) off -= 2 * Math.PI;
+      if (off < -Math.PI) off += 2 * Math.PI;
+      if (Math.abs(off) <= Math.asin(sys.star.radius / norm(sv))) logs++;
+    }
+    if (logs >= 3) good++;
+  }
+  return good >= 2;
+}
+
 export function generateSolvableSystem(seed: number, difficulty: Difficulty = 'navigator', chapter = 1) {
-  for (let k = 0; k < 50; k++) {
+  for (let k = 0; k < 200; k++) {
     const s = (seed + k * 7919) >>> 0;
     const sys = generateSystem(s, difficulty, chapter);
-    let ok = true;
+    // Chapter 8 needs all three named near stars on the map.
+    const starsOk = variantOf(sys.features) !== 'stars' || nearStarsOf(sys).length >= 3;
+    let ok = starsOk && transitsCatchable(sys) && targetWatchable(sys);
     for (let trial = 0; trial < 3 && ok; trial++) {
       const run = botPlay(sys, COMPETENT, s * 31 + trial);
       ok = run.result?.outcome === 'success';

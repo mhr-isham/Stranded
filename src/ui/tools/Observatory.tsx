@@ -714,7 +714,7 @@ function TrackerPanel() {
             {s.trackOn ? 'Auto-log: ON (nightly)' : 'Turn on nightly auto-log'}
           </button>
           <div className="muted" style={{ fontSize: 13 }}>
-            {obs.ok ? 'Tracking now: target visible.' : obs.flare ? 'A flare is washing out the sky — the tracker waits it out.' : obs.cloudy ? 'Clouded out tonight.' : obs.sunAlt > -12 * DEG ? 'Waiting for a dark sky.' : 'Target below 12° altitude.'} Warp time to
+            {obs.ok ? 'Tracking now: target visible.' : obs.flare ? 'A flare is washing out the sky — the tracker waits it out.' : obs.cloudy ? 'Clouded out tonight.' : obs.sunAlt > obs.lim.sun ? (obs.lim.sun > -10 * DEG ? 'Waiting for twilight.' : 'Waiting for a dark sky.') : `Target below ${Math.round(obs.lim.track / DEG)}° altitude.`} Warp time to
             collect weeks of data.
           </div>
         </>

@@ -11,7 +11,7 @@ import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
 import { evaluateAchievements, ACHIEVEMENTS } from '../../game/achievements';
-import { toast } from '../common/widgets';
+import { startRun, toast } from '../common/widgets';
 import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
 import { countText, modeOf } from '../../game/modes';
 import { predictionPoints } from '../../game/predictions';
@@ -276,11 +276,11 @@ function Debrief() {
             <button className="btn primary" onClick={share}>
               {copied ? 'Copied!' : 'Share result'}
             </button>
-            <button className="btn" onClick={() => useGame.getState().newGame(s.seed, s.settings, s.chapter)}>
+            <button className="btn" onClick={() => startRun(s.seed, s.settings, s.chapter)}>
               Retry this system
             </button>
             {kind === 'success' && !s.tutorial.active && !s.settings.freeRoam && CHAPTERS.some((c) => c.n === s.chapter + 1) && chapterUnlocked(s, s.chapter + 1) && (
-              <button className="btn primary" onClick={() => useGame.getState().newGame(randomSeed(), s.settings, s.chapter + 1)}>
+              <button className="btn primary" onClick={() => startRun(randomSeed(), s.settings, s.chapter + 1)}>
                 Chapter {s.chapter + 1}: {chapterOf(s.chapter + 1).title} →
               </button>
             )}

@@ -20,6 +20,9 @@ import { Formula, SanityWarning, SendToSheet, ToolHeader } from '../common/sheet
 import { toast, useGameTime } from '../common/widgets';
 
 const MAX_PROBES = 2;
+
+/** Signed log scale for the chart: hours near the peak stay wide, days far out still fit. */
+const slog = (h: number) => Math.sign(h) * Math.log10(1 + Math.abs(h));
 const NOISE = 0.0015; // relative scatter of one Doppler speed sample
 
 function gauss(seed: number, i: number) {
@@ -37,28 +40,44 @@ export function ProbeBay() {
   const [aimR, setAimR] = useState(2.5); // in units of your R₂
   const [band, setBand] = useState<[number, number] | null>(null);
   const p = s.probe;
-  const launched = s.probesLaunched;
+  // A probe lost on the planet doesn't use up a slot (it still costs its fuel).
+  const crashedCount = (s.probeLog ?? []).filter((q) => q.crashed && q.arriveAt <= t).length;
+  const launched = s.probesLaunched - crashedCount;
   const arrived = p && t >= p.arriveAt;
 
   const launch = () => {
     if (!R2) return toast('Measure the blue planet’s radius R₂ first — the aim is in planet radii.');
     const aim = aimR * R2.value;
-    useGame.setState({ ...launchProbe(sys, s, aim, clock.t), probesLaunched: launched + 1 });
+    useGame.setState({ ...launchProbe(sys, s, aim, clock.t), probesLaunched: s.probesLaunched + 1 });
     sfx('launch');
     toast(`Probe away — ${fmt(probeTransitDays(sys), 0)} days to the blue planet.`);
   };
 
-  // Doppler samples every 20 minutes for ±36 h, and every 2 minutes within 3 h of closest approach.
-  const times = [...Array.from({ length: 100 }, (_, i) => -36 + i / 3), ...Array.from({ length: 181 }, (_, i) => -3 + i / 30), ...Array.from({ length: 100 }, (_, i) => 3 + (i + 1) / 3)];
+  // Doppler samples every 12 h from 30 days out, every 20 minutes within 36 h, and every
+  // 2 minutes within 3 h of closest approach. Far out the speed is nearly v∞ (still a
+  // little high: the planet's pull reaches a long way).
+  const far = Array.from({ length: 57 }, (_, i) => 720 - 12 * i); // 720 … 48 h
+  const times = [
+    ...far.map((h) => -h),
+    ...Array.from({ length: 100 }, (_, i) => -36 + i / 3),
+    ...Array.from({ length: 181 }, (_, i) => -3 + i / 30),
+    ...Array.from({ length: 100 }, (_, i) => 3 + (i + 1) / 3),
+    ...far.slice().reverse(),
+  ];
   const samples = p && arrived && !p.crashed
     ? times.map((hrs, i) => {
         const v = flybySpeedAt(sys, { vInf: p.vInf, rPeri: p.rPeri, vPeak: p.vPeak, deflection: 0, crashed: false }, hrs * HOUR);
-        return { x: hrs, y: (v * (1 + NOISE * gauss(Math.round(p.launchedAt), i))) / 1000 };
+        return { x: slog(hrs), y: (v * (1 + NOISE * gauss(Math.round(p.launchedAt), i))) / 1000 };
       })
     : [];
   const sel = band ? samples.filter((q) => q.x >= band[0] && q.x <= band[1]) : [];
   const mean = sel.length ? sel.reduce((a, q) => a + q.y, 0) / sel.length : null;
-  const se = sel.length > 1 && mean !== null ? Math.sqrt(sel.reduce((a, q) => a + (q.y - mean) ** 2, 0) / (sel.length - 1) / sel.length) : undefined;
+  // Uncertainty: the scatter of the mean, but no less than the slope still left in the
+  // stretch (an honest bound on how far its average sits above the true v∞).
+  const se =
+    sel.length > 1 && mean !== null
+      ? Math.max(Math.sqrt(sel.reduce((a, q) => a + (q.y - mean) ** 2, 0) / (sel.length - 1) / sel.length), mean - Math.min(...sel.map((q) => q.y)))
+      : undefined;
   const peak = sel.length ? Math.max(...sel.map((q) => q.y)) : null;
   // Radar altimeter: height above the cloud tops at closest approach, ±10 km.
   const altKm = p && !p.crashed ? (p.rPeri - sys.target.radius) / 1000 + 10 * gauss(Math.round(p.launchedAt), 999) : null;
@@ -71,7 +90,8 @@ export function ProbeBay() {
             <div style={{ width: '100%', maxWidth: 760 }}>
               <Chart
                 series={[{ pts: samples, color: '#6cc4ff', kind: 'dots', faded: (q) => !!band && (q.x < band[0] || q.x > band[1]) }]}
-                xLabel="hours from closest approach"
+                xLabel="hours from closest approach (log scale)"
+                xFmt={(x) => fmt(Math.sign(x) * (10 ** Math.abs(x) - 1), 0)}
                 yLabel="probe speed (km/s)"
                 band={band}
                 onBand={setBand}
@@ -103,7 +123,7 @@ export function ProbeBay() {
           </div>
           <div className="row">
             <span style={{ fontSize: 13 }}>Closest approach</span>
-            <input type="range" min={1.05} max={6} step={0.05} value={aimR} onChange={(e) => setAimR(Number(e.target.value))} style={{ flex: 1 }} disabled={!!p && !arrived} />
+            <input type="range" min={1.3} max={6} step={0.05} value={aimR} onChange={(e) => setAimR(Number(e.target.value))} style={{ flex: 1 }} disabled={!!p && !arrived} />
             <span className="mono">{fmt(aimR, 2)} R₂</span>
           </div>
           {R2 ? (

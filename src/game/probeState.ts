@@ -36,11 +36,20 @@ export function launchProbe(sys: StarSystem, s: GameState, aim: number, now: num
     vPeak: f.vPeak,
     crashed: f.crashed,
   };
-  return { probe, penaltyDv: s.penaltyDv + PROBE_COST };
+  return { probe, probeLog: [...(s.probeLog ?? []), probe], penaltyDv: s.penaltyDv + PROBE_COST };
 }
 
-/** True flyby values, for scoring. */
-export function probeTruth(s: GameState) {
-  const p = s.probe;
-  return p && !p.crashed ? { vInf: p.vInf, vPeak: p.vPeak, rPeri: p.rPeri } : {};
+/**
+ * True flyby values, for scoring. With two probes the sheet may hold readings from
+ * either, so each reading is scored against the probe it is closest to.
+ */
+export function probeTruth(s: Pick<GameState, 'probe' | 'probeLog' | 'sheet'>) {
+  const flown = [...(s.probeLog ?? []), ...(s.probe ? [s.probe] : [])].filter((p) => !p.crashed);
+  if (!flown.length) return {};
+  const pick = (k: 'vInf' | 'vPeak' | 'rPeri') => {
+    const v = (s.sheet as Record<string, { value: number } | undefined>)[k]?.value;
+    if (v === undefined) return flown[flown.length - 1][k];
+    return flown.reduce((best, p) => (Math.abs(p[k] - v) < Math.abs(best - v) ? p[k] : best), flown[0][k]);
+  };
+  return { vInf: pick('vInf'), vPeak: pick('vPeak'), rPeri: pick('rPeri') };
 }

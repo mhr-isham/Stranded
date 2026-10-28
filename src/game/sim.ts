@@ -5,7 +5,7 @@
 import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
 import { flareAt } from '../engine/flares';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
-import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude } from '../engine/measure';
+import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude, targetSkyLimits } from '../engine/measure';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
 import { norm } from '../engine/vec';
 import { hash32 } from '../engine/rng';
@@ -36,15 +36,16 @@ export function currentWorld() {
 }
 
 /** Can the tracker see the blue planet right now? */
-export function targetObservable(t: number, minAlt = 12 * DEG) {
+export function targetObservable(t: number, minAlt?: number) {
   const s = useGame.getState();
   const { system: sys } = currentWorld();
+  const lim = targetSkyLimits(sys);
   const f = localFrame(sys, t, sys.site);
   const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
   const alt = toHorizontal(topocentric(sys, 'target', t, sys.site), f).alt;
   const cloudy = s.settings.survival && isCloudy(s.seed, t);
   const flare = !!flareAt(sys, t);
-  return { ok: sunAlt < -12 * DEG && alt > minAlt && !cloudy && !flare, sunAlt, alt, cloudy, flare };
+  return { ok: sunAlt < lim.sun && alt > (minAlt ?? lim.track) && !cloudy && !flare, sunAlt, alt, cloudy, flare, lim };
 }
 
 /** Chapter 7: can the giant be seen right now (dark sky, high enough, no clouds)? */

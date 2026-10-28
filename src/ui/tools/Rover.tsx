@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
-import { parallaxSite } from '../../engine/measure';
+import { parallaxSite, targetSkyLimits } from '../../engine/measure';
 import { localFrame, observerPos, toHorizontal, topocentric } from '../../engine/sky';
 import { norm, sub, unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
@@ -54,7 +54,8 @@ export function Rover() {
   const A = siteInfo(sys.site);
   const B = siteInfo(roverSite);
   const M = siteInfo(midSite);
-  const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > 15 && B.alt > 15 && A.sun < -12 && B.sun < -12 && !(s.settings.survival && isCloudy(s.seed, t));
+  const lim = targetSkyLimits(sys);
+  const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > lim.par / DEG && B.alt > lim.par / DEG && A.sun < lim.sun / DEG && B.sun < lim.sun / DEG && !(s.settings.survival && isCloudy(s.seed, t));
 
   const drive = () => {
     if (s.northTrip.dist > 0 || s.northTrip.arriveAt > clock.t) return toast('The rover is out north at the shadow stick. Bring it back first.');
@@ -196,7 +197,7 @@ export function Rover() {
           </button>
           {!canImage && (
             <div className="amber" style={{ fontSize: 13 }}>
-              {!s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : 'Both sites need a dark sky with the planet above 15°.'}
+              {!s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : `Both sites need ${lim.sun > -10 * DEG ? 'twilight or darker' : 'a dark sky'} with the planet above ${Math.round(lim.par / DEG)}°.`}
             </div>
           )}
         </div>

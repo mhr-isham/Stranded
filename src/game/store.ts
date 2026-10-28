@@ -170,6 +170,8 @@ export interface GameState {
   /** Chapter 2: the probe sent past the blue planet. */
   probe: ProbeState | null;
   probesLaunched: number;
+  /** Every probe flown this run (the sheet may hold readings from any of them). */
+  probeLog: ProbeState[];
   /** Chapter 5: the solar camera that times transits. */
   sunCamOn: boolean;
   sunLog: TimedValue[];
@@ -265,6 +267,7 @@ const initial = {
   ascentPenalty: null as number | null,
   arrival: null as GameState['arrival'],
   probesLaunched: 0,
+  probeLog: [],
   shadows: [] as GameState['shadows'],
   sunCamOn: false,
   sunLog: [] as TimedValue[],

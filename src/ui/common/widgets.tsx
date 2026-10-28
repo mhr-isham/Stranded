@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useGame, type Settings } from '../../game/store';
+import { world } from '../../game/world';
 import { clock, subscribeClock } from '../../game/clock';
 
 /** A dialog. Closes on the backdrop, Esc or its ✕ when it has `onClose`; `top` puts it above the tutorial card. */
@@ -72,4 +74,25 @@ export function ToastHost() {
     return () => clearTimeout(id);
   }, [msg]);
   return msg ? <div className="toast panel">{msg}</div> : null;
+}
+
+/**
+ * Start a run. Building a solvable system can take a few seconds (the hard
+ * chapters reject many), so say so on screen first instead of freezing.
+ */
+export function startRun(seed: number, settings: Settings, chapter = 1) {
+  const el = document.createElement('div');
+  el.className = 'charting';
+  el.textContent = 'Charting a new star system…';
+  document.body.appendChild(el);
+  requestAnimationFrame(() =>
+    setTimeout(() => {
+      try {
+        world(seed, settings.difficulty, chapter);
+        useGame.getState().newGame(seed, settings, chapter);
+      } finally {
+        el.remove();
+      }
+    }, 30),
+  );
 }
