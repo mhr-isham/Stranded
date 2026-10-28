@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DERIVED_KEYS, QUANTITY_INFO, deriveAll, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
+import { QUANTITY_INFO, deriveAll, derivedFor, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { DAY } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
-import { modelFromPrimaries, planTransfer } from '../../engine/planner';
+import { bestTransfer, modelFromPrimaries, planTransfer } from '../../engine/planner';
 import { gradeRun, scoreQuantity } from '../../engine/scoring';
 import { sfx } from '../../game/audio';
 import { fmt, sig, toDisplay } from '../../game/format';
@@ -88,8 +88,8 @@ export function Results() {
           <h1 className={info.cls} style={{ fontSize: 'clamp(28px, 6vw, 42px)', margin: '4px 0' }}>
             {info.title}
           </h1>
-          <div className="muted">{info.text}</div>
-          <EchoQuote text={info.echo} />
+          <div className="muted">{named(info.text)}</div>
+          <EchoQuote text={named(info.echo)} />
           <p style={{ margin: '8px 0 0', fontSize: 14 }}>
             ECHO kept the ship’s state from just before launch. You can go back to the launch planner, re-check your numbers and take more
             measurements — the clock goes back too.
@@ -123,7 +123,8 @@ function Debrief() {
   const variant = variantOf(sys.features);
   const truth = truthValues(sys, sheet, probeTruth(s));
   const derived = deriveAll(sheet, variant);
-  const rows = ([...keysFor(variant), ...DERIVED_KEYS] as QuantityKey[]).filter((k) => variant !== 'probe' || k !== 'aM').map((k) => {
+  // This chapter's measured and derived quantities, each once.
+  const rows = [...new Set([...keysFor(variant), ...Object.keys(derivedFor(variant))] as QuantityKey[])].filter((k) => variant !== 'probe' || k !== 'aM').map((k) => {
     const e = (sheet as Record<string, { value: number; sigma: number } | undefined>)[k] ?? (derived as Record<string, { value: number; sigma: number } | undefined>)[k];
     return { k, e, sc: e && Number.isFinite(truth[k]) ? scoreQuantity(e.value, e.sigma, truth[k]) : null };
   });
@@ -146,7 +147,8 @@ function Debrief() {
       const alt = { ...sheet, [k]: { ...sheet[k]!, value: truth[k] } };
       const m = modelFromPrimaries(alt, variant);
       if (!m) continue;
-      const p = planTransfer(m, outcome.plan.departTime, outcome.plan.tof);
+      // A slingshot is replanned as a slingshot (a direct route would cost the same for every row).
+      const p = m.giant ? bestTransfer(m, outcome.plan.departTime) : planTransfer(m, outcome.plan.departTime, outcome.plan.tof);
       if (!p) continue;
       const r = simulateLaunch(sys, p.plan);
       out.push({ k, saved: base - r.correctionCost });
@@ -214,8 +216,8 @@ function Debrief() {
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}
           </h1>
-          <div className="muted">{info.text}</div>
-          {!s.tutorial.active && <EchoQuote text={info.echo} />}
+          <div className="muted">{named(info.text)}</div>
+          {!s.tutorial.active && <EchoQuote text={named(info.echo)} />}
           <div className="row" style={{ justifyContent: 'center', gap: 28, marginTop: 14 }}>
             <div>
               <div style={{ fontFamily: 'var(--display)', fontSize: 64, fontWeight: 700, lineHeight: 1 }} className={grade.letter === 'F' ? 'red' : 'blue'}>
@@ -297,7 +299,7 @@ function Debrief() {
             {budget.every((b) => b.saved < 0.5) && <div className="faint" style={{ fontSize: 13 }}>No single measurement cost a whole m/s: the corrections were small all round.</div>}
             {budget.filter((b) => b.saved >= 0.5).slice(0, 6).map((b) => (
               <div key={b.k} className="row" style={{ gap: 10 }}>
-                <span style={{ width: 170, fontSize: 13 }}>{QUANTITY_INFO[b.k].label}</span>
+                <span style={{ width: 170, fontSize: 13 }}>{named(labelFor(b.k, variant))}</span>
                 <div style={{ flex: 1, height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 5 }}>
                   <div style={{ width: `${Math.max(0, Math.min(100, (100 * b.saved) / Math.max(1, budget[0].saved)))}%`, height: '100%', background: 'var(--amber)', borderRadius: 5 }} />
                 </div>
@@ -346,7 +348,7 @@ function Debrief() {
                 {rows.map(({ k, e, sc }) => (
                   <tr key={k}>
                     <td>
-                      {QUANTITY_INFO[k].symbol} <span className="muted">{labelFor(k, variant)}</span>
+                      {QUANTITY_INFO[k].symbol} <span className="muted">{named(labelFor(k, variant))}</span>
                     </td>
                     <td className="num">{e ? `${sig(toDisplay(k, e.value), 5)} ± ${sig(toDisplay(k, e.sigma), 2)}` : '—'}</td>
                     <td className="num">{sig(toDisplay(k, truth[k]), 5)}</td>
@@ -383,4 +385,12 @@ function Debrief() {
 function landingBonus(a: { landing: string } | null) {
   if (!a) return 0;
   return a.landing === 'clean' ? 60 : a.landing === 'rough' ? 20 : 0;
+}
+
+/** Use the player's (or chapter 9's real) name for the blue planet in debrief text. */
+function named(txt: string) {
+  const n = useGame.getState().names.target?.trim();
+  if (!n) return txt;
+  const cap = n.charAt(0).toUpperCase() + n.slice(1);
+  return txt.replace(/\bthe blue planet/g, n).replace(/\bThe blue planet/g, cap).replace(/\bBlue planet/g, cap).replace(/\bblue planet/g, n);
 }

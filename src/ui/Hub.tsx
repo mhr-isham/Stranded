@@ -80,7 +80,7 @@ export function Hub() {
       />
       {stations.map((st, i) => (
         <button
-          key={st.kind}
+          key={st.screen}
           ref={(el) => void (tagRefs.current[i] = el)}
           className="hotspot"
           data-tut={`hotspot-${st.screen === 'sheet' ? 'ship' : st.screen}`}

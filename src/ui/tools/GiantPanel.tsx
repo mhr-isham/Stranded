@@ -2,10 +2,10 @@
 // loops give its synodic period and opposition date (Kepler's method sharpens
 // both), and its big moon weighs it. Its mass decides how hard it bends our path.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { fitOrbit, type OrbitFit } from '../../engine/orbitfit';
-import { sineFit } from '../../game/fits';
+import { moonSwingFit, sineFit } from '../../game/fits';
 import { fmt } from '../../game/format';
 import { checkMissions, giantObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
@@ -38,7 +38,45 @@ export function GiantPanel() {
   const mpts = s.moonTrackG.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
   const used = mpts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
   const span = used.length ? used[used.length - 1].x - used[0].x : 0;
-  const mfit = used.length >= 8 && span < 120 ? sineFit(used.map((p) => p.x), used.map((p) => p.y), 2, 200) : null;
+  // The line of sight turns as the giant moves in our sky: the fit uses the giant's own
+  // tracked longitude (interpolated, unwrapped) so it finds the moon's true period.
+  const lonAt = (d: number) => {
+    const tg = s.trackG;
+    if (tg.length < 2) return 0;
+    // First log at or after d (binary search; the log is in time order).
+    let lo = 0;
+    let hi = tg.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (tg[m].at / DAY < d) lo = m + 1;
+      else hi = m;
+    }
+    const i = Math.min(tg.length - 1, Math.max(1, lo));
+    const a = tg[i - 1];
+    const b = tg[i];
+    let dl = b.v - a.v;
+    if (dl > Math.PI) dl -= 2 * Math.PI;
+    if (dl < -Math.PI) dl += 2 * Math.PI;
+    const f = (d - a.at / DAY) / Math.max(1e-9, (b.at - a.at) / DAY);
+    return a.v + dl * f;
+  };
+  const unwrapFrom = (d0: number) => (d: number) => {
+    let x = lonAt(d) - lonAt(d0);
+    while (x > Math.PI) x -= 2 * Math.PI;
+    while (x < -Math.PI) x += 2 * Math.PI;
+    return x;
+  };
+  const mfit = useMemo(() => {
+    if (used.length < 12 || span >= 120) return null;
+    const xs = used.map((p) => p.x);
+    const ys = used.map((p) => p.y);
+    if (s.trackG.length < 2) return sineFit(xs, ys, 2, 200);
+    const ph = unwrapFrom(xs[0]);
+    // The moon may orbit either way round: keep the better fit.
+    const fits = [moonSwingFit(xs, ys, 2, 200, ph), moonSwingFit(xs, ys, 2, 200, (d) => -ph(d))].filter((f) => f !== null);
+    return fits.sort((a, b) => a!.rms - b!.rms)[0] ?? null;
+    // Refit only when the data or the chosen stretch changes.
+  }, [band, s.moonTrackG.length, s.trackG.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const mid = used.length ? 0.5 * (used[0].x + used[used.length - 1].x) : 0;
 
   return (
@@ -153,6 +191,7 @@ export function GiantPanel() {
           />
         )}
         {mpts.length > 1 && span >= 120 && <div className="amber" style={{ fontSize: 13 }}>Drag across a stretch of at most ~120 days to fit.</div>}
+        {mpts.length > 1 && span < 120 && <div className="faint" style={{ fontSize: 12 }}>Best: about two of the moon’s swings (60–100 days) with the giant tracked too — the fit allows for the giant moving across our sky and coming nearer or going away.</div>}
         {mfit && (
           <>
             <dl className="kv">

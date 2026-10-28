@@ -337,7 +337,8 @@ export function missionsFor(s: Pick<GameState, 'chapter'>): Mission[] {
   if (s.chapter === 2) return CH2;
   if (s.chapter === 3) return CH3;
   if (s.chapter === 4) return CH4;
-  if (s.chapter === 5) return CH5;
+  // Chapter 9's Earth, seen from Mars, is an inner planet too.
+  if (s.chapter === 5 || s.chapter === 9) return CH5;
   if (s.chapter === 6) return CH6;
   if (s.chapter === 7) return CH7;
   if (s.chapter === 8) return CH8;

@@ -251,10 +251,11 @@ const slingCache = new Map<string, number[]>();
 const DAY_S = 86400;
 
 /** Slingshot windows in the player's model: dips of the best route cost over departure dates. */
-function slingshotWindows(m: PlayerModel, t0: number, t1: number): number[] {
-  // Searched only over the dates asked for (rounded, so it caches): it is the slow part.
-  const a = Math.floor(t0 / (10 * DAY_S)) * 10 * DAY_S;
-  const b = Math.ceil(t1 / (10 * DAY_S)) * 10 * DAY_S;
+function slingshotWindows(m: PlayerModel, t1: number): number[] {
+  // Searched from day 0 on a fixed grid (so a window doesn't shift or vanish as the
+  // clock moves on), up to the end asked for, rounded so it caches: it is the slow part.
+  const a = 0;
+  const b = Math.ceil(t1 / (100 * DAY_S)) * 100 * DAY_S;
   const key = [m.P1, m.P2, m.a1, m.a2, m.Mstar, m.tOpp, m.M1, m.R1, m.M2, m.R2, m.giant!.a, m.giant!.P, m.giant!.tOpp, m.giant!.M, a, b].join(',');
   let w = slingCache.get(key);
   if (w) return w;
@@ -268,7 +269,7 @@ function slingshotWindows(m: PlayerModel, t0: number, t1: number): number[] {
 /** Hohmann windows predicted by the player's model between t0 and t1. */
 export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
   if (m.ecc) return ellipseWindows(m).filter((t) => t >= t0 && t <= t1);
-  if (m.giant) return slingshotWindows(m, t0, t1).filter((t) => t >= t0 && t <= t1);
+  if (m.giant) return slingshotWindows(m, t1).filter((t) => t >= t0 && t <= t1);
   const { lead } = hohmannFor(m);
   const out: number[] = [];
   // Outer target: the lead shrinks with time; inner target: it grows.

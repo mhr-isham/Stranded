@@ -55,6 +55,8 @@ export function Rover() {
   const B = siteInfo(roverSite);
   const M = siteInfo(midSite);
   const lim = targetSkyLimits(sys);
+  // On a locked planet the rover drives south for parallax (engine/measure.ts parallaxSite).
+  const heading = sys.features.locked ? 'south' : 'east';
   const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > lim.par / DEG && B.alt > lim.par / DEG && A.sun < lim.sun / DEG && B.sun < lim.sun / DEG && !(s.settings.survival && isCloudy(s.seed, t));
 
   const drive = () => {
@@ -166,11 +168,11 @@ export function Rover() {
           <b>1 · Position the rover</b>
           <div className="row between">
             <span className="muted">Rover is</span>
-            <span className="mono">{driving ? `driving… ${fmt((s.rover.arriveAt - t) / DAY, 1)} d left` : `${fmt(s.rover.dist / 1000, 0)} km east`}</span>
+            <span className="mono">{driving ? `driving… ${fmt((s.rover.arriveAt - t) / DAY, 1)} d left` : `${fmt(s.rover.dist / 1000, 0)} km ${heading}`}</span>
           </div>
           <input type="range" min={500} max={6000} step={100} value={target} onChange={(e) => setTarget(Number(e.target.value))} disabled={driving} />
           <div className="row between">
-            <span className="muted" style={{ fontSize: 13 }}>Send to {target} km east · {fmt(Math.abs(target * 1000 - s.rover.dist) / speed, 1)} days</span>
+            <span className="muted" style={{ fontSize: 13 }}>Send to {target} km {heading} · {fmt(Math.abs(target * 1000 - s.rover.dist) / speed, 1)} days</span>
             <button className="btn primary small" disabled={driving || target * 1000 === s.rover.dist} onClick={drive}>
               Drive
             </button>

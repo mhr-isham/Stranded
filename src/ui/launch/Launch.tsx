@@ -63,7 +63,13 @@ export function Launch() {
   const hoh = useMemo(() => (model ? hohmannFor(model) : null), [model]);
   // A window stays listed for a day after it opens, so warping onto it doesn't make it vanish.
   const windows = useMemo(() => (model ? predictedWindows(model, Math.max(0, t - DAY), end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
-  const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (windows[0] ?? t) / DAY);
+  // Which windows can our fuel pay for (by the player's own model)? Default to the first of those.
+  const affordable = useMemo(
+    () => (model ? windows.filter((w) => (bestTransfer(model, w)?.total ?? Infinity) <= budget) : []),
+    [model, windows, budget],
+  );
+  const firstWindow = affordable[0] ?? windows[0];
+  const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
   const plan: PlannedTransfer | null = useMemo(() => {
     if (!model) return null;
     return autoTof || model.giant ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
@@ -186,8 +192,14 @@ export function Launch() {
           <input type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
           <div className="row" data-tut="launch-windows">
             {windows.slice(0, 3).map((w, i) => (
-              <button key={w} className="btn small" onClick={() => setDep(w / DAY)}>
+              <button
+                key={w}
+                className={`btn small ${affordable.includes(w) ? '' : 'ghost'}`}
+                title={affordable.includes(w) ? undefined : 'By your numbers this window costs more fuel than we carry.'}
+                onClick={() => setDep(w / DAY)}
+              >
                 Window {i + 1}: day {fmt(w / DAY, 1)}
+                {affordable.includes(w) ? '' : ' · over budget'}
               </button>
             ))}
             <button className={`btn small ${dep === 'now' ? 'primary' : 'ghost'}`} onClick={() => setDep('now')}>
