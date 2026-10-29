@@ -1,6 +1,6 @@
 # Stranded — Story bible
 
-The story that runs through the prologue and all nine chapters (see [`DESIGN-V2.md`](DESIGN-V2.md) §7–8). This is the source of truth for characters, plot, tone and every scripted line. Lines that are already in the game are marked **(in game)**.
+The story that runs through the prologue and all nine chapters (see the [unified game review](GAME-REVIEW.md#5-campaign-every-chapter)). This is the source of truth for characters, plot, tone and every scripted line. Lines that are already in the game are marked **(in game)**.
 
 ---
 
@@ -46,7 +46,7 @@ What doesn't:
 ## 3. Characters
 
 ### The Navigator (the player)
-- Never seen and never named by default (the player can name themselves; §DESIGN-V2 4.1). No gender; ECHO calls them "Navigator".
+- Never seen and never named by default (the player can name themselves; see GAME-REVIEW.md, CHAR-01). No gender; ECHO calls them "Navigator".
 - Defined by what they *do*: careful, honest about their error bars. ECHO's respect grows with the player's calibration, not with their score.
 
 ### ECHO
@@ -110,7 +110,7 @@ In modes with a rewind, the failure scene plays first, then the rewind offer.
 
 ## 5. Script samples
 
-### 5.1 Prologue opening (DESIGN-V2 §9.1)
+### 5.1 Prologue opening
 > *(alarms; tumbling stars)*
 > ECHO: Fold exit — irregular. Spin rate high. Navigation… not found.
 > ECHO: Controls are not responding. Don't fight it. Not yet.
