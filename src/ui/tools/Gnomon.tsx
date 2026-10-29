@@ -80,7 +80,7 @@ export function Gnomon() {
     if (markL === null) return toast('Drag the marker to the tip of the shadow first.');
     const readAlt = Math.atan(STICK / markL);
     useGame.setState({ shadows: [...s.shadows, { site: where, at: clock.t, alt: readAlt, dist: where === 'camp' ? 0 : trip.dist }] });
-    sfx('log');
+    sfx('measure');
     toast(`Shadow ${fmt(markL, 3)} m → sun at ${fmt(readAlt / DEG, 3)}°`);
   };
 

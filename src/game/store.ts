@@ -47,6 +47,9 @@ export interface Settings {
   survival: boolean;
   formulas: boolean;
   sound: boolean;
+  /** Independent audio mix, optional for compatibility with existing saves. */
+  musicVolume?: number;
+  effectsVolume?: number;
   /** Free Roam: no deadline, no score, an optional true-value overlay. */
   freeRoam?: boolean;
   /** Free Roam sandbox overlay: show the true values on the sheet. */

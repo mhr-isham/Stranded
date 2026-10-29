@@ -12,6 +12,7 @@ import { useMode } from '../game/modes';
 import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
 import { quantityName, readiness } from '../game/readiness';
 import { flareAt } from '../engine/flares';
+import { AudioSettings } from './common/AudioSettings';
 
 export function Hud() {
   const t = useGameTime(6);
@@ -135,7 +136,7 @@ export function Hud() {
             />
           )}
           {!s.tutorial.active && <CheckpointPanel onDone={() => setMenu(false)} />}
-          <Toggle on={s.settings.sound} onChange={(v) => s.set({ settings: { ...s.settings, sound: v } })} label="Sound" />
+          <AudioSettings settings={s.settings} onChange={(settings) => s.set({ settings })} />
           <div className="row" style={{ justifyContent: 'space-between', marginTop: 16 }}>
             <button
               className="btn"

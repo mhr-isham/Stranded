@@ -1,157 +1,153 @@
-// Tiny synthesised sound effects (no audio files), plus a soft ambient pad.
+import { useGame, type Settings } from './store';
+import { sceneFor, scoreStep, STEP_SECONDS } from './score';
+import { Synth, type Cue } from './synth';
 
-import { useGame } from './store';
+export type Sfx = Cue;
+export const AUDIO_DEFAULTS = { musicVolume: 0.65, effectsVolume: 0.8 };
+const volume = (value: number | undefined, fallback: number) => (Number.isFinite(value) ? Math.max(0, Math.min(1, value!)) : fallback);
 
 let ctx: AudioContext | null = null;
-let ambient: { stop: () => void } | null = null;
+let master: GainNode;
+let musicGain: GainNode;
+let effectsGain: GainNode;
+let music: Synth;
+let effects: Synth;
+let timer: ReturnType<typeof setInterval> | null = null;
+let next = 0;
+let step = 0;
+let wanted = false;
+let engine: ReturnType<Synth['engine']> | null = null;
+let unsubscribe: (() => void) | null = null;
+const lastCue = new Map<Cue, number>();
+
+function sync(settings: Settings) {
+  if (!ctx) return;
+  const audible = settings.sound && !document.hidden;
+  if (!audible) stopRumble();
+  // Mute the shared bus, including already scheduled notes and engine tails.
+  master.gain.setTargetAtTime(audible ? 0.8 : 0, ctx.currentTime, 0.015);
+  musicGain.gain.setTargetAtTime(volume(settings.musicVolume, AUDIO_DEFAULTS.musicVolume), ctx.currentTime, 0.1);
+  effectsGain.gain.setTargetAtTime(volume(settings.effectsVolume, AUDIO_DEFAULTS.effectsVolume), ctx.currentTime, 0.03);
+  if (audible && wanted) schedule();
+  else if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
 
 function ac() {
-  if (!useGame.getState().settings.sound) return null;
+  if (!useGame.getState().settings.sound || document.hidden) return null;
   if (!ctx) {
     const C = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!C) return null;
     ctx = new C();
+    master = ctx.createGain();
+    master.gain.value = 0;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -12;
+    limiter.knee.value = 12;
+    limiter.ratio.value = 5;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.18;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 28;
+    master.connect(highpass).connect(limiter).connect(ctx.destination);
+    musicGain = ctx.createGain();
+    effectsGain = ctx.createGain();
+    musicGain.connect(master);
+    effectsGain.connect(master);
+    music = new Synth(ctx, musicGain, true);
+    effects = new Synth(ctx, effectsGain);
+    next = ctx.currentTime + 0.04;
+    unsubscribe = useGame.subscribe((s, prev) => {
+      if (s.settings !== prev.settings) sync(s.settings);
+    });
+    document.addEventListener('visibilitychange', onVisibility);
+    sync(useGame.getState().settings);
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
   return ctx;
 }
 
-function tone(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0.08, slide = 0) {
-  const a = ac();
-  if (!a) return;
-  const o = a.createOscillator();
-  const g = a.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, a.currentTime);
-  if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, a.currentTime + dur);
-  g.gain.setValueAtTime(gain, a.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-  o.connect(g).connect(a.destination);
-  o.start();
-  o.stop(a.currentTime + dur);
+function schedule() {
+  if (timer || !ctx) return;
+  next = Math.max(next, ctx.currentTime + 0.03);
+  const pump = () => {
+    if (!ctx || ctx.state !== 'running') return;
+    // A throttled tab must not replay a backlog of notes when it returns.
+    if (next < ctx.currentTime) next = ctx.currentTime + 0.02;
+    const s = useGame.getState();
+    const scene = sceneFor(s);
+    music.out.gain.setTargetAtTime(1.8 * (s.storyQueue.length ? 0.38 : scene === 'focus' ? 0.7 : 1), ctx.currentTime, 0.25);
+    while (next < ctx.currentTime + 0.15) {
+      scoreStep(scene, step++).forEach((n) => music.note(n, next));
+      next += STEP_SECONDS;
+    }
+  };
+  pump();
+  timer = setInterval(pump, 35);
 }
 
-export type Sfx = 'click' | 'tick' | 'good' | 'bad' | 'log' | 'launch' | 'unlock';
+function onVisibility() {
+  if (!ctx) return;
+  sync(useGame.getState().settings);
+  if (document.hidden) {
+    stopRumble();
+    void ctx.suspend().catch(() => {});
+  } else if (useGame.getState().settings.sound) {
+    next = ctx.currentTime + 0.04;
+    void ctx.resume().catch(() => {});
+  }
+}
 
 export function sfx(kind: Sfx) {
-  switch (kind) {
-    case 'click':
-      return tone(880, 0.06, 'square', 0.04);
-    case 'tick':
-      return tone(1400, 0.03, 'sine', 0.05);
-    case 'good':
-      tone(660, 0.12, 'sine', 0.07);
-      setTimeout(() => tone(990, 0.18, 'sine', 0.06), 90);
-      return;
-    case 'bad':
-      return tone(220, 0.3, 'sawtooth', 0.04, 0.6);
-    case 'log':
-      return tone(1200, 0.08, 'triangle', 0.05, 1.3);
-    case 'unlock':
-      [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.25, 'sine', 0.05), i * 90));
-      return;
-    case 'launch': {
-      const a = ac();
-      if (!a) return;
-      const len = 4;
-      const buf = a.createBuffer(1, a.sampleRate * len, a.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.min(1, i / (a.sampleRate * 0.5)) * (1 - i / d.length);
-      const src = a.createBufferSource();
-      src.buffer = buf;
-      const f = a.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.value = 300;
-      const g = a.createGain();
-      g.gain.value = 0.35;
-      src.connect(f).connect(g).connect(a.destination);
-      src.start();
-      return;
-    }
-  }
-}
-
-/** Gentle wind + drone. Starts on first user gesture. */
-export function startAmbient() {
-  const a = ac();
-  if (!a || ambient) return;
-  const master = a.createGain();
-  master.gain.value = 0.0;
-  master.gain.linearRampToValueAtTime(0.05, a.currentTime + 4);
-  master.connect(a.destination);
-  const oscs = [55, 82.4, 110.2].map((f, i) => {
-    const o = a.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = f;
-    o.detune.value = i * 4;
-    const g = a.createGain();
-    g.gain.value = 0.35 / (i + 1);
-    o.connect(g).connect(master);
-    o.start();
-    return o;
-  });
-  const len = 3;
-  const buf = a.createBuffer(1, a.sampleRate * len, a.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  const noise = a.createBufferSource();
-  noise.buffer = buf;
-  noise.loop = true;
-  const bp = a.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = 500;
-  bp.Q.value = 0.6;
-  const ng = a.createGain();
-  ng.gain.value = 0.25;
-  noise.connect(bp).connect(ng).connect(master);
-  noise.start();
-  ambient = {
-    stop: () => {
-      oscs.forEach((o) => o.stop());
-      noise.stop();
-      ambient = null;
-    },
-  };
-}
-
-export function stopAmbient() {
-  ambient?.stop();
-}
-
-let rumble: { gain: GainNode; filter: BiquadFilterNode; stop: () => void } | null = null;
-
-/**
- * Continuous engine / airflow noise for flying scenes. level 0..1 sets the
- * loudness, tone 0..1 how bright it is (roar vs rushing air). Call stopRumble() when done.
- */
-export function setRumble(level: number, tone = 0.3) {
   const a = ac();
   if (!a) return;
-  if (!rumble) {
-    const buf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate);
-    const d = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < d.length; i++) {
-      last = 0.97 * last + 0.03 * (Math.random() * 2 - 1);
-      d[i] = last * 6;
-    }
-    const src = a.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    const filter = a.createBiquadFilter();
-    filter.type = 'lowpass';
-    const gain = a.createGain();
-    gain.gain.value = 0;
-    src.connect(filter).connect(gain).connect(a.destination);
-    src.start();
-    rumble = { gain, filter, stop: () => src.stop() };
-  }
-  rumble.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.4, a.currentTime, 0.08);
-  rumble.filter.frequency.setTargetAtTime(150 + tone * 1800, a.currentTime, 0.1);
+  // Mission batches may award several unlocks together. Keep the reward clear.
+  if (a.currentTime - (lastCue.get(kind) ?? -Infinity) < (kind === 'unlock' ? 0.45 : 0.035)) return;
+  lastCue.set(kind, a.currentTime);
+  effects.cue(kind, a.currentTime + 0.002);
 }
 
-export function stopRumble() {
-  if (!rumble) return;
-  rumble.stop();
-  rumble = null;
+/** Gesture-unlocked original music, arranged live for the current game scene. */
+export function startAmbient() {
+  wanted = true;
+  if (ac()) schedule();
 }
+export function stopAmbient() {
+  wanted = false;
+  if (timer) clearInterval(timer);
+  timer = null;
+  if (ctx) musicGain.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+}
+export function setRumble(level: number, tone = 0.3) {
+  if (!ac()) return;
+  const l = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
+  const t = Number.isFinite(tone) ? Math.max(0, Math.min(1, tone)) : 0.3;
+  if (!engine && l > 0.001) engine = effects.engine(effectsGain);
+  engine?.set(l, t);
+}
+export function stopRumble() {
+  engine?.stop();
+  engine = null;
+}
+
+/** Release timers, subscriptions and voices on app teardown / hot replacement. */
+export function disposeAudio() {
+  stopAmbient();
+  stopRumble();
+  unsubscribe?.();
+  unsubscribe = null;
+  document.removeEventListener('visibilitychange', onVisibility);
+  if (ctx) {
+    music.stop();
+    effects.stop();
+    void ctx.close().catch(() => {});
+  }
+  ctx = null;
+  step = 0;
+  next = 0;
+  lastCue.clear();
+}
+if (import.meta.hot) import.meta.hot.dispose(disposeAudio);

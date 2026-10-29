@@ -18,6 +18,8 @@ It runs as a single web page on phones and laptops, with no sign-in. Progress is
 
 **Ways to play:** a nine-chapter **Campaign** with a story, a **Single expedition** to a random system, and **Free Roam** (no clock, no score; optionally show the true values). Five modes run from **Stargazer** (gentle, fully coached) to **Legend** (no formula sheet, no safety net). The **Flight School** teaches every method, and each chapter's new idea has an optional module.
 
+**Audio:** an original electronic score changes arrangement for exploration, precision tools, flight and endings. Mechanical tool cues, discovery flourishes and thrust-responsive ship audio give actions distinct feedback. Music starts after a click or key press; adjust **Music** and **Sound effects** separately in setup or the ☰ menu. Both preferences are saved. Audio pauses in the background. All music and effects are synthesized locally, with no streaming or audio downloads.
+
 ## The campaign
 
 | # | Chapter | What changes | New method |
@@ -101,5 +103,7 @@ scripts/validate.ts   validation report → reports/validation.md
 2. **Competent noisy play.** It reports the median error for each quantity, how often the truth falls inside the stated 1σ and 2σ, and the outcome rates. With the solver's skill level, the success rate is 100% on Cadet, about 95% on Navigator and about 83% on Astronomer. Every campaign chapter is checked too: the solver reaches orbit in 35–40 of 40 systems per chapter on Navigator.
 
 `npm test` runs the unit tests, which check the orbital mechanics, generator determinism, chain recovery, error propagation and scoring.
+
+For browser audio regression checks, start a fresh `npm run dev` server, install Python Playwright (`python -m pip install playwright` and `python -m playwright install chromium`), then run `python scripts/check_audio.py`. Use `--browser /path/to/chromium` if needed. The check renders the actual score/effects into WAV previews, verifies finite output and clipping headroom, and exercises audio controls, persistence, backgrounding and flight/landing. Previews and screenshots go to `/tmp/stranded-audio-check`. See [the audio QA report](reports/audio-qa.md) for the tested mix and scope.
 
 The design review and build plan are in [`docs/PLAN.md`](docs/PLAN.md). The current design (modes, chapters, story, flight) is [`docs/DESIGN-V2.md`](docs/DESIGN-V2.md), with the camp, rover, ship and fuel redesigned in [`docs/DESIGN-V3.md`](docs/DESIGN-V3.md); the engagement research is in [`docs/ENGAGEMENT.md`](docs/ENGAGEMENT.md) and [`docs/ENGAGEMENT-DEEP-DIVE.md`](docs/ENGAGEMENT-DEEP-DIVE.md).

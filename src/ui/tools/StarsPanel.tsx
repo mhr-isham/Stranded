@@ -45,7 +45,7 @@ export function StarsPanel() {
     const v = Math.round((parallaxOffset(sys, st, clock.t) + noise) / (0.001 * ARCSEC)) * 0.001 * ARCSEC;
     s.set({ starPar: [...s.starPar, { i: sel, at: clock.t, v }] });
     toast(`${st.name}: ${fmt(v / ARCSEC, 3)}″ logged`);
-    sfx('log');
+    sfx('shutter');
   };
 
   // Distances from the sheet's parallaxes and our orbit radius.

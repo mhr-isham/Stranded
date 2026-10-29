@@ -3,7 +3,7 @@ import { clock } from '../game/clock';
 import { advance, currentWorld, fastForward } from '../game/sim';
 import { botMeasure, COMPETENT } from '../engine/solver';
 import { makeRng } from '../engine/rng';
-import { startAmbient } from '../game/audio';
+import { disposeAudio, startAmbient } from '../game/audio';
 import { useGame } from '../game/store';
 import { ToastHost } from './common/widgets';
 import { Game } from './Game';
@@ -56,12 +56,15 @@ export default function App() {
     window.addEventListener('pagehide', save);
     const firstGesture = () => {
       startAmbient();
-      window.removeEventListener('pointerdown', firstGesture);
     };
     window.addEventListener('pointerdown', firstGesture);
+    window.addEventListener('keydown', firstGesture);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('pagehide', save);
+      window.removeEventListener('pointerdown', firstGesture);
+      window.removeEventListener('keydown', firstGesture);
+      disposeAudio();
     };
   }, []);
 

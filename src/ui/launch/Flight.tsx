@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DAY } from '../../engine/constants';
 import { planetPos, planetVel } from '../../engine/ephemeris';
 import { G } from '../../engine/constants';
@@ -13,6 +13,7 @@ import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { CanvasView } from '../common/CanvasView';
+import { setRumble, sfx, stopRumble } from '../../game/audio';
 
 const DURATION = 14; // seconds of animation
 
@@ -24,6 +25,13 @@ export function Flight() {
   const tutorial = useGame((s) => s.tutorial.active);
   const arrivalDone = useGame((s) => !!s.arrival);
   const [stage, setStage] = useState(0);
+  useEffect(() => {
+    if (!outcome) return;
+    const burning = stage === 0 || (outcome.result.outcome !== 'no-escape' && (stage === 2 || stage === 3));
+    setRumble(burning ? (stage === 0 ? 0.75 : 0.45) : 0, 0.35);
+    if (stage === 2 && outcome.result.outcome !== 'no-escape') sfx('radio');
+    return stopRumble;
+  }, [stage, outcome]);
   if (!outcome) return null;
   const { plan, result } = outcome;
   const path = (result.path ?? []).filter((v) => v && Number.isFinite(v[0]) && Number.isFinite(v[1]));

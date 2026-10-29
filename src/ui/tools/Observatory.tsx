@@ -486,7 +486,7 @@ export function Observatory() {
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v }] }));
               toast('Sky position logged');
-              sfx('log');
+              sfx('shutter');
             }}
           />
         )}
@@ -502,7 +502,7 @@ export function Observatory() {
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v: eclLon(c) }] }));
               toast('Star position logged');
-              sfx('log');
+              sfx('shutter');
             }}
           />
         )}
@@ -533,7 +533,7 @@ export function Observatory() {
                 s.addReading({ key: 'alpha2', value: a, at: clock.t, note: `day ${fmt(clock.t / DAY, 1)}` });
                 const warn = outlierNote(a, s.readings.filter((r) => r.key === 'alpha2' && r.kept).map((r) => r.value), 0.15);
                 toast(warn ? `Logged ${fmt(a / ARCSEC, 2)}″ — but it is far from your other readings. Check the wires.` : `Diameter ${fmt(a / ARCSEC, 2)}″ logged`);
-                sfx('log');
+                sfx('shutter');
               }}
             >
               Log diameter

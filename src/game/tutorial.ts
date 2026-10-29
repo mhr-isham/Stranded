@@ -23,7 +23,7 @@ const rng = makeRng(2024);
 /** Start Flight School: a fixed, friendly system with the tutorial switched on. */
 export function startTutorial() {
   const g = useGame.getState();
-  g.newGame(TUTORIAL_SEED, { ...TUTORIAL_SETTINGS, sound: g.settings.sound });
+  g.newGame(TUTORIAL_SEED, { ...TUTORIAL_SETTINGS, sound: g.settings.sound, musicVolume: g.settings.musicVolume, effectsVolume: g.settings.effectsVolume });
   useGame.setState({ tutorial: { active: true, step: 0, flags: [], lessons: useGame.getState().tutorial.lessons } });
 }
 

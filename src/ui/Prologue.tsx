@@ -257,7 +257,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const S = sim.current;
     if (S.stage !== 'descent' || S.d.chute !== 'stowed') return;
     S.d = deployChute(params, S.d);
-    sfx(S.d.chute === 'open' ? 'good' : 'bad');
+    sfx(S.d.chute === 'open' ? 'chute' : 'bad');
     if (S.d.chute === 'torn') setLine('The chute tore — we were going too fast for it. Engines only now.');
     else setLine('Chute open. It slows us, but not enough to land on its own — you’ll need a last burn near the ground.');
   }
@@ -528,7 +528,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         const touch = S.rescued || judged === 'crash' ? 'rescued' : judged;
         S.result = { touch, site: siteAt(terrain, S.d.x) };
         stopRumble();
-        sfx(touch === 'clean' ? 'unlock' : 'bad');
+        sfx(touch === 'clean' ? 'touchdown' : 'bad');
         goStage('landed');
         setLine(
           touch === 'clean'

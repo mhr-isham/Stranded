@@ -72,7 +72,7 @@ export function Hill() {
     const R = (h * Math.cos(theta)) / (1 - Math.cos(theta));
     setResult({ theta, R, h, untouched: Math.abs(view.current.pitch + 0.3) < 1e-9 });
     flag('hill-read');
-    sfx('log');
+    sfx('measure');
   };
 
   return (

@@ -81,7 +81,7 @@ export function Rover() {
     });
     setMarks({ A: null, B: null });
     flag('rover-captured');
-    sfx('log');
+    sfx('shutter');
   };
 
   const p = cap && marks.A && marks.B ? Math.hypot(marks.A.x - marks.B.x, marks.A.y - marks.B.y) : null;

@@ -15,6 +15,7 @@ import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId, challe
 import { CHAPTERS, chapterOf, chapterUnlocked } from '../game/campaign';
 import { LESSONS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
+import { AudioSettings } from './common/AudioSettings';
 
 /** Starting something new replaces the run in progress: ask first. */
 function okToReplace() {
@@ -264,7 +265,12 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
                 : 'Show the formula behind every step. Each mode picks a default; you can change it here or during play.'
             }
           />
-          <Toggle on={settings.sound} onChange={(v) => setSettings({ ...settings, sound: v })} label="Sound" />
+          <AudioSettings settings={settings} onChange={(value) => {
+            setSettings(value);
+            // Preview audio preferences immediately without changing run rules.
+            const current = useGame.getState().settings;
+            useGame.setState({ settings: { ...current, sound: value.sound, musicVolume: value.musicVolume, effectsVolume: value.effectsVolume } });
+          }} />
     </>
   );
 }
@@ -373,7 +379,7 @@ function FreeRoamModal({ onClose }: { onClose: () => void }) {
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
         <button
           className="btn primary big"
-          onClick={() => okToReplace() && startRun(randomSeed(), { difficulty: 'stargazer', survival: false, formulas: true, sound: s.settings.sound, freeRoam: true }, ch)}
+          onClick={() => okToReplace() && startRun(randomSeed(), { ...s.settings, challenges: [], difficulty: 'stargazer', survival: false, formulas: true, freeRoam: true }, ch)}
         >
           Start exploring
         </button>
