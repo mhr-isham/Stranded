@@ -62,8 +62,8 @@ The game has more implemented systems than its presentation currently connects. 
 
 | Principle | Current condition | Judgment and proposed rule |
 |---|---|---|
-| Same physical laws across difficulty | Shared engine exists; environmental frequencies and some corrections differ by mode | Keep the same equations. Label different hardware/allowances; distinguish assistance from removing a physical effect. |
-| No truth before commitment | Mostly protected in ordinary play; paid verification and tutorial helpers are explicit exceptions | State those exceptions honestly. Free Roam can show truth; ranked runs cannot. Never imply a predicted path is the true path. |
+| Same physical laws across difficulty | Shared engine exists; environmental frequencies and some corrections differ by mode | **Agreed — 15 November 2026.** Keep the same physical equations across difficulty; vary assistance, reserves and explicitly labeled equipment/allowances. Distinguish correction or assistance from secretly changing a physical law. |
+| No truth before commitment | Mostly protected in ordinary play; paid verification and tutorial helpers are explicit exceptions | **Agreed — 15 November 2026.** Protect hidden true system values in ordinary scored play; use observations, predictions and consistency checks for feedback. Clearly label teaching and sandbox exceptions. Never imply a predicted path is the true path. The exact availability, cost and information revealed by ECHO verification remain open for the mode-assistance discussion. |
 | One new idea at a time | Chapters have focused twists; beginners still see many controls | Keep the chapter structure; disclose tools and resource details when relevant. |
 | No quizzes in ordinary gameplay | Present direction | Explain after observations. Research concept questions can exist in an optional playtest, outside the story. |
 | Physics inside a system; fold drive between systems | Broad direction, with simplified/arcade flight portions | Mark approximations. Do not advertise every visual or mechanic as a validated physical simulation. |
