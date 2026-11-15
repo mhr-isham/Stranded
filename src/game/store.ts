@@ -13,6 +13,7 @@ import type { ProbeState } from './probeState';
 import type { AtlasCard, SystemNames } from './atlas';
 import type { FlightLeg, PilotingRecord } from './piloting';
 import { RULESET_VERSION } from './world';
+import type { ExerciseId, TrainingHistory } from './training';
 
 export type Screen =
   | 'map'
@@ -157,6 +158,9 @@ export interface GameState {
   outcome: Outcome | null;
   lastNightLog: number;
   tutorial: TutorialState;
+  training: TrainingHistory;
+  schoolOpen: { chapter?: number } | null;
+  schoolSession: { id: ExerciseId; start: number; end: number; completedSteps: string[]; assisted: boolean } | null;
   /** Identifies this run, so checkpoints from an older run are ignored. */
   runId: number;
   /** Campaign chapter of this run (1 = the first system, also used for plain expeditions). */
@@ -279,6 +283,9 @@ const initial = {
   outcome: null,
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
+  training: {} as TrainingHistory,
+  schoolOpen: null as GameState['schoolOpen'],
+  schoolSession: null as GameState['schoolSession'],
   runId: 0,
   chapter: 1,
   campaign: {} as GameState['campaign'],
@@ -337,6 +344,7 @@ export const useGame = create<GameState>()(
           atlas: get().atlas ?? [],
           logs: get().logs ?? [],
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
+          training: get().training ?? {},
         });
       },
       addReading: (r) =>

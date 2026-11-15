@@ -29,6 +29,7 @@ import { AttitudeIndicator } from './common/AttitudeIndicator';
 import { flightSensitivity } from '../game/flightInput';
 import { completeManualFlight, manualFlightRequired, markFlightAssisted } from '../game/piloting';
 import { leaveFlightPractice, startFlightPractice } from './common/flightPractice';
+import { recordTraining } from '../game/training';
 import { CanvasView } from './common/CanvasView';
 import { drawStarship } from '../render/ship';
 import { hopEstimate, hopPilot, type HopPhase } from '../engine/hop';
@@ -533,6 +534,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         const judged = judgeTouchdown(terrain, S.d, assist);
         // The prologue can't kill you: a crash counts as a rescue (with its damage).
         const touch = S.rescued || judged === 'crash' ? 'rescued' : judged;
+        if (s.settings.flightPractice) recordTraining('flight:landing', 'completed', touch === 'rescued');
         if (manualRequired && touch === 'rescued') markFlightAssisted('landing');
         S.result = { touch, site: siteAt(terrain, S.d.x) };
         stopRumble();

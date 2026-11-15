@@ -120,6 +120,17 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .nav .btn.active { background: rgba(108, 196, 255, 0.18); border-color: rgba(108, 196, 255, 0.5); }
 
 /* Missions */
+.school-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal:has(.school-library) { background: #08111f; width: min(980px, 100%); }
+.school-group { margin-top: 22px; }
+.school-group > h3 { color: var(--blue); margin-bottom: 10px; }
+.school-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.school-card h3 { font-size: 16px; margin: 0; }
+.school-card .btn { white-space: normal; text-align: left; }
+.school-card .row:last-child { margin-top: auto; }
+.school-context { color: var(--amber); font-size: 11px; }
+.hotspot[data-training-focus] { z-index: 22; }
+@media (max-width: 600px) { .school-filters { grid-template-columns: 1fr; } }
 .missions { position: absolute; left: 8px; top: calc(var(--hud-h) - 2px + var(--safe-top)); width: 300px; max-height: calc(100% - 160px); overflow: auto; z-index: 15; }
 .mission-active h3 { font-size: 16px; margin: 2px 0 6px; }
 .mission-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; }

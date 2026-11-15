@@ -15,6 +15,7 @@ import { Results } from './launch/Results';
 import { Flight } from './launch/Flight';
 import { Title } from './Title';
 import { Tutorial } from './tutorial/Tutorial';
+import { FlightSchool } from './FlightSchool';
 
 if (import.meta.env.DEV) {
   // Test hooks for automated browser checks (dev server only).
@@ -35,6 +36,7 @@ export default function App() {
   const phase = useGame((s) => s.phase);
   const runId = useGame((s) => s.runId);
   const tutorial = useGame((s) => s.tutorial.active);
+  const school = useGame((s) => s.schoolOpen);
 
   // One simulation loop for the whole game, independent of which canvas is shown.
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function App() {
       {phase === 'hop' && <Prologue key={`${runId}-hop`} hop />}
       {phase === 'results' && <Results />}
       {tutorial && <Tutorial />}
+      {school && <FlightSchool recommendedChapter={school.chapter} onClose={() => useGame.setState({ schoolOpen: null })} />}
       {phase !== 'title' && phase !== 'prologue' && <StoryHost />}
       <ToastHost />
     </>

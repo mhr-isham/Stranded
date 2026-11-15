@@ -18,6 +18,7 @@ import { flightSensitivity } from '../../game/flightInput';
 import { completeManualFlight, manualFlightRequired, markFlightAssisted } from '../../game/piloting';
 import { AttitudeIndicator } from '../common/AttitudeIndicator';
 import { leaveFlightPractice, startFlightPractice } from '../common/flightPractice';
+import { recordTraining } from '../../game/training';
 
 const SPEED = 20; // simulated seconds per real second
 /** Pitch change while a control is held (rad per simulated second): ~23° per real second. */
@@ -74,6 +75,7 @@ export function Ascent() {
     const x = st.current;
     const penalty = Math.max(-150, Math.min(cap, x.dv - baseline));
     setDone({ dv: x.dv, penalty, auto: usedAuto });
+    if (s.settings.flightPractice) recordTraining('flight:ascent', 'completed', usedAuto);
     if (!usedAuto) completeManualFlight('ascent');
     stopRumble();
     sfx(penalty < 200 ? 'unlock' : 'good');

@@ -142,6 +142,7 @@ export function Hud() {
       {menu && (
         <Modal top onClose={() => setMenu(false)}>
           <h2>Expedition</h2>
+          <button className="btn small" onClick={() => { s.set({ schoolOpen: { chapter: s.chapter } }); setMenu(false); }}>Open Flight School</button>
           <dl className="kv" style={{ margin: '8px 0 12px' }}>
             <dt>System seed</dt>
             <dd>{s.seed}</dd>

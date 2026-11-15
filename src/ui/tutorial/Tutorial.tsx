@@ -6,6 +6,9 @@ import { clock, setWarp } from '../../game/clock';
 import { useGame } from '../../game/store';
 import { LESSONS, type LessonId } from './lessons';
 import { STEPS, type TutStep } from './steps';
+import { recordTraining } from '../../game/training';
+import { finishSchoolExercise, schoolExerciseComplete } from './schoolPractice';
+import { leaveFlightPractice } from '../common/flightPractice';
 
 /** Render **bold** markup. */
 export function rich(text: string): ReactNode {
@@ -34,6 +37,7 @@ function targetBox(target: string | undefined): Box | null {
     for (const el of els) {
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
+      if (el.classList.contains('hotspot')) el.setAttribute('data-training-focus', 'true');
       // Keep the target clear of the HUD (top) and the nav bar (bottom).
       const navTop = document.querySelector('nav.nav')?.getBoundingClientRect().top ?? window.innerHeight;
       const hidden = r.top > navTop - 12 || r.bottom < 70 || (r.bottom > navTop && r.height < navTop * 0.5);
@@ -50,8 +54,14 @@ function targetBox(target: string | undefined): Box | null {
 export function LessonModal({ id, onClose }: { id: LessonId; onClose: () => void }) {
   const L = LESSONS[id];
   useEffect(() => {
+    const wasPaused = clock.paused;
+    const runId = useGame.getState().runId;
+    clock.paused = true;
+    clock.emit();
     const s = useGame.getState();
     if (!s.tutorial.lessons.includes(id)) useGame.setState({ tutorial: { ...s.tutorial, lessons: [...s.tutorial.lessons, id] } });
+    recordTraining(`lesson:${id}`, 'started');
+    return () => { if (useGame.getState().runId === runId) { clock.paused = wasPaused; clock.emit(); } };
   }, [id]);
   // Portal to <body> so the lesson sits above every screen's stacking context.
   return createPortal(
@@ -67,7 +77,7 @@ export function LessonModal({ id, onClose }: { id: LessonId; onClose: () => void
         </div>
         <L.C />
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-          <button className="btn primary" onClick={onClose}>
+          <button className="btn primary" onClick={() => { recordTraining(`lesson:${id}`, 'completed'); onClose(); }}>
             Got it
           </button>
         </div>
@@ -81,6 +91,9 @@ export function Tutorial() {
   const s = useGame();
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const step = STEPS[idx];
+  const session = s.schoolSession;
+  const first = session?.start ?? 0;
+  const last = session?.end ?? STEPS.length - 1;
   const [box, setBox] = useState<Box | null>(null);
   const [lesson, setLesson] = useState<LessonId | null>(null);
   const [mini, setMini] = useState(false);
@@ -90,8 +103,11 @@ export function Tutorial() {
   const advancing = useRef<number | null>(null);
 
   const goStep = (i: number) => {
-    const next = Math.max(0, Math.min(STEPS.length - 1, i));
-    useGame.setState({ tutorial: { ...useGame.getState().tutorial, step: next, note: undefined } });
+    const next = Math.max(first, Math.min(last, i));
+    const current = useGame.getState();
+    const completedSteps = current.schoolSession && (!step.done || step.done(current))
+      ? [...new Set([...current.schoolSession.completedSteps, step.id])] : current.schoolSession?.completedSteps;
+    useGame.setState({ tutorial: { ...current.tutorial, step: next, note: undefined }, ...(current.schoolSession ? { schoolSession: { ...current.schoolSession, completedSteps: completedSteps! } } : {}) });
   };
 
   // Track the target box every frame (things move: canvases, scrolling panels).
@@ -104,6 +120,10 @@ export function Tutorial() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
+  }, [step.target]);
+
+  useEffect(() => () => {
+    document.querySelectorAll('.hotspot[data-training-focus]').forEach((el) => el.removeAttribute('data-training-focus'));
   }, [step.target]);
 
   // Step entry: run its hook, calm the clock and open its lesson.
@@ -180,7 +200,7 @@ export function Tutorial() {
   }
 
   const missingTarget = step.target && !box && step.screen && s.screen !== step.screen && s.phase === 'play';
-  const progress = (idx + 1) / STEPS.length;
+  const progress = (idx - first + 1) / (last - first + 1);
   const chapters = [...new Set(STEPS.map((x) => x.chapter))];
   const chapterNo = chapters.indexOf(step.chapter) + 1;
 
@@ -195,7 +215,7 @@ export function Tutorial() {
       <div className={`tut-card panel ${mini ? 'mini' : ''} ${box ? '' : 'free'}`} style={cardStyle} role="dialog" aria-label="Flight School">
         <div className="row between">
           <span className="meter-label" style={{ color: 'var(--amber)' }}>
-            🎓 Flight School · {chapterNo}/{chapters.length} {step.chapter}
+            🎓 Flight School · {session ? `${idx - first + 1}/${last - first + 1}` : `${chapterNo}/${chapters.length}`} {step.chapter}
           </span>
           <span className="row" style={{ gap: 2 }}>
             <button className="btn small ghost" onClick={() => setMini(!mini)} aria-label={mini ? 'Expand' : 'Minimise'} title={mini ? 'Expand' : 'Minimise'}>
@@ -213,7 +233,8 @@ export function Tutorial() {
           {step.title} {done && step.done && <span className="tut-done">✓</span>}
         </h3>
         <div className="body">
-          {step.body.map((p, i) => (
+          {session && <p className="school-context">Unscored practice. Prerequisite observations may be supplied for this exercise; your expedition is preserved. Completing this guide records practice, not a skill certification.</p>}
+          {(session && step.id === 'debrief-grade' ? ['This practice run is unscored. Inspect the fuel and measurement feedback, then finish the exercise to restore your expedition.'] : step.body).map((p, i) => (
             <p key={i}>{rich(p)}</p>
           ))}
         </div>
@@ -270,27 +291,30 @@ export function Tutorial() {
             </button>
           )}
           {step.doIt && !done && (
-            <button className="btn small" onClick={() => (step.doIt!.run(), sfx('click'))} title="ECHO does this step for you — you learn more doing it yourself">
+            <button className="btn small" onClick={() => { const current = useGame.getState(); if (current.schoolSession) useGame.setState({ schoolSession: { ...current.schoolSession, assisted: true } }); step.doIt!.run(); sfx('click'); }} title="ECHO does this step for you — you learn more doing it yourself">
               🤖 {step.doIt.label ?? 'Do it for me'}
             </button>
           )}
           <span className="spacer" />
-          <button className="btn small ghost" disabled={idx === 0} onClick={() => goStep(idx - 1)}>
+          <button className="btn small ghost" disabled={idx === first} onClick={() => goStep(idx - 1)}>
             Back
           </button>
-          {idx < STEPS.length - 1 ? (
+          {idx < last ? (
             <button className={`btn small ${!step.done || done ? 'primary' : ''}`} onClick={() => goStep(idx + 1)} title={step.done && !done ? 'Skip this step' : undefined}>
               {step.done && !done ? 'Skip' : 'Next'}
             </button>
           ) : (
             <button
               className="btn small primary"
+              disabled={!!session && !schoolExerciseComplete(s)}
+              title={session && !schoolExerciseComplete(s) ? 'Revisit skipped required steps, or use Exit tutorial to skip this exercise for now.' : undefined}
               onClick={() => {
+                if (session) { finishSchoolExercise(); return; }
                 exitTutorial();
                 useGame.setState({ phase: 'title', outcome: null, debriefSeen: true });
               }}
             >
-              Finish
+              {session ? 'Finish exercise' : 'Finish'}
             </button>
           )}
         </div>
@@ -300,17 +324,21 @@ export function Tutorial() {
         <div className="modal-back" style={{ zIndex: 96 }} onPointerDown={(e) => e.target === e.currentTarget && setConfirmExit(false)}>
           <div className="modal panel">
             <h2>Leave Flight School?</h2>
-            <p className="muted">You can keep playing this system without the guide, or go back to the title screen. Lessons stay available in the Codex.</p>
+            <p className="muted">{session ? 'Your expedition will be restored. Return now to leave this exercise in progress, or explicitly skip it for now. You can repeat it from Flight School at any time.' : 'You can keep playing this system without the guide, or go back to the title screen. Lessons stay available in the Codex.'}</p>
             <div className="row" style={{ justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setConfirmExit(false)}>
                 Stay
               </button>
-              <button className="btn" onClick={() => (exitTutorial(), setConfirmExit(false))}>
+              {session ? <>
+                <button className="btn" onClick={leaveFlightPractice}>Return to library</button>
+                <button className="btn primary" onClick={() => finishSchoolExercise(true)}>Skip exercise for now</button>
+              </> : <><button className="btn" onClick={() => (exitTutorial(), setConfirmExit(false))}>
                 Continue without guide
               </button>
               <button className="btn primary" onClick={() => (exitTutorial(), useGame.setState({ phase: 'title' }), setConfirmExit(false))}>
                 Title screen
               </button>
+              </>}
             </div>
           </div>
         </div>

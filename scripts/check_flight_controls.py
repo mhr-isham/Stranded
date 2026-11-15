@@ -33,7 +33,7 @@ with sync_playwright() as p:
         page.goto('http://localhost:5173/', wait_until='networkidle')
         page.evaluate('''()=>{__game.getState().newGame(91,{difficulty:'navigator',survival:false,formulas:true,sound:false});__game.getState().setSheet('g',{value:9.81,sigma:.2});__clock.t=123;__clock.paused=true;__game.setState({phase:'title',savedT:123})}''')
         page.get_by_role('button', name='Flight School', exact=False).click()
-        page.get_by_role('combobox').select_option('astronomer')
+        page.get_by_role('combobox', name='Practice handling', exact=True).select_option('astronomer')
         page.get_by_role('button', name='Practice ascent', exact=True).click()
         page.wait_for_function("__game.getState().phase==='ascent'", timeout=60000)
         page.get_by_role('button', name='Ready to fly', exact=True).click()
@@ -80,8 +80,7 @@ with sync_playwright() as p:
         assert page.evaluate('__game.getState().sheet.g.value') == 9.81
         assert page.evaluate('__clock.t') == 123
         assert page.evaluate('__game.getState().atlas.length') == 0
-        page.get_by_role('button', name='Flight School', exact=False).click()
-        page.get_by_role('combobox').select_option('astronomer')
+        page.get_by_role('combobox', name='Practice handling', exact=True).select_option('astronomer')
         page.get_by_role('button', name='Practice entry and landing', exact=True).click()
         page.wait_for_function("__game.getState().phase==='landing'", timeout=60000)
         page.screenshot(path=str(out / f'entry-{width}.png'))
