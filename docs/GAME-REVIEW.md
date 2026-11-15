@@ -50,9 +50,13 @@ Status vocabulary:
 
 The best emotional promise is equally distinctive: your measurements keep people alive and finish another navigator's journey. Surface logistics and manual flight should make that promise tangible, rather than become separate games that delay it.
 
+**Discussion decision — 15 November 2026:** Astronomy remains the main activity. Broad expedition exploration, survival, driving and flying should also receive substantial attention and enjoyable gameplay, serving a wider range of players. They are significant parts of the experience, not merely brief transitions between measurements. This accepts the overall identity; it does not approve the current plot or character treatment. The story and characters need substantial further discussion and potential revamping under section 10 before their related implementations are settled.
+
 ### DIR-02 — The central problem
 
 The game has more implemented systems than its presentation currently connects. A player can measure, drive, process ice, read a log and watch a transfer without understanding how these activities affect one another. Adding more buttons will not solve that. Prioritize visible consequences: a better sighting changes a predicted corridor; a journey finds an observing site; a crew member reacts to a decision; a repaired instrument changes the camp.
+
+**Discussion decision — 15 November 2026:** The principle of visible connections and consequences between systems is accepted. Separate technical connections (measurement → model → flight, travel → observing conditions) from narrative connections (crew reactions, meaningful repairs, physical story artifacts). Carry the latter into section 10 and its character/story discussion. The examples above are discussion directions, not blanket approval of specific mechanics, scenes or a frozen narrative. Implement each concrete connection when its corresponding feature and dependencies have been discussed.
 
 ### DIR-03 — Principles to preserve and clarify
 
