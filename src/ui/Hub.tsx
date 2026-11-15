@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { DEG } from '../engine/constants';
 import { clock } from '../game/clock';
 import { activeMission } from '../game/missions';
+import { useMode } from '../game/modes';
 import { currentWorld } from '../game/sim';
 import { useGame, type Screen } from '../game/store';
 import { skyColors } from '../render/color';
@@ -20,8 +21,10 @@ export function Hub() {
   const { system: sys, catalog } = currentWorld();
   const survival = useGame((s) => s.settings.survival);
   const chapter = useGame((s) => s.chapter);
+  const freeRoam = useGame((s) => !!s.settings.freeRoam);
   const go = useGame((s) => s.go);
   const next = useGame((s) => activeMission(s));
+  const guidance = useMode().coaching;
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const stations = useMemo<HubStation[]>(() => {
     const list: HubStation[] = [
@@ -33,10 +36,10 @@ export function Hub() {
       { kind: 'hill', az: land.hillAz, alt: land.ridges[1].alt(land.hillAz) - 0.2 * DEG, size: 2.2 * DEG, label: 'The hill', icon: '⛰', screen: 'hill' },
     ];
     if (survival) list.push({ kind: 'workshop' as StationKind, az: 207 * DEG, alt: -3 * DEG, size: 5 * DEG, label: 'Workshop', icon: '🔧', screen: 'workshop' });
-    if (chapter === 2) list.push({ kind: 'probe', az: 130 * DEG, alt: -3.4 * DEG, size: 5 * DEG, label: 'Probe bay', icon: '🛰', screen: 'probe' });
-    if (chapter === 3) list.push({ kind: 'gnomon', az: 154 * DEG, alt: -3.6 * DEG, size: 3.5 * DEG, label: 'Shadow stick', icon: '📐', screen: 'gnomon' });
+    if (chapter === 2 || freeRoam) list.push({ kind: 'probe', az: 130 * DEG, alt: -3.4 * DEG, size: 5 * DEG, label: 'Probe bay', icon: '🛰', screen: 'probe' });
+    if (chapter === 3 || freeRoam) list.push({ kind: 'gnomon', az: 154 * DEG, alt: -3.6 * DEG, size: 3.5 * DEG, label: 'Shadow stick', icon: '📐', screen: 'gnomon' });
     return list;
-  }, [land, survival, chapter]);
+  }, [land, survival, chapter, freeRoam]);
   const tagRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const cam = useRef({ az: 165 * DEG, drag: null as null | { x: number; az: number }, scale: 1 });
 
@@ -87,7 +90,7 @@ export function Hub() {
           style={{ transform: 'translate(-9999px,0)' }}
           onClick={() => go(st.screen)}
         >
-          <span className={`tag ${next?.screen === st.screen ? 'next' : ''}`}>
+          <span className={`tag ${guidance && next?.screen === st.screen ? 'next' : ''}`}>
             {st.icon} {st.label}
           </span>
           <span className="stem" />

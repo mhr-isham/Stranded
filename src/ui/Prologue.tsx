@@ -282,6 +282,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (later) {
+      if (s.settings.freeRoam) { useGame.setState({ camp, phase: 'play', screen: 'hub', storyQueue: [], echo: [] }); return; }
       // A new chapter: straight to camp, then the chapter's briefing.
       useGame.setState({ camp });
       beginPlay();
@@ -289,6 +290,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       if (b) unlockLog(b);
       return;
     }
+    if (s.settings.freeRoam) { useGame.setState({ camp, phase: 'play', screen: 'hub', storyQueue: [], echo: [] }); return; }
     unlockLog('fall', false);
     useGame.setState({ camp, phase: 'intro' });
   };
@@ -306,6 +308,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       useGame.setState({ camp: { ...campAt(hopTo, 'skipped'), landing: s.camp?.landing ?? 'skipped' }, hop: null, phase: 'play', screen: 'map' });
       return;
     }
+    if (s.settings.freeRoam) { useGame.setState({ camp: campAt(x, 'skipped'), phase: 'play', screen: 'hub', storyQueue: [], echo: [] }); return; }
     if (!later) unlockLog('fall', false);
     useGame.setState({ camp: campAt(x, 'skipped') });
     beginPlay();

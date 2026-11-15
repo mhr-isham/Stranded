@@ -36,7 +36,7 @@ export function Game() {
 
   useEffect(() => {
     const g = useGame.getState();
-    g.say(modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
+    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
     checkMissions();
   }, []);
 

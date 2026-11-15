@@ -349,7 +349,7 @@ export const LOGS: Record<string, StoryLog> = {
 /** Unlock a log and (optionally) play its scene now. */
 export function unlockLog(id: keyof typeof LOGS | string, play = true) {
   const s = useGame.getState();
-  if (s.tutorial.active || !LOGS[id]) return;
+  if (s.tutorial.active || s.settings.freeRoam || !LOGS[id]) return;
   const logs = s.logs.includes(id) ? s.logs : [...s.logs, id];
   useGame.setState({ logs, storyQueue: play && !s.logs.includes(id) ? [...s.storyQueue, id] : s.storyQueue });
 }

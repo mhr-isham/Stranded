@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useGame, type Settings } from '../../game/store';
 import { world } from '../../game/world';
 import { clock, subscribeClock } from '../../game/clock';
+import { campDistances, terrainFor } from '../../game/surface';
 
 /** A dialog. Closes on the backdrop, Esc or its ✕ when it has `onClose`; `top` puts it above the tutorial card. */
 export function Modal({ children, onClose, top }: { children: ReactNode; onClose?: () => void; top?: boolean }) {
@@ -30,10 +31,19 @@ export function Modal({ children, onClose, top }: { children: ReactNode; onClose
 
 export function Toggle({ on, onChange, label, sub }: { on: boolean; onChange: (v: boolean) => void; label: ReactNode; sub?: ReactNode }) {
   return (
-    <button type="button" className="toggle btn ghost" style={{ width: '100%', borderRadius: 0, padding: '10px 0' }} onClick={() => onChange(!on)}>
+    <button
+      type="button"
+      className="toggle btn ghost"
+      style={{ width: '100%', borderRadius: 0, padding: '10px 0' }}
+      onClick={() => onChange(!on)}
+    >
       <span style={{ textAlign: 'left' }}>
         <div style={{ fontWeight: 600 }}>{label}</div>
-        {sub && <div className="muted" style={{ fontSize: 12, fontWeight: 400, whiteSpace: 'normal' }}>{sub}</div>}
+        {sub && (
+          <div className="muted" style={{ fontSize: 12, fontWeight: 400, whiteSpace: 'normal' }}>
+            {sub}
+          </div>
+        )}
       </span>
       <span className={`switch ${on ? 'on' : ''}`} />
     </button>
@@ -52,10 +62,7 @@ export function useGameTime(hz = 8) {
 
 /** Re-render when warp / pause state changes. */
 export function useClockState() {
-  return useSyncExternalStore(
-    subscribeClock,
-    () => `${clock.warpIndex}:${clock.paused}:${clock.realtime}`,
-  );
+  return useSyncExternalStore(subscribeClock, () => `${clock.warpIndex}:${clock.paused}:${clock.realtime}`);
 }
 
 let toastSetter: ((s: string | null) => void) | null = null;
@@ -88,8 +95,23 @@ export function startRun(seed: number, settings: Settings, chapter = 1) {
   requestAnimationFrame(() =>
     setTimeout(() => {
       try {
-        world(seed, settings.difficulty, chapter);
+        const { system } = world(seed, settings.difficulty, chapter);
         useGame.getState().newGame(seed, settings, chapter);
+        if (settings.freeRoam) {
+          const terrain = terrainFor(system);
+          const flat = terrain.features.find((f) => f.kind === 'flat')!;
+          const x = (flat.x0 + flat.x1) / 2;
+          clock.t = 1;
+          clock.paused = true;
+          useGame.setState({
+            phase: 'play',
+            screen: 'hub',
+            savedT: 1,
+            identified: true,
+            camp: { x, landing: 'skipped', ...campDistances(terrain, x) },
+          });
+          clock.emit();
+        }
       } finally {
         el.remove();
       }

@@ -12,7 +12,7 @@ import { CanvasView } from './common/CanvasView';
 import { Modal, Toggle, startRun } from './common/widgets';
 import { AtlasGrid, CalibrationPanel } from './Atlas';
 import { CHALLENGES, CHALLENGE_IDS, challengesUnlocked, type ChallengeId, challengeRedundant } from '../game/challenges';
-import { CHAPTERS, chapterOf, chapterUnlocked } from '../game/campaign';
+import { CHAPTERS, chapterOf, chapterUnlocked, expeditionChapters } from '../game/campaign';
 import { LESSONS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
 import { AudioSettings } from './common/AudioSettings';
@@ -33,6 +33,7 @@ export function Title() {
   const [roam, setRoam] = useState(false);
   const [settings, setSettings] = useState<Settings>({ ...s.settings });
   const [seedText, setSeedText] = useState('');
+  const [expeditionChapter, setExpeditionChapter] = useState(1);
   const demo = useMemo(() => {
     const sys = generateSystem(20251, 'navigator');
     return { sys, cat: starCatalog(sys.seed), land: makeLandscape(sys.seed, sys.hillHeight) };
@@ -43,7 +44,7 @@ export function Title() {
   const inTutorial = s.tutorial.active;
 
   const start = (seed: number) => {
-    if (okToReplace()) startRun(seed, settings);
+    if (okToReplace()) startRun(seed, { ...settings, freeRoam: false, showTruth: false, campaignRun: false }, expeditionChapter);
   };
 
   return (
@@ -60,10 +61,15 @@ export function Title() {
       <div className="title-wrap">
         <div className="logo">STRANDED</div>
         <p className="tagline">
-          Your ship fell into an unknown star system. No catalogue. No radio. Fixed fuel. Measure the system with your own hands — then
-          plot a course to the blue planet before the air runs out.
+          Your ship fell into an unknown star system. No catalogue. No radio. Fixed fuel. Measure the system with your own hands — then plot
+          a course to the blue planet before the air runs out.
         </p>
         <div className="menu">
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+            Campaign: scored story · Expedition: scored single system
+            <br />
+            Flight School: guided practice, unscored · Free Roam: no score or deadline
+          </p>
           {canContinue && (
             <button className="btn primary big" onClick={() => useGame.setState({ phase: 'play' })}>
               {inTutorial ? 'Continue Flight School' : 'Continue'}
@@ -97,11 +103,35 @@ export function Title() {
       {setup && (
         <Modal onClose={() => setSetup(false)}>
           <h2>Single expedition</h2>
-          <p className="muted" style={{ margin: '2px 0 8px', fontSize: 13 }}>One star system like the first chapter — random, daily or from a seed.</p>
+          <p className="muted" style={{ margin: '2px 0 8px', fontSize: 13 }}>
+            One scored star system with fuel and life-support limits set by your mode. Choose random, daily or a seed.
+          </p>
+          <label className="field">
+            System variation
+            <select className="input" value={expeditionChapter} onChange={(e) => setExpeditionChapter(Number(e.target.value))}>
+              {expeditionChapters(s).map((c) => (
+                <option key={c.n} value={c.n}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted" style={{ fontSize: 13 }}>
+            {chapterOf(expeditionChapter).idea}
+          </p>
+          <p className="faint" style={{ fontSize: 12 }}>
+            Complete Campaign chapters to unlock their variations here. Free Roam offers all system types for practice.
+          </p>
           <ModeSettings settings={settings} setSettings={setSettings} />
           <div className="field" style={{ marginTop: 12 }}>
             <label>System seed (optional — share it so friends play the same system)</label>
-            <input className="input" inputMode="numeric" placeholder="random" value={seedText} onChange={(e) => setSeedText(e.target.value.replace(/\D/g, ''))} />
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="random"
+              value={seedText}
+              onChange={(e) => setSeedText(e.target.value.replace(/\D/g, ''))}
+            />
           </div>
           <div className="row" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={() => start(dailySeed())}>
@@ -131,19 +161,19 @@ export function Title() {
           <h2>How to play</h2>
           <div className="stack muted" style={{ fontSize: 14 }}>
             <p style={{ margin: 0 }}>
-              <b className="blue">Measure.</b> Use the pendulum, the hill, the observatory and the rover. Every tool is operated by you, so the
-              errors are yours too — repeat readings and use long baselines to shrink them.
+              <b className="blue">Measure.</b> Use the pendulum, the hill, the observatory and the rover. Every tool is operated by you, so
+              the errors are yours too — repeat readings and use long baselines to shrink them.
             </p>
             <p style={{ margin: 0 }}>
-              <b className="blue">Record honestly.</b> Each value goes on the progress sheet with a ± error. The score rewards honest error bars:
-              a tight range that misses the truth scores worse than a wide one that contains it.
+              <b className="blue">Record honestly.</b> Each value goes on the progress sheet with a ± error. The score rewards honest error
+              bars: a tight range that misses the truth scores worse than a wide one that contains it.
             </p>
             <p style={{ margin: 0 }}>
               <b className="blue">Use time.</b> Warp time to watch the sky move — but life support runs down while you wait.
             </p>
             <p style={{ margin: 0 }}>
-              <b className="blue">Launch.</b> Plan a transfer from your own numbers. ECHO flies it through the real system: bad numbers cost fuel on
-              course corrections.
+              <b className="blue">Launch.</b> Plan a transfer from your own numbers. ECHO flies it through the real system: bad numbers cost
+              fuel on course corrections.
             </p>
           </div>
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
@@ -174,109 +204,130 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
   };
   return (
     <>
-          <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
-            Pick a mode. The physics is the same in all of them — only the spare fuel, spare air and help change.
-          </p>
-          <div className="mode-pick" role="radiogroup" aria-label="Mode">
-            {MODE_ORDER.map((id, i) => (
+      <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
+        Pick a mode. The physics is the same in all of them — only the spare fuel, spare air and help change.
+      </p>
+      <div className="mode-pick" role="radiogroup" aria-label="Mode">
+        {MODE_ORDER.map((id, i) => (
+          <button
+            key={id}
+            role="radio"
+            aria-checked={settings.difficulty === id}
+            className={`mode-chip ${settings.difficulty === id ? 'on' : ''}`}
+            onClick={() =>
+              setSettings({
+                ...settings,
+                difficulty: id,
+                challenges: id === 'astronomer' || id === 'legend' ? settings.challenges : [],
+                formulas: MODES[id].formulas,
+                survival:
+                  MODES[id].survivalForced || ((id === 'astronomer' || id === 'legend') && settings.challenges?.includes('survival'))
+                    ? true
+                    : MODES[settings.difficulty].survivalForced
+                      ? false
+                      : settings.survival,
+              })
+            }
+          >
+            <span className="mode-pips" aria-hidden>
+              {MODE_ORDER.map((_, k) => (
+                <i key={k} className={k <= i ? 'on' : ''} />
+              ))}
+            </span>
+            {MODES[id].name}
+          </button>
+        ))}
+      </div>
+      {(() => {
+        const m = MODES[settings.difficulty];
+        return (
+          <div className="mode-detail">
+            <b>
+              {m.name} <em>{m.tag}</em>
+            </b>
+            <span className="diff-for">{m.forWho}</span>
+            <ul>
+              {m.expect.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
+      {hard && challengesUnlocked({ atlas }) && (
+        <div className="callout key" style={{ margin: '0 0 8px' }}>
+          <b>Astronomer Challenges · +5% score each</b>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            {CHALLENGE_IDS.map((id) => (
               <button
                 key={id}
-                role="radio"
-                aria-checked={settings.difficulty === id}
-                className={`mode-chip ${settings.difficulty === id ? 'on' : ''}`}
-                onClick={() =>
-                  setSettings({
-                    ...settings,
-                    difficulty: id,
-                    challenges: id === 'astronomer' || id === 'legend' ? settings.challenges : [],
-                    formulas: MODES[id].formulas,
-                    survival:
-                      MODES[id].survivalForced || ((id === 'astronomer' || id === 'legend') && settings.challenges?.includes('survival'))
-                        ? true
-                        : MODES[settings.difficulty].survivalForced
-                          ? false
-                          : settings.survival,
-                  })
+                className={`btn small ${chosen.includes(id) ? 'primary' : ''}`}
+                disabled={challengeRedundant(settings.difficulty, id)}
+                title={
+                  challengeRedundant(settings.difficulty, id) ? `Already part of ${MODES[settings.difficulty].name}` : CHALLENGES[id].text
                 }
+                onClick={() => toggleChallenge(id)}
               >
-                <span className="mode-pips" aria-hidden>
-                  {MODE_ORDER.map((_, k) => (
-                    <i key={k} className={k <= i ? 'on' : ''} />
-                  ))}
-                </span>
-                {MODES[id].name}
+                {CHALLENGES[id].icon} {CHALLENGES[id].name}
               </button>
             ))}
           </div>
-          {(() => {
-            const m = MODES[settings.difficulty];
-            return (
-              <div className="mode-detail">
-                <b>
-                  {m.name} <em>{m.tag}</em>
-                </b>
-                <span className="diff-for">{m.forWho}</span>
-                <ul>
-                  {m.expect.map((e) => (
-                    <li key={e}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })()}
-          {hard && challengesUnlocked({ atlas }) && (
-            <div className="callout key" style={{ margin: '0 0 8px' }}>
-              <b>Astronomer Challenges · +5% score each</b>
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                {CHALLENGE_IDS.map((id) => (
-                  <button
-                    key={id}
-                    className={`btn small ${chosen.includes(id) ? 'primary' : ''}`}
-                    disabled={challengeRedundant(settings.difficulty, id)}
-                    title={challengeRedundant(settings.difficulty, id) ? `Already part of ${MODES[settings.difficulty].name}` : CHALLENGES[id].text}
-                    onClick={() => toggleChallenge(id)}
-                  >
-                    {CHALLENGES[id].icon} {CHALLENGES[id].name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {hard && !challengesUnlocked({ atlas }) && (
-            <div className="faint" style={{ fontSize: 12, margin: '0 0 8px' }}>Reach orbit once in Astronomer to unlock eight optional Astronomer Challenges.</div>
-          )}
-          <Toggle
-            on={settings.survival}
-            onChange={(v) => !MODES[settings.difficulty].survivalForced && !chosen.includes('survival') && setSettings({ ...settings, survival: v })}
-            label="Survival mode"
-            sub={
-              MODES[settings.difficulty].survivalForced
-                ? 'Always on in Legend.'
-                : 'Manage oxygen, food and power. Weather can cloud the sky. Salvage the wreck to upgrade your tools.'
-            }
-          />
-          <Toggle
-            on={settings.formulas}
-            onChange={(v) => !MODES[settings.difficulty].formulasLocked && !chosen.includes('noFormula') && setSettings({ ...settings, formulas: v })}
-            label="Formula sheet"
-            sub={
-              MODES[settings.difficulty].formulasLocked
-                ? 'Not available in Legend.'
-                : 'Show the formula behind every step. Each mode picks a default; you can change it here or during play.'
-            }
-          />
-          <AudioSettings settings={settings} onChange={(value) => {
-            setSettings(value);
-            // Preview audio preferences immediately without changing run rules.
-            const current = useGame.getState().settings;
-            useGame.setState({ settings: { ...current, sound: value.sound, musicVolume: value.musicVolume, effectsVolume: value.effectsVolume } });
-          }} />
+        </div>
+      )}
+      {hard && !challengesUnlocked({ atlas }) && (
+        <div className="faint" style={{ fontSize: 12, margin: '0 0 8px' }}>
+          Reach orbit once in Astronomer to unlock eight optional Astronomer Challenges.
+        </div>
+      )}
+      <Toggle
+        on={settings.survival}
+        onChange={(v) =>
+          !MODES[settings.difficulty].survivalForced && !chosen.includes('survival') && setSettings({ ...settings, survival: v })
+        }
+        label="Survival mode"
+        sub={
+          MODES[settings.difficulty].survivalForced
+            ? 'Always on in Legend.'
+            : 'Manage oxygen, food and power. Weather can cloud the sky. Salvage the wreck to upgrade your tools.'
+        }
+      />
+      <Toggle
+        on={settings.formulas}
+        onChange={(v) =>
+          !MODES[settings.difficulty].formulasLocked && !chosen.includes('noFormula') && setSettings({ ...settings, formulas: v })
+        }
+        label="Formula sheet"
+        sub={
+          MODES[settings.difficulty].formulasLocked
+            ? 'Not available in Legend.'
+            : 'Show the formula behind every step. Each mode picks a default; you can change it here or during play.'
+        }
+      />
+      <AudioSettings
+        settings={settings}
+        onChange={(value) => {
+          setSettings(value);
+          // Preview audio preferences immediately without changing run rules.
+          const current = useGame.getState().settings;
+          useGame.setState({
+            settings: { ...current, sound: value.sound, musicVolume: value.musicVolume, effectsVolume: value.effectsVolume },
+          });
+        }}
+      />
     </>
   );
 }
 
 /** Chapters in order; each opens when the previous one is completed. Lessons are optional. */
-function CampaignModal({ settings, setSettings, onClose }: { settings: Settings; setSettings: (s: Settings) => void; onClose: () => void }) {
+function CampaignModal({
+  settings,
+  setSettings,
+  onClose,
+}: {
+  settings: Settings;
+  setSettings: (s: Settings) => void;
+  onClose: () => void;
+}) {
   const s = useGame();
   const [pick, setPick] = useState<number | null>(null);
   const [lesson, setLesson] = useState<LessonId | null>(null);
@@ -287,22 +338,36 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
         <>
           <h2>Campaign</h2>
           <p className="muted" style={{ margin: '2px 0 10px', fontSize: 13 }}>
-            Follow the Halcyon’s trail home. Each chapter is a new star system that needs one new idea.
+            Follow the Halcyon’s trail home in a scored, nine-chapter journey. Each system teaches a new idea. Choose difficulty for each
+            chapter; fuel and life-support pressure follow that mode.
           </p>
           <div className="stack" style={{ gap: 8 }}>
             {CHAPTERS.map((c) => {
               const open = c.ready && chapterUnlocked(s, c.n);
               const prog = s.campaign[c.n];
-              const best = prog ? Object.entries(prog.best).map(([m, b]) => `${MODES[m as keyof typeof MODES]?.name ?? m} ${b!.grade}`).join(' · ') : '';
+              const best = prog
+                ? Object.entries(prog.best)
+                    .map(([m, b]) => `${MODES[m as keyof typeof MODES]?.name ?? m} ${b!.grade}`)
+                    .join(' · ')
+                : '';
               return (
-                <button key={c.n} className={`panel panel-pad chapter-row ${open ? '' : 'locked'}`} disabled={!open} onClick={() => setPick(c.n)}>
+                <button
+                  key={c.n}
+                  className={`panel panel-pad chapter-row ${open ? '' : 'locked'}`}
+                  disabled={!open}
+                  onClick={() => setPick(c.n)}
+                >
                   <span className="chapter-n">{c.n}</span>
                   <span style={{ flex: 1, textAlign: 'left' }}>
                     <b>{c.title}</b>
                     <span className="muted" style={{ display: 'block', fontSize: 12 }}>
                       {c.ready ? c.idea : 'In development'}
                     </span>
-                    {best && <span className="faint" style={{ display: 'block', fontSize: 11 }}>Best: {best}</span>}
+                    {best && (
+                      <span className="faint" style={{ display: 'block', fontSize: 11 }}>
+                        Best: {best}
+                      </span>
+                    )}
                   </span>
                   <span style={{ fontSize: 18 }}>{prog?.done ? '✓' : open ? '▶' : '🔒'}</span>
                 </button>
@@ -338,12 +403,19 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
                   </button>
                 ))}
               </div>
-              <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>A few minutes. Skip it if you like — it stays in the Codex.</div>
+              <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>
+                A few minutes. Skip it if you like — it stays in the Codex.
+              </div>
             </div>
           )}
           <ModeSettings settings={settings} setSettings={setSettings} />
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-            <button className="btn primary big" onClick={() => okToReplace() && startRun(randomSeed(), settings, ch.n)}>
+            <button
+              className="btn primary big"
+              onClick={() =>
+                okToReplace() && startRun(randomSeed(), { ...settings, freeRoam: false, showTruth: false, campaignRun: true }, ch.n)
+              }
+            >
               Start chapter {ch.n}
             </button>
           </div>
@@ -357,14 +429,16 @@ function CampaignModal({ settings, setSettings, onClose }: { settings: Settings;
 /** No deadline, no score: explore any system you have reached, with an optional true-value overlay. */
 function FreeRoamModal({ onClose }: { onClose: () => void }) {
   const s = useGame();
-  const options = CHAPTERS.filter((c) => c.ready && (c.n === 1 || s.campaign[c.n]?.done || chapterUnlocked(s, c.n)));
+  const options = CHAPTERS.filter((c) => c.ready);
   const [ch, setCh] = useState(1);
+  const [guidance, setGuidance] = useState(false);
+  const [truth, setTruth] = useState(false);
   return (
     <Modal onClose={onClose}>
       <h2>Free Roam</h2>
       <p className="muted" style={{ margin: '2px 0 10px', fontSize: 13 }}>
-        No deadline and no score. All the tools, the rover, the ship and the sky — measure, explore, hop around, draw your own conclusions. In the menu
-        you can switch on a sandbox overlay that shows the true values.
+        No deadline and no score. All the tools, the rover, the ship and the sky — measure, explore, hop around, draw your own conclusions.
+        In the menu you can switch on a sandbox overlay that shows the true values.
       </p>
       <div className="field">
         <label>Kind of system</label>
@@ -376,10 +450,41 @@ function FreeRoamModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
+      <p className="muted" style={{ fontSize: 13 }}>
+        {chapterOf(ch).idea}
+      </p>
+      <p className="faint" style={{ fontSize: 12 }}>
+        Enter directly at camp with the tools relevant to this system available. No campaign unlocks required. Landing practice is optional
+        in the expedition menu.
+      </p>
+      <Toggle on={guidance} onChange={setGuidance} label="ECHO guidance" sub="Optional suggestions and measurement goals." />
+      <Toggle
+        on={truth}
+        onChange={setTruth}
+        label="Sandbox: show the true values"
+        sub="Reveal true values on the sheet. This sandbox is never scored."
+      />
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
         <button
           className="btn primary big"
-          onClick={() => okToReplace() && startRun(randomSeed(), { ...s.settings, challenges: [], difficulty: 'stargazer', survival: false, formulas: true, freeRoam: true }, ch)}
+          onClick={() =>
+            okToReplace() &&
+            startRun(
+              randomSeed(),
+              {
+                ...s.settings,
+                challenges: [],
+                difficulty: 'stargazer',
+                survival: false,
+                formulas: true,
+                freeRoam: true,
+                campaignRun: false,
+                freeRoamGuidance: guidance,
+                showTruth: truth,
+              },
+              ch,
+            )
+          }
         >
           Start exploring
         </button>

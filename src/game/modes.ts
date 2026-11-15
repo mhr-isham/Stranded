@@ -169,11 +169,19 @@ export const modeOf = (d: Difficulty): ModeRules => MODES[d] ?? MODES.navigator;
 
 /** Rules of the expedition in progress, as a hook. */
 export function useMode() {
-  return modeOf(useGame((s) => s.settings.difficulty));
+  const settings = useGame((s) => s.settings);
+  return effectiveMode(settings);
 }
 
 /** Rules of the expedition in progress, outside React. */
-export const currentMode = () => modeOf(useGame.getState().settings.difficulty);
+export const currentMode = () => effectiveMode(useGame.getState().settings);
+
+export function effectiveMode(settings: import('./store').Settings): ModeRules {
+  const rules = modeOf(settings.difficulty);
+  return settings.freeRoam
+    ? { ...rules, coaching: !!settings.freeRoamGuidance, missions: settings.freeRoamGuidance ? 'coach' : 'off' }
+    : rules;
+}
 
 /** "∞" for unlimited counts, else the number. */
 export const countText = (n: number) => (Number.isFinite(n) ? String(n) : '∞');

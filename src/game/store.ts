@@ -52,6 +52,9 @@ export interface Settings {
   effectsVolume?: number;
   /** Free Roam: no deadline, no score, an optional true-value overlay. */
   freeRoam?: boolean;
+  /** Absent in legacy saves, which used expedition wins as campaign progress. */
+  campaignRun?: boolean;
+  freeRoamGuidance?: boolean;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
   /** Astronomer Challenges chosen for this run. */
@@ -337,7 +340,7 @@ export const useGame = create<GameState>()(
         }),
       say: (line) =>
         set((s) =>
-          line.coach && !modeOf(s.settings.difficulty).coaching ? s : (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
+          (s.settings.freeRoam && !s.settings.freeRoamGuidance) || (line.coach && !modeOf(s.settings.difficulty).coaching) ? s : (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
       dismissEcho: () => set((s) => ({ echo: s.echo.slice(1) })),
       unlock: (kind, id) => set((s) => (s[kind].includes(id) ? s : { [kind]: [...s[kind], id] } as Partial<GameState>)),
     }),

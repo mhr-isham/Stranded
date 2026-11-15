@@ -116,6 +116,12 @@ export const CHAPTERS: ChapterSpec[] = [
 
 export const chapterOf = (n: number) => CHAPTERS.find((c) => c.n === n) ?? CHAPTERS[0];
 
+/** Variations are earned in Campaign; the original system is always available. */
+export const expeditionChapters = (s: Pick<GameState, 'campaign'>) => CHAPTERS.filter((c) => c.ready && (c.n === 1 || s.campaign[c.n]?.done));
+
+/** Preserve legacy progress behavior; new single expeditions are independent. */
+export const countsForCampaign = (s: Pick<GameState, 'settings' | 'tutorial'>) => !s.tutorial.active && !s.settings.freeRoam && s.settings.campaignRun !== false;
+
 /** Chapters open in order: each needs the previous playable chapter completed. */
 export function chapterUnlocked(s: Pick<GameState, 'campaign'>, n: number) {
   const playable = CHAPTERS.filter((c) => c.ready).map((c) => c.n);

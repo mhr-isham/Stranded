@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DAY } from '../engine/constants';
 import { WARPS, clock, setWarp, togglePause } from '../game/clock';
-import { currentWorld } from '../game/sim';
+import { checkMissions, currentWorld } from '../game/sim';
 import { useGame } from '../game/store';
 import { lifeSupportEnd } from '../game/survival';
 import { dayNumber, hhmm, localSolarHours } from '../game/time';
@@ -51,16 +51,31 @@ export function Hud() {
           </div>
         </div>
         <div className="panel hud-block warp" data-tut="hud-warp">
-          <button className="btn icon small" aria-label="Slower" onClick={() => (setWarp(clock.warpIndex - 1), flag('warp-changed'))} disabled={clock.realtime}>
+          <button
+            className="btn icon small"
+            aria-label="Slower"
+            onClick={() => (setWarp(clock.warpIndex - 1), flag('warp-changed'))}
+            disabled={clock.realtime}
+          >
             ◀
           </button>
-          <button className="btn small hide-phone" onClick={() => (togglePause(), flag('warp-changed'))} style={{ minWidth: 40 }} aria-label="Pause">
+          <button
+            className="btn small hide-phone"
+            onClick={() => (togglePause(), flag('warp-changed'))}
+            style={{ minWidth: 40 }}
+            aria-label="Pause"
+          >
             {clock.paused ? '▶' : '❚❚'}
           </button>
           <button className="rate btn ghost small" onClick={() => (togglePause(), flag('warp-changed'))} title="Tap to pause / resume">
             {clock.realtime ? 'real time' : clock.paused ? 'paused' : WARPS[clock.warpIndex].label}
           </button>
-          <button className="btn icon small" aria-label="Faster" onClick={() => (setWarp(clock.warpIndex + 1), flag('warp-changed'))} disabled={clock.realtime}>
+          <button
+            className="btn icon small"
+            aria-label="Faster"
+            onClick={() => (setWarp(clock.warpIndex + 1), flag('warp-changed'))}
+            disabled={clock.realtime}
+          >
             ▶
           </button>
         </div>
@@ -71,16 +86,29 @@ export function Hud() {
               Life<span className="hide-phone"> support</span>
             </div>
             <div className="meter">
-              <i style={{ width: `${lifeFrac * 100}%`, background: lifeFrac < 0.15 ? 'var(--red)' : lifeFrac < 0.35 ? 'var(--amber)' : 'var(--green)' }} />
+              <i
+                style={{
+                  width: `${lifeFrac * 100}%`,
+                  background: lifeFrac < 0.15 ? 'var(--red)' : lifeFrac < 0.35 ? 'var(--amber)' : 'var(--green)',
+                }}
+              />
             </div>
           </div>
-          <span className="mono" style={{ fontSize: 13 }}>{s.settings.freeRoam || s.tutorial.active ? '∞' : `${fmt(daysLeft, 0)} d`}</span>
+          <span className="mono" style={{ fontSize: 13 }}>
+            {s.settings.freeRoam || s.tutorial.active ? '∞' : `${fmt(daysLeft, 0)} d`}
+          </span>
         </div>
         {s.settings.survival && (
           <button className="panel hud-block btn hide-phone" style={{ gap: 10 }} onClick={() => s.go('workshop')} title="Camp supplies">
-            <span className="mono" style={{ fontSize: 12 }}>O₂ {fmt(Math.max(0, s.survival.o2), 0)}</span>
-            <span className="mono" style={{ fontSize: 12 }}>🍲 {fmt(s.survival.food, 0)}</span>
-            <span className={`mono ${s.survival.power < 15 ? 'red' : ''}`} style={{ fontSize: 12 }}>⚡{fmt(s.survival.power, 0)}%</span>
+            <span className="mono" style={{ fontSize: 12 }}>
+              O₂ {fmt(Math.max(0, s.survival.o2), 0)}
+            </span>
+            <span className="mono" style={{ fontSize: 12 }}>
+              🍲 {fmt(s.survival.food, 0)}
+            </span>
+            <span className={`mono ${s.survival.power < 15 ? 'red' : ''}`} style={{ fontSize: 12 }}>
+              ⚡{fmt(s.survival.power, 0)}%
+            </span>
             {s.survival.leak && <span className="red">⚠</span>}
           </button>
         )}
@@ -101,7 +129,9 @@ export function Hud() {
         <div className="panel hud-block hide-phone" data-tut="hud-fuel">
           <div>
             <div className="meter-label">Fuel Δv</div>
-            <div className="mono" style={{ fontSize: 14 }}>{fmt(fuel / 1000, 2)} km/s</div>
+            <div className="mono" style={{ fontSize: 14 }}>
+              {fmt(fuel / 1000, 2)} km/s
+            </div>
           </div>
         </div>
         <button className="panel hud-block btn" onClick={() => setMenu(true)} aria-label="Menu">
@@ -123,17 +153,39 @@ export function Hud() {
           </dl>
           <Toggle
             on={s.settings.formulas}
-            onChange={(v) => !mode.formulasLocked && !s.settings.challenges?.includes('noFormula') && s.set({ settings: { ...s.settings, formulas: v } })}
+            onChange={(v) =>
+              !mode.formulasLocked && !s.settings.challenges?.includes('noFormula') && s.set({ settings: { ...s.settings, formulas: v } })
+            }
             label="Formula sheet"
             sub={mode.formulasLocked ? `Not available in ${mode.name}.` : 'Shown in tools and on the progress sheet.'}
           />
           {s.settings.freeRoam && (
-            <Toggle
-              on={!!s.settings.showTruth}
-              onChange={(v) => s.set({ settings: { ...s.settings, showTruth: v } })}
-              label="Sandbox: show the true values"
-              sub="Free Roam only. The sheet shows the real value next to yours — a way to explore, never scored."
-            />
+            <div className="stack">
+              <Toggle
+                on={!!s.settings.freeRoamGuidance}
+                onChange={(v) => {
+                  s.set({ settings: { ...s.settings, freeRoamGuidance: v }, echo: [] });
+                  if (v) checkMissions();
+                }}
+                label="ECHO guidance"
+                sub="Optional suggestions and measurement goals."
+              />
+              <Toggle
+                on={!!s.settings.showTruth}
+                onChange={(v) => s.set({ settings: { ...s.settings, showTruth: v } })}
+                label="Sandbox: show the true values"
+                sub="Free Roam only. The sheet shows the real value next to yours — a way to explore, never scored."
+              />
+              <button
+                className="btn"
+                onClick={() => {
+                  s.set({ phase: 'prologue', storyQueue: [], echo: [] });
+                  setMenu(false);
+                }}
+              >
+                Practice landing
+              </button>
+            </div>
           )}
           {!s.tutorial.active && <CheckpointPanel onDone={() => setMenu(false)} />}
           <AudioSettings settings={s.settings} onChange={(settings) => s.set({ settings })} />
@@ -175,7 +227,9 @@ function CheckpointPanel({ onDone }: { onDone: () => void }) {
     <div className="stack" style={{ padding: '10px 0', gap: 8 }}>
       <div className="row between">
         <b style={{ fontSize: 14 }}>Checkpoints</b>
-        <span className="faint" style={{ fontSize: 12 }}>{finite ? `${left} save${left === 1 ? '' : 's'} left this run` : 'save any time'}</span>
+        <span className="faint" style={{ fontSize: 12 }}>
+          {finite ? `${left} save${left === 1 ? '' : 's'} left this run` : 'save any time'}
+        </span>
       </div>
       {Array.from({ length: SLOTS }, (_, i) => {
         const snap = slots[i];
@@ -232,7 +286,12 @@ function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: nu
         <div className="hide-phone">
           <div className="meter-label">Ready</div>
           <div className="meter" style={{ width: 70 }}>
-            <i style={{ width: `${frac * 100}%`, background: pct === null ? 'var(--blue)' : `var(--${cls === 'green' ? 'green' : cls === 'amber' ? 'amber' : 'red'})` }} />
+            <i
+              style={{
+                width: `${frac * 100}%`,
+                background: pct === null ? 'var(--blue)' : `var(--${cls === 'green' ? 'green' : cls === 'amber' ? 'amber' : 'red'})`,
+              }}
+            />
           </div>
         </div>
         <span className={`mono ${cls}`} style={{ fontSize: 13 }}>
@@ -264,12 +323,14 @@ function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: nu
             <div className="callout tip">
               <b>{mode.coaching && mode.missions === 'coach' ? 'Improve this next' : 'Weakest value'}</b>
               {quantityName(r.weakest.k)} causes about {Math.round(r.weakest.share * 100)}% of the flight’s uncertainty.
-              {mode.missions === 'coach' && ' More readings, a longer baseline or a steadier hand on that one will raise your chance the most.'}
+              {mode.missions === 'coach' &&
+                ' More readings, a longer baseline or a steadier hand on that one will raise your chance the most.'}
             </div>
           )}
           {pct === null && (
             <div className="faint" style={{ fontSize: 12 }}>
-              Once every value is on the sheet, ECHO flies the plan through versions of the system that fit your error bars and shows how many arrive.
+              Once every value is on the sheet, ECHO flies the plan through versions of the system that fit your error bars and shows how
+              many arrive.
             </div>
           )}
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>

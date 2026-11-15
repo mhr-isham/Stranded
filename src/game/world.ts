@@ -7,6 +7,8 @@ import type { Difficulty, StarSystem } from '../engine/types';
 import { solarDay } from '../engine/ephemeris';
 
 let cacheKey = '';
+/** Include in shared results; bump when generation, physics or scoring changes. */
+export const RULESET_VERSION = 1;
 let cached: { system: StarSystem; catalog: CatalogStar[]; solarDay: number } | null = null;
 
 export function world(seed: number, difficulty: Difficulty, chapter = 1) {
