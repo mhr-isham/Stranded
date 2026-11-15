@@ -24,6 +24,11 @@ import { setRumble, sfx, stopRumble } from '../game/audio';
 import { modeOf } from '../game/modes';
 import { currentWorld } from '../game/sim';
 import { useGame, type CampInfo } from '../game/store';
+import { FlightAssistDialog, FlightButton, FlightToolbar, useFlightControls } from './common/FlightControls';
+import { AttitudeIndicator } from './common/AttitudeIndicator';
+import { flightSensitivity } from '../game/flightInput';
+import { completeManualFlight, manualFlightRequired, markFlightAssisted } from '../game/piloting';
+import { leaveFlightPractice, startFlightPractice } from './common/flightPractice';
 import { CanvasView } from './common/CanvasView';
 import { drawStarship } from '../render/ship';
 import { hopEstimate, hopPilot, type HopPhase } from '../engine/hop';
@@ -82,6 +87,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const s = useGame();
   const { system: sys } = currentWorld();
   const mode = modeOf(s.settings.difficulty);
+  const manualRequired = arrival && manualFlightRequired(s);
+  const reducedMotion = s.settings.flightReducedMotion ?? window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const [assistDialog, setAssistDialog] = useState(false);
   const assist = mode.landingAssist || s.tutorial.active;
   // Arrival at the blue planet uses its own gravity and a terrain around the beacon.
   const g = arrival ? (G * sys.target.mass) / sys.target.radius ** 2 : surfaceGravity(sys);
@@ -184,7 +192,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     pilot: { phase: 'lift', n: 0 },
     result: null,
   });
-  const input = useRef({ left: false, right: false, thrust: false });
+  const controls = useFlightControls(chute, manualRequired || !!s.settings.flightPractice);
+  const { input } = controls;
   const [stage, setStage] = useState<Stage>(hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble');
   const [line, setLine] = useState(
     hop
@@ -210,24 +219,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
 
   // Test hook (dev server only).
   useEffect(() => {
-    if (import.meta.env.DEV) Object.assign(window, { __prologue: { sim, input } });
-  }, []);
+    if (import.meta.env.DEV) Object.assign(window, { __prologue: { sim, input, controls, terrain, params, runId: s.runId } });
+  });
 
   // Keyboard controls.
   useEffect(() => {
-    const set = (e: KeyboardEvent, v: boolean) => {
-      const k = e.key.toLowerCase();
-      if (k === 'arrowleft' || k === 'a') input.current.left = v;
-      else if (k === 'arrowright' || k === 'd') input.current.right = v;
-      else if (k === 'arrowup' || k === 'w' || k === ' ') input.current.thrust = v;
-      else if (k === 'p' && v) chute();
-      else return;
-      e.preventDefault();
-    };
-    const down = (e: KeyboardEvent) => set(e, true);
-    const up = (e: KeyboardEvent) => set(e, false);
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
     const id = setInterval(() => {
       const S = sim.current;
       const ground = terrain.height(S.d.x);
@@ -246,8 +242,6 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       });
     }, 100);
     return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
       clearInterval(id);
       stopRumble();
     };
@@ -272,7 +266,10 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
 
   const finish = (camp: CampInfo) => {
     stopRumble();
+    if (s.settings.flightPractice) { leaveFlightPractice(); return; }
     if (arrival) {
+      if (camp.landing === 'rescued' || camp.landing === 'skipped') markFlightAssisted('landing');
+      else completeManualFlight('landing');
       useGame.setState({ arrival: { landing: camp.landing, site: camp.site }, phase: 'results' });
       return;
     }
@@ -300,6 +297,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const x = (f.x0 + f.x1) / 2;
     stopRumble();
     if (arrival) {
+      markFlightAssisted('landing');
       useGame.setState({ arrival: { landing: 'skipped', site: 'flat' }, phase: 'results' });
       return;
     }
@@ -330,9 +328,10 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   };
 
   function update(dt: number) {
+    if (controls.paused || assistDialog) return;
     const S = sim.current;
     const u = input.current;
-    const turn = (u.right ? 1 : 0) - (u.left ? 1 : 0);
+    const turn = ((u.right ? 1 : 0) - (u.left ? 1 : 0)) * flightSensitivity(s.settings.flightSensitivity);
     S.stageT += dt;
     // Effects: sparks fade, the jolt settles, the dropped shield falls.
     for (const p of S.sparks) {
@@ -430,7 +429,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         } else {
           S.shieldHurt = true;
           S.heat = 60;
-          S.gamma = Math.max(S.gamma, -6);
+          // Required manual entry keeps steering with the player after damage.
+          if (!manualRequired) S.gamma = Math.max(S.gamma, -6);
           S.d.fuel *= 0.85;
           setLine('Shield damage. We lost some of the descent tank to the heat. Stay in the corridor.');
           sfx('bad');
@@ -454,9 +454,12 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       // Could we still stop? Either as we point now (if burning), or after swinging
       // upright first (about √(2|tilt|/turn rate) seconds of falling). Doomed only if neither works.
       const burning = u.thrust && S.d.fuel > 0;
+      // A survivable hard touchdown is still a manual landing. Rescue must
+      // not demand zero speed when the model accepts a rough arrival.
+      const landingLimit = 9 * (assist ? 1.3 : 1);
       const canStop = (tDelay: number, accel: number) => {
         const hLeft = h - 2 - Math.max(0, -S.d.vy) * tDelay;
-        const need = S.d.vy < 0 ? (S.d.vy * S.d.vy) / (2 * Math.max(1, hLeft)) : 0;
+        const need = S.d.vy < 0 ? Math.max(0, S.d.vy * S.d.vy - (landingLimit - 0.1) ** 2) / (2 * Math.max(1, hLeft)) : 0;
         return need <= 1.05 * Math.max(0.1, accel);
       };
       const fuelOk = S.d.fuel > 0;
@@ -466,12 +469,13 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
           canStop(Math.abs(S.d.om) / params.turnAccel + Math.sqrt((2 * Math.abs(S.d.th)) / params.turnAccel) + 0.3, params.thrust - g));
       // ECHO's own hop flights skip the stopping test (they brake late on purpose) but not the skid check.
       const doomed =
-        (!(hop && S.echoFly) && ((h < 2500 && S.d.vy < 0 && !stoppable && fuelOk) || (!fuelOk && S.d.vy < -8 && h < 400))) ||
+        (!(hop && S.echoFly) && ((h < 2500 && S.d.vy < -landingLimit && !stoppable && fuelOk) || (!fuelOk && S.d.vy < -landingLimit && h < 400))) ||
         (h < 35 && Math.abs(S.d.vx) > 12);
       if (S.launched && !S.rescued && doomed) {
         S.rescued = true;
+        if (manualRequired) markFlightAssisted('landing');
         sfx('bad');
-        setLine('Taking control! Hold on.');
+        setLine(manualRequired ? 'Taking control. Your journey continues as assisted, without a hard-mode score. Measurements are preserved.' : 'Taking control! Hold on.');
       }
       let uu = { turn, throttle: u.thrust ? 1 : 0 };
       // ECHO flies the hop the way a good pilot would.
@@ -529,6 +533,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         const judged = judgeTouchdown(terrain, S.d, assist);
         // The prologue can't kill you: a crash counts as a rescue (with its damage).
         const touch = S.rescued || judged === 'crash' ? 'rescued' : judged;
+        if (manualRequired && touch === 'rescued') markFlightAssisted('landing');
         S.result = { touch, site: siteAt(terrain, S.d.x) };
         stopRumble();
         sfx(touch === 'clean' ? 'touchdown' : 'bad');
@@ -556,7 +561,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const tumbling = S.stage === 'tumble';
     ctx.save();
     // The fold exit shakes everything.
-    if (tumbling) {
+    if (tumbling && !reducedMotion) {
       const k = (S.stageT < 1.5 ? 10 : 3) * dpr;
       ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     }
@@ -708,7 +713,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const band = Math.pow(Math.sin(Math.PI * (1 - f)), 0.6);
     const I = Math.min(1, (0.3 + 0.7 * band) * (0.55 + S.heat / 140));
     ctx.save();
-    const k = I * 5 * dpr;
+    const k = reducedMotion ? 0 : I * 5 * dpr;
     ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     const top = arrival ? [8, 16, 40] : [6, 9, 22];
@@ -799,7 +804,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.fill();
     ctx.restore();
     // Sparks shed from the shield.
-    for (let i = 0; i < 2 + I * 6; i++)
+    for (let i = 0; !reducedMotion && !controls.paused && i < 2 + I * 6; i++)
       S.sparks.push({ x: sx + vx * 0.4 * size + (Math.random() - 0.5) * size * 0.6, y: sy + vy * 0.4 * size, vx: -vx * (300 + 400 * Math.random()) * dpr + (Math.random() - 0.5) * 80 * dpr, vy: -vy * (300 + 400 * Math.random()) * dpr + (Math.random() - 0.5) * 80 * dpr, life: 0.6 });
     ctx.lineWidth = 1.6 * dpr;
     for (const p of S.sparks) {
@@ -829,7 +834,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const X = (wx: number) => w / 2 + (wx - d.x) / mpp;
     const Y = (wy: number) => shipY - (wy - d.y) / mpp;
     ctx.save();
-    if (S.shake > 0) ctx.translate((Math.random() - 0.5) * S.shake * 14 * dpr, (Math.random() - 0.5) * S.shake * 14 * dpr);
+    if (S.shake > 0 && !reducedMotion) ctx.translate((Math.random() - 0.5) * S.shake * 14 * dpr, (Math.random() - 0.5) * S.shake * 14 * dpr);
     // Sky: deep blue high up, warm haze near the ground, and a low sun.
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     const hi = Math.min(1, d.y / 10000);
@@ -1091,8 +1096,12 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   }
 
   return (
-    <div className="screen prologue">
+    <div className="screen prologue flight-screen" role="region" aria-label="Landing flight" tabIndex={-1}>
       <CanvasView draw={draw} />
+      {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? 'Destination landing' : 'Arrival · opening sequence'} status={s.settings.flightPractice ? 'Practice · unscored' : manualRequired && s.piloting.assisted.length ? 'Assisted · unscored' : manualRequired ? 'Manual flight required' : stage} controls={controls}>
+        <p>Use short steering inputs. During entry, left makes the path shallower and right makes it steeper. During descent, tilt to control drift and burn to slow the fall. A parachute helps only within its pressure limit.</p>
+        <p>Land nearly upright, with little sideways drift and vertical speed below {assist ? 5 : 4} m/s. The instruments show the current conditions.</p>
+      </FlightToolbar>}
       <div className="prologue-echo panel">
         <span className="mono blue" style={{ fontSize: 11, letterSpacing: '0.14em' }}>
           ECHO
@@ -1100,8 +1109,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         <div>{line}</div>
       </div>
       {stage !== 'landed' && (
-        <button className="btn small ghost prologue-skip" onClick={skip}>
-          Skip
+        <button className="btn small ghost prologue-skip" onClick={() => { if (s.settings.flightPractice) leaveFlightPractice(); else if (manualRequired) { controls.pause(true); setAssistDialog(true); } else skip(); }}>
+          {s.settings.flightPractice ? 'Exit practice' : manualRequired ? 'ECHO landing' : 'Skip'}
         </button>
       )}
 
@@ -1137,6 +1146,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
           <div className="faint" style={{ fontSize: 11 }}>▶ nose down · steeper</div>
         </div>
       )}
+      {stage === 'descent' && <AttitudeIndicator angle={hud.tilt} label="Tilt" value={`${hud.tilt.toFixed(0)}°`} />}
 
       {stage === 'descent' && (
         <div className="prologue-hud panel">
@@ -1173,8 +1183,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       {(stage === 'stabilize' || stage === 'deorbit' || stage === 'entry' || stage === 'descent') && (
         <div className="prologue-controls">
           <div className="row" style={{ gap: 10 }}>
-            <HoldButton label="⟲" aria="Rotate left" on={(v) => (input.current.left = v)} />
-            <HoldButton label="⟳" aria="Rotate right" on={(v) => (input.current.right = v)} />
+            <FlightButton label="Rotate left" action="left" icon="↶" shortcut="← A" controls={controls} />
+            <FlightButton label="Rotate right" action="right" icon="↷" shortcut="→ D" controls={controls} />
           </div>
           <div className="row" style={{ gap: 10 }}>
             {stage === 'descent' && !hop && (
@@ -1194,10 +1204,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
                 {echoFly ? '🤖 ECHO is flying' : '🤖 Let ECHO fly'}
               </button>
             )}
-            {(stage === 'deorbit' || stage === 'descent') && !(hop && echoFly) && <HoldButton label="BURN" aria="Burn" big on={(v) => (input.current.thrust = v)} />}
+            {(stage === 'deorbit' || stage === 'descent') && !(hop && echoFly) && <FlightButton label="Burn" action="thrust" icon="▲" shortcut="↑ W Space" controls={controls} burn />}
           </div>
         </div>
       )}
+      {assistDialog && <FlightAssistDialog onCancel={() => setAssistDialog(false)} onConfirm={() => { setAssistDialog(false); skip(); }} />}
       {stage !== 'landed' && stage !== 'tumble' && (
         <div className="prologue-keys faint hide-phone">← → or A D rotate · ↑ W or Space burn{stage === 'descent' && !hop ? ' · P parachute' : ''}</div>
       )}
@@ -1227,32 +1238,14 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
                   finish(campAt(sim.current.d.x, sim.current.result!.touch === 'rescued' ? 'rescued' : sim.current.result!.touch))
                 }
               >
-                Continue
+                {s.settings.flightPractice ? 'Finish practice' : 'Continue'}
               </button>
+              {s.settings.flightPractice && <button className="btn" onClick={() => startFlightPractice('landing', s.settings.difficulty)}>Practise again</button>}
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function HoldButton({ label, aria, on, big }: { label: string; aria: string; on: (v: boolean) => void; big?: boolean }) {
-  return (
-    <button
-      className={`btn ${big ? 'amber big' : 'icon-big'}`}
-      aria-label={aria}
-      onPointerDown={(e) => {
-        (e.target as Element).setPointerCapture?.(e.pointerId);
-        on(true);
-      }}
-      onPointerUp={() => on(false)}
-      onPointerCancel={() => on(false)}
-      onPointerLeave={() => on(false)}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      {label}
-    </button>
   );
 }
 

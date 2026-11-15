@@ -32,6 +32,7 @@ import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { flag, jumpTo } from '../../game/tutorial';
+import { manualFlightRequired } from '../../game/piloting';
 
 interface McResult {
   fuelLeft: number[];
@@ -41,6 +42,7 @@ interface McResult {
 
 export function Launch() {
   const s = useGame();
+  const manualRequired = manualFlightRequired(s);
   const { system: sys } = currentWorld();
   const t = useGameTime(2);
   const variant = variantOf(sys.features);
@@ -152,7 +154,7 @@ export function Launch() {
     if (!p) return toast('No transfer found for this date.');
     sfx('launch');
     if (!s.tutorial.active) savePrelaunch();
-    if (manual) {
+    if (manual || manualRequired) {
       // Fly the ascent to parking orbit first; the flight is simulated after it.
       useGame.setState({ pendingLaunch: { plan: p.plan }, phase: 'ascent' });
       return;
@@ -312,19 +314,19 @@ export function Launch() {
               confirm ? (
                 <div className="stack" style={{ gap: 6 }}>
                   <div className="row">
-                    <button className="btn danger big" onClick={() => launch(false)} style={{ flex: 1 }}>
-                      🚀 Confirm launch
+                    <button className="btn danger big" onClick={() => launch(manualRequired)} style={{ flex: 1 }}>
+                      {manualRequired ? '🕹 Begin manual ascent' : '🚀 Confirm launch'}
                     </button>
                     <button className="btn" onClick={() => setConfirm(false)}>
                       Wait
                     </button>
                   </div>
-                  {!s.tutorial.active && (
+                  {!s.tutorial.active && !manualRequired && (
                     <button className="btn" onClick={() => launch(true)}>
                       🕹 Fly the ascent yourself
                     </button>
                   )}
-                  {!s.tutorial.active && <div className="faint" style={{ fontSize: 12 }}>ECHO flies the ascent unless you take it. Fuel you waste beyond ECHO’s profile comes out of the margin.</div>}
+                  {!s.tutorial.active && <div className="faint" style={{ fontSize: 12 }}>{manualRequired ? 'Manual ascent and destination entry/landing are required. A rescue preserves your expedition as assisted, without a hard-mode score. Flight begins paused so you can check the controls.' : 'ECHO flies the ascent unless you take it. Fuel you waste beyond ECHO’s profile comes out of the margin.'}</div>}
                 </div>
               ) : (
                 <button className="btn amber big" onClick={() => setConfirm(true)}>

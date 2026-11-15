@@ -8,7 +8,6 @@ import { gradeRun, scoreQuantity } from '../../engine/scoring';
 import { sfx } from '../../game/audio';
 import { fmt, sig, toDisplay } from '../../game/format';
 import { currentWorld } from '../../game/sim';
-import { RULESET_VERSION } from '../../game/world';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
 import { evaluateAchievements, ACHIEVEMENTS } from '../../game/achievements';
@@ -24,6 +23,7 @@ import { CHAPTER_CODEX } from '../../game/codex';
 import { ANOMALIES, affectedReadings, sharpEyePoints } from '../../game/anomalies';
 import { CHALLENGES, challengeBonus } from '../../game/challenges';
 import { probeTruth } from '../../game/probeState';
+import { assistedFlight } from '../../game/piloting';
 
 const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; echo: string }> = {
   success: {
@@ -115,6 +115,8 @@ export function Results() {
 
 function Debrief() {
   const s = useGame();
+  const assisted = assistedFlight(s);
+  const scored = !s.settings.freeRoam && !assisted;
   const mode = modeOf(s.settings.difficulty);
   const { system: sys } = currentWorld();
   const outcome = s.outcome;
@@ -171,7 +173,7 @@ function Debrief() {
       const c = g0.campaign[g0.chapter] ?? { done: false, best: {} };
       const prev = c.best[g0.settings.difficulty];
       const best = !prev || grade.total > prev.score ? { grade: grade.letter, score: grade.total } : prev;
-      useGame.setState({ campaign: { ...g0.campaign, [g0.chapter]: { done: c.done || kind === 'success', best: { ...c.best, [g0.settings.difficulty]: best } } } });
+      useGame.setState({ campaign: { ...g0.campaign, [g0.chapter]: { done: c.done || kind === 'success', best: assistedFlight(g0) ? c.best : { ...c.best, [g0.settings.difficulty]: best } } } });
     }
     // Every run, success or not, becomes a finished card in the Atlas.
     const g = useGame.getState();
@@ -184,15 +186,16 @@ function Debrief() {
         date: Date.now(),
         names: g.names,
         outcome: kind,
-        grade: grade.letter,
-        score: grade.total,
+        grade: assistedFlight(g) ? '—' : grade.letter,
+        score: assistedFlight(g) ? 0 : grade.total,
+        assisted: assistedFlight(g) || undefined,
         camp: g.camp,
         predictions: { made: g.predictions.filter((p) => p.result).length, inside: g.predictions.filter((p) => p.result && p.result.z <= 1).length },
         rows: rows.filter((r) => r.e && r.sc).map((r) => ({ k: r.k, value: r.e!.value, sigma: r.e!.sigma, truth: truth[r.k], z: r.sc!.z })),
       };
       useGame.setState({ atlas: [...g.atlas, card] });
     }
-    if (!useGame.getState().settings.freeRoam) earned.forEach((a) => useGame.getState().unlock('achievements', a));
+    if (!useGame.getState().settings.freeRoam && !assistedFlight(useGame.getState())) earned.forEach((a) => useGame.getState().unlock('achievements', a));
     sfx(kind === 'success' ? 'unlock' : 'bad');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -201,7 +204,7 @@ function Debrief() {
       .filter((r) => r.sc)
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
-    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${RULESET_VERSION} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · grade ${grade.letter} · ${grade.total} pts\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
+    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
     // Say "copied" only if it was; otherwise offer the text to copy by hand.
     const fallback = () => window.prompt('Copy your result:', text);
     if (!navigator.clipboard) return void fallback();
@@ -219,23 +222,24 @@ function Debrief() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(24px + var(--safe-top)) 14px 40px' }} className="stack">
         <div className="panel panel-pad" style={{ textAlign: 'center' }} data-tut="results-grade">
           <div className="meter-label">
-            {s.settings.freeRoam ? 'Free Roam · not scored · ' : 'Mission debrief · '}
+            {s.settings.freeRoam ? 'Free Roam · not scored · ' : assisted ? 'Assisted journey · unscored · ' : 'Mission debrief · '}
             {sys.features.real ? 'the Solar System' : s.names.star ? `${nameOf(s.names, 'star')} system` : `system #${s.seed}`}
           </div>
           <h1 className={info.cls} style={{ fontSize: 'clamp(30px, 6vw, 48px)', margin: '6px 0' }}>
             {info.title}
           </h1>
           <div className="muted">{named(info.text)}</div>
+          {assisted && <div className="callout tip" style={{ textAlign: 'left' }}>This journey used ECHO flight assistance or did not complete the required manual phases. Your measurements and story progress are preserved. No hard-mode score, grade, achievement or challenge unlock is awarded.</div>}
           {!s.tutorial.active && (!s.settings.freeRoam || s.settings.freeRoamGuidance) && <EchoQuote text={named(info.echo)} />}
           <div className="row" style={{ justifyContent: 'center', gap: 28, marginTop: 14 }}>
-            {!s.settings.freeRoam && <div>
+            {scored && <div>
               <div style={{ fontFamily: 'var(--display)', fontSize: 64, fontWeight: 700, lineHeight: 1 }} className={grade.letter === 'F' ? 'red' : 'blue'}>
                 {grade.letter}
               </div>
               <div className="faint">grade</div>
             </div>}
             <dl className="kv" style={{ minWidth: 220 }}>
-              {!s.settings.freeRoam && <>
+              {scored && <>
               <dt>Score</dt>
               <dd>{grade.total}</dd>
               <dt>Measurement points</dt>
@@ -245,12 +249,12 @@ function Debrief() {
               <dd>{outcome ? `${fmt(outcome.result.fuelLeft / 1000, 3)} km/s` : '—'}</dd>
               <dt>Course corrections</dt>
               <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
-              {!s.settings.freeRoam && <><dt>Hints used</dt><dd>{s.hintsUsed}</dd></>}
+              {scored && <><dt>Hints used</dt><dd>{s.hintsUsed}</dd></>}
               {s.predictions.some((p) => p.result) && (
                 <>
                   <dt>Predictions</dt>
                   <dd>
-                    {s.predictions.filter((p) => p.result && p.result.z <= 1).length}/{s.predictions.filter((p) => p.result).length} inside{!s.settings.freeRoam && ` · ${predictionPoints(s)} pts`}
+                    {s.predictions.filter((p) => p.result && p.result.z <= 1).length}/{s.predictions.filter((p) => p.result).length} inside{scored && ` · ${predictionPoints(s)} pts`}
                   </dd>
                 </>
               )}
@@ -266,11 +270,11 @@ function Debrief() {
                 <>
                   <dt>Landing</dt>
                   <dd>
-                    {s.arrival.landing === 'clean' ? `clean${s.settings.freeRoam ? '' : ' (+60)'}` : s.arrival.landing === 'rough' ? `hard${s.settings.freeRoam ? '' : ' (+20)'}` : 'ECHO took over'}
+                    {s.arrival.landing === 'clean' ? `clean${scored ? ' (+60)' : ''}` : s.arrival.landing === 'rough' ? `hard${scored ? ' (+20)' : ''}` : 'ECHO took over'}
                   </dd>
                 </>
               )}
-              {(s.settings.challenges?.length ?? 0) > 0 && (
+              {scored && (s.settings.challenges?.length ?? 0) > 0 && (
                 <>
                   <dt>Challenges (+{(s.settings.challenges!.length * 5).toFixed(0)}%)</dt>
                   <dd title={s.settings.challenges!.map((c) => CHALLENGES[c].name).join(', ')}>{s.settings.challenges!.map((c) => CHALLENGES[c].icon).join(' ')}</dd>
@@ -286,7 +290,7 @@ function Debrief() {
           </div>
           <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
             {!s.settings.freeRoam && <button className="btn primary" onClick={share}>
-              {copied ? 'Copied!' : 'Share result'}
+              {copied ? 'Copied!' : assisted ? 'Share assisted journey' : 'Share result'}
             </button>}
             {s.settings.freeRoam && <button className="btn primary" onClick={() => useGame.setState({ phase: 'play', screen: 'hub', outcome: null })}>
               Return to exploring
@@ -334,7 +338,7 @@ function Debrief() {
                 <span>
                   {r.key === 'g' ? '🌬 Pendulum on a windy day' : '🌫 Horizon dip on a humid morning'} · day {fmt(r.at / DAY, 1)}
                 </span>
-                <span className={r.kept ? 'amber' : 'green'}>{r.kept ? 'kept' : s.settings.freeRoam ? 'left out' : 'left out · Sharp Eye +15'}</span>
+                <span className={r.kept ? 'amber' : 'green'}>{r.kept ? 'kept' : scored ? 'left out · Sharp Eye +15' : 'left out'}</span>
               </div>
             ))}
             <div className="faint" style={{ fontSize: 12 }}>
@@ -354,7 +358,7 @@ function Debrief() {
                   <th style={{ textAlign: 'right' }}>You</th>
                   <th style={{ textAlign: 'right' }}>Truth</th>
                   <th style={{ textAlign: 'right' }}>Off by</th>
-                  {!s.settings.freeRoam && <th style={{ textAlign: 'right' }}>Points</th>}
+                  {scored && <th style={{ textAlign: 'right' }}>Points</th>}
                 </tr>
               </thead>
               <tbody>
@@ -366,18 +370,18 @@ function Debrief() {
                     <td className="num">{e ? `${sig(toDisplay(k, e.value), 5)} ± ${sig(toDisplay(k, e.sigma), 2)}` : '—'}</td>
                     <td className="num">{sig(toDisplay(k, truth[k]), 5)}</td>
                     <td className={`num ${sc ? (sc.inside ? 'green' : sc.z < 2 ? 'amber' : 'red') : ''}`}>{sc ? `${fmt(sc.z, 1)}σ` : ''}</td>
-                    {!s.settings.freeRoam && <td className="num">{sc?.points ?? ''}</td>}
+                    {scored && <td className="num">{sc?.points ?? ''}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {!s.settings.freeRoam && <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+          {scored && <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
             Points reward precise and honest error bars. A tight error bar that misses the truth scores below zero.
           </div>}
         </div>
 
-        {!s.settings.freeRoam && earned.length > 0 && (
+        {scored && earned.length > 0 && (
           <div className="panel panel-pad">
             <h2 style={{ fontSize: 18, marginBottom: 8 }}>Achievements</h2>
             <div className="row">

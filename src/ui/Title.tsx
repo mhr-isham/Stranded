@@ -16,6 +16,8 @@ import { CHAPTERS, chapterOf, chapterUnlocked, expeditionChapters } from '../gam
 import { LESSONS, type LessonId } from './tutorial/lessons';
 import { LessonModal } from './tutorial/Tutorial';
 import { AudioSettings } from './common/AudioSettings';
+import { startFlightPractice } from './common/flightPractice';
+import type { Difficulty } from '../engine/types';
 
 /** Starting something new replaces the run in progress: ask first. */
 function okToReplace() {
@@ -31,6 +33,7 @@ export function Title() {
   const [atlas, setAtlas] = useState(false);
   const [campaign, setCampaign] = useState(false);
   const [roam, setRoam] = useState(false);
+  const [school, setSchool] = useState(false);
   const [settings, setSettings] = useState<Settings>({ ...s.settings });
   const [seedText, setSeedText] = useState('');
   const [expeditionChapter, setExpeditionChapter] = useState(1);
@@ -75,7 +78,7 @@ export function Title() {
               {inTutorial ? 'Continue Flight School' : 'Continue'}
             </button>
           )}
-          <button className={`btn big ${canContinue ? '' : 'amber'}`} onClick={() => okToReplace() && startTutorial()}>
+          <button className={`btn big ${canContinue ? '' : 'amber'}`} onClick={() => setSchool(true)}>
             🎓 Flight School <span style={{ fontWeight: 500, fontSize: 13, opacity: 0.8 }}>· start here</span>
           </button>
           <button className={`btn big ${canContinue ? '' : 'primary'}`} onClick={() => setCampaign(true)}>
@@ -145,6 +148,7 @@ export function Title() {
       )}
 
       {roam && <FreeRoamModal onClose={() => setRoam(false)} />}
+      {school && <FlightSchoolModal onClose={() => setSchool(false)} />}
       {campaign && <CampaignModal settings={settings} setSettings={setSettings} onClose={() => setCampaign(false)} />}
 
       {atlas && (
@@ -427,6 +431,27 @@ function CampaignModal({
 }
 
 /** No deadline, no score: explore any system you have reached, with an optional true-value overlay. */
+function FlightSchoolModal({ onClose }: { onClose: () => void }) {
+  const [difficulty, setDifficulty] = useState<Difficulty>(useGame.getState().settings.difficulty);
+  return <Modal onClose={onClose}>
+    <h2>Flight School</h2>
+    <p className="muted">Optional, repeatable training. Flight drills preserve your existing expedition and measurements.</p>
+    <button className="btn primary" onClick={() => okToReplace() && startTutorial()}>Basic Training · measurements and navigation</button>
+    <hr className="sep" />
+    <h3>Unscored flight drills</h3>
+    <label className="field">Practice handling
+      <select className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
+        {MODE_ORDER.map((id) => <option key={id} value={id}>{MODES[id].name}{MODES[id].landingAssist ? ' · landing stabilization' : ' · manual handling'}</option>)}
+      </select>
+    </label>
+    <div className="stack" style={{ marginTop: 12 }}>
+      <button className="btn" onClick={() => startFlightPractice('ascent', difficulty)}>Practice ascent</button>
+      <button className="btn" onClick={() => startFlightPractice('landing', difficulty)}>Practice entry and landing</button>
+    </div>
+    <p className="faint" style={{ fontSize: 12 }}>Use pause and Controls to adjust sensitivity and motion. Exit or repeat a drill at any time. Basic Training starts a separate expedition and asks before replacing an unfinished one.</p>
+  </Modal>;
+}
+
 function FreeRoamModal({ onClose }: { onClose: () => void }) {
   const s = useGame();
   const options = CHAPTERS.filter((c) => c.ready);

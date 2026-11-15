@@ -92,14 +92,14 @@ export function AtlasGrid() {
             <button key={c.id} className="panel panel-pad atlas-card" onClick={() => setOpen(c)}>
               <div className="row between">
                 <b>{c.names.star ? `${nameOf(c.names, 'star')} system` : `System #${c.seed}`}</b>
-                <span className="grade">{c.grade}</span>
+                <span className={c.assisted ? 'chip' : 'grade'}>{c.assisted ? 'Assisted' : c.grade}</span>
               </div>
               <div className={`${OUTCOME[c.outcome]?.cls ?? ''}`} style={{ fontSize: 13 }}>
                 {OUTCOME[c.outcome]?.label ?? c.outcome}
               </div>
               <div className="faint" style={{ fontSize: 12 }}>
                 {MODES[c.mode]?.name ?? c.mode}
-                {c.survival ? ' · survival' : ''} · {new Date(c.date).toLocaleDateString()} · {c.score} pts
+                {c.survival ? ' · survival' : ''} · {new Date(c.date).toLocaleDateString()} · {c.assisted ? 'unscored journey' : `${c.score} pts`}
               </div>
               <div className="faint" style={{ fontSize: 12 }}>
                 {c.rows.filter((r) => r.z <= 1).length}/{c.rows.length} values honest
@@ -112,6 +112,7 @@ export function AtlasGrid() {
       {open && (
         <Modal onClose={() => setOpen(null)}>
           <h2>{open.names.star ? `${nameOf(open.names, 'star')} system` : `System #${open.seed}`}</h2>
+          {open.assisted && <div className="callout tip">Assisted journey · no hard-mode score. Your measurements and story progress are preserved.</div>}
           <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
             {nameOf(open.names, 'home')} → {nameOf(open.names, 'target')} · seed {open.seed} · {MODES[open.mode]?.name}
             {open.camp ? ` · camp: ${open.camp.site}` : ''}

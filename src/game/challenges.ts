@@ -25,7 +25,7 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; text:
 export const CHALLENGE_IDS = Object.keys(CHALLENGES) as ChallengeId[];
 
 /** Unlocked after reaching orbit once in Astronomer (or Legend). */
-export const challengesUnlocked = (s: Pick<GameState, 'atlas'>) => s.atlas.some((c) => c.outcome === 'success' && (c.mode === 'astronomer' || c.mode === 'legend'));
+export const challengesUnlocked = (s: Pick<GameState, 'atlas'>) => s.atlas.some((c) => !c.assisted && c.outcome === 'success' && (c.mode === 'astronomer' || c.mode === 'legend'));
 
 export const hasChallenge = (s: Pick<GameState, 'settings'>, id: ChallengeId) => !!s.settings.challenges?.includes(id);
 

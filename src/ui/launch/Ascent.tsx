@@ -13,6 +13,11 @@ import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { drawStarship } from '../../render/ship';
 import { CanvasView } from '../common/CanvasView';
+import { FlightAssistDialog, FlightButton, FlightToolbar, useFlightControls } from '../common/FlightControls';
+import { flightSensitivity } from '../../game/flightInput';
+import { completeManualFlight, manualFlightRequired, markFlightAssisted } from '../../game/piloting';
+import { AttitudeIndicator } from '../common/AttitudeIndicator';
+import { leaveFlightPractice, startFlightPractice } from '../common/flightPractice';
 
 const SPEED = 20; // simulated seconds per real second
 /** Pitch change while a control is held (rad per simulated second): ~23° per real second. */
@@ -29,52 +34,54 @@ export function Ascent() {
   }, [sys]);
   const baseline = useMemo(() => autopilotDv(params), [params]);
   const st = useRef(ascentStart(params));
-  const input = useRef({ up: false, down: false, thrust: false });
+  const controls = useFlightControls(undefined, true);
+  const { input } = controls;
+  const manualRequired = manualFlightRequired(s);
+  const [assistDialog, setAssistDialog] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoRef = useRef(false);
   autoRef.current = auto;
-  const [hud, setHud] = useState({ h: 0, v: 0, apo: 0, peri: 0, pitch: 90, dv: 0 });
+  const [hud, setHud] = useState({ h: 0, v: 0, vr: 0, vt: 0, apo: 0, peri: 0, pitch: 90, dv: 0 });
   const [done, setDone] = useState<null | { dv: number; penalty: number; auto: boolean }>(null);
   const trail = useRef<{ r: number; th: number }[]>([]);
   // Wasted Δv is capped in the forgiving modes.
   const cap = mode.landingAssist ? (mode.rewinds === Infinity ? 300 : mode.rewinds > 0 ? 500 : 800) : Infinity;
 
   useEffect(() => {
-    const set = (e: KeyboardEvent, v: boolean) => {
-      const k = e.key.toLowerCase();
-      // The ship climbs out heading east (to the right): → / D tips the nose over that way.
-      if (k === 'arrowleft' || k === 'a') input.current.up = v;
-      else if (k === 'arrowright' || k === 'd') input.current.down = v;
-      else if (k === 'arrowup' || k === 'w' || k === ' ') input.current.thrust = v;
-      else return;
-      e.preventDefault();
-    };
-    const d = (e: KeyboardEvent) => set(e, true);
-    const u = (e: KeyboardEvent) => set(e, false);
-    window.addEventListener('keydown', d);
-    window.addEventListener('keyup', u);
     const id = setInterval(() => {
       const x = st.current;
       const a = apsides(params, x);
-      setHud({ h: x.r - params.R, v: Math.hypot(x.vr, x.vt), apo: a.apo - params.R, peri: a.peri - params.R, pitch: (x.pitch * 180) / Math.PI, dv: x.dv });
+      setHud({ h: x.r - params.R, v: Math.hypot(x.vr, x.vt), vr: x.vr, vt: x.vt, apo: a.apo - params.R, peri: a.peri - params.R, pitch: (x.pitch * 180) / Math.PI, dv: x.dv });
     }, 100);
     return () => {
-      window.removeEventListener('keydown', d);
-      window.removeEventListener('keyup', u);
       clearInterval(id);
       stopRumble();
     };
   }, [params]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) Object.assign(window, { __ascent: { state: st, input, controls, params, baseline, runId: s.runId } });
+  });
+
+  const takeOver = () => {
+    markFlightAssisted('ascent');
+    controls.release();
+    setAuto(true);
+    autoRef.current = true;
+  };
+
   const finish = (usedAuto: boolean) => {
     const x = st.current;
     const penalty = Math.max(-150, Math.min(cap, x.dv - baseline));
     setDone({ dv: x.dv, penalty, auto: usedAuto });
+    if (!usedAuto) completeManualFlight('ascent');
     stopRumble();
     sfx(penalty < 200 ? 'unlock' : 'good');
   };
 
   const proceed = () => {
+    if (s.settings.flightPractice) { leaveFlightPractice(); return; }
+    if (!pending) return;
     const penalty = done?.penalty ?? 0;
     const g = useGame.getState();
     const budget = sys.fuelDv - g.penaltyDv - penalty;
@@ -83,13 +90,13 @@ export function Ascent() {
   };
 
   function update(dt: number) {
-    if (done) return;
+    if (done || controls.paused || assistDialog) return;
     let x = st.current;
     const n = Math.ceil((dt * SPEED) / 0.05);
     for (let i = 0; i < n; i++) {
       const u = autoRef.current
         ? autopilot(params, x)
-        : { pitchRate: (input.current.up ? PITCH_RATE : 0) - (input.current.down ? PITCH_RATE : 0), throttle: input.current.thrust ? 1 : 0 };
+        : { pitchRate: ((input.current.left ? PITCH_RATE : 0) - (input.current.right ? PITCH_RATE : 0)) * flightSensitivity(s.settings.flightSensitivity), throttle: input.current.thrust ? 1 : 0 };
       x = stepAscent(params, x, u, (dt * SPEED) / n);
       if (inOrbit(params, x)) break;
     }
@@ -100,19 +107,26 @@ export function Ascent() {
     if (inOrbit(params, x)) finish(autoRef.current);
     // Falling back, or far over budget: ECHO takes over.
     else if (!autoRef.current && ((x.t > 60 && x.vr < -50 && x.r - params.R < 30e3) || x.dv > baseline * 1.8)) {
-      setAuto(true);
+      takeOver();
       sfx('bad');
     }
   }
 
   return (
-    <div className="screen">
+    <div className="screen flight-screen ascent-screen" role="region" aria-label="Ascent flight" tabIndex={-1}>
       <CanvasView
         draw={({ ctx, w, h, dpr, dt }) => {
           update(Math.min(dt, 0.05));
           const x = st.current;
           ctx.fillStyle = '#03050b';
           ctx.fillRect(0, 0, w, h);
+          const sky = ctx.createRadialGradient(w * 0.25, h * 0.15, 0, w * 0.25, h * 0.15, Math.max(w, h));
+          sky.addColorStop(0, '#142c51'); sky.addColorStop(0.65, '#050d1c'); sky.addColorStop(1, '#03050b');
+          ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 90; i++) {
+            ctx.fillStyle = i % 4 === 0 ? '#9db9da' : '#52627b';
+            ctx.fillRect(((i * 0.618033 + sys.seed * 0.001) % 1) * w, ((i * 0.414214) % 1) * h, dpr, dpr);
+          }
           // Camera: zoom out as we climb.
           const span = Math.max(40e3, (x.r - params.R) * 3.2 + 30e3, 0);
           const scale = Math.min(w, h) / span;
@@ -130,7 +144,9 @@ export function Ascent() {
           ctx.beginPath();
           ctx.arc(pcx, pcy, (params.R + 60e3) * scale, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = '#5b5240';
+          const planet = ctx.createLinearGradient(0, Math.max(0, pcy - params.R * scale), 0, h);
+          planet.addColorStop(0, '#766b53'); planet.addColorStop(1, '#242b2b');
+          ctx.fillStyle = planet;
           ctx.beginPath();
           ctx.arc(pcx, pcy, params.R * scale, 0, Math.PI * 2);
           ctx.fill();
@@ -170,6 +186,10 @@ export function Ascent() {
           drawStarship(ctx, cx, cy, dir, 30 * dpr, { now: performance.now(), thrust: thr > 0 && !done ? thr : 0, shield: false, light: 1 });
         }}
       />
+      {!done && <FlightToolbar title="Ascent · parking orbit" status={s.settings.flightPractice ? 'Practice · unscored' : manualRequired && s.piloting.assisted.length ? 'Assisted · unscored' : auto ? 'ECHO flying' : manualRequired ? 'Manual flight required' : 'Manual flight'} controls={controls}>
+        <p>Pitch is measured above the local horizon: 90° points up, 0° points along it. Raise the high point, coast, then raise the low point into orbit. Fuel beyond ECHO’s reference profile reduces your transfer reserve.</p>
+      </FlightToolbar>}
+      {s.settings.flightPractice && !done && <button className="btn small prologue-skip" onClick={leaveFlightPractice}>Exit practice</button>}
       <div className="prologue-echo panel">
         <span className="mono blue" style={{ fontSize: 11, letterSpacing: '0.14em' }}>
           ECHO
@@ -177,19 +197,22 @@ export function Ascent() {
         <div>
           {done
             ? done.auto
-              ? 'Orbit. I flew it — the departure burn comes next.'
+              ? s.settings.flightPractice ? 'Orbit reached. Practice complete; your expedition is waiting.' : `Orbit. I flew it — the departure burn comes next.${manualRequired ? ' This journey is assisted and unscored.' : ''}`
               : `Orbit achieved. You used ${fmt(done.dv / 1000, 2)} km/s; my profile takes ${fmt(baseline / 1000, 2)}.`
             : auto
-              ? 'I have it. Gravity turn, coast to the top, then a burn along the horizon to raise the low point.'
+              ? `ECHO has control.${manualRequired ? ' Your expedition continues as assisted, without a hard-mode score.' : ''}`
               : 'Climb straight up, then lean east steadily. When the blue line’s high point reaches the green orbit, cut the engine, coast up, and burn flat along the horizon to lift the low point out of the air.'}
         </div>
       </div>
       <div className="prologue-hud panel">
+        <div className="meter-label">Flight instruments</div>
         <dl className="kv">
           <dt>Altitude</dt>
           <dd>{fmt(hud.h / 1000, 1)} km</dd>
           <dt>Speed</dt>
           <dd>{fmt(hud.v / 1000, 2)} km/s</dd>
+          <dt>Climb rate</dt><dd>{fmt(hud.vr, 0)} m/s</dd>
+          <dt>East speed</dt><dd>{fmt(hud.vt / 1000, 2)} km/s</dd>
           <dt>High point</dt>
           <dd>{Number.isFinite(hud.apo) ? `${fmt(hud.apo / 1000, 0)} km` : 'escape'}</dd>
           <dt>Low point</dt>
@@ -203,22 +226,25 @@ export function Ascent() {
           Orbit when the low point is above {fmt((0.7 * params.orbitAlt) / 1000, 0)} km. ECHO’s profile: {fmt(baseline / 1000, 2)} km/s.
         </div>
       </div>
+      <AttitudeIndicator angle={90 - hud.pitch} label="Pitch" value={`${fmt(hud.pitch, 0)}°`} />
+      {!done && <div className="flight-legend panel"><span className="green">◎ Target orbit</span><span className="blue">↗ Current coast</span><span className="amber">— Flown path</span></div>}
       {!done && (
         <div className="prologue-controls">
           <div className="row" style={{ gap: 10 }}>
-            <HoldBtn label="⤴" aria="Pitch up" on={(v) => (input.current.up = v)} />
-            <HoldBtn label="⤵" aria="Pitch over" on={(v) => (input.current.down = v)} />
+            <FlightButton label="Pitch up" action="left" icon="↶" shortcut="← A" controls={controls} />
+            <FlightButton label="Pitch over" action="right" icon="↷" shortcut="→ D" controls={controls} />
           </div>
           <div className="row" style={{ gap: 10 }}>
             {!auto && (
-              <button className="btn" onClick={() => setAuto(true)}>
-                Let ECHO fly
+              <button className="btn flight-assist-button" onClick={() => { if (manualRequired) { controls.pause(true); setAssistDialog(true); } else takeOver(); }}>
+                {manualRequired ? 'Request ECHO rescue' : 'Let ECHO fly'}
               </button>
             )}
-            <HoldBtn label="BURN" aria="Burn" big on={(v) => (input.current.thrust = v)} />
+            <FlightButton label="Burn" action="thrust" icon="▲" shortcut="↑ W Space" controls={controls} burn />
           </div>
         </div>
       )}
+      {assistDialog && <FlightAssistDialog onCancel={() => setAssistDialog(false)} onConfirm={() => { takeOver(); setAssistDialog(false); controls.pause(false); }} />}
       {done && (
         <div className="title-wrap">
           <div className="intro-card panel">
@@ -231,31 +257,13 @@ export function Ascent() {
             </div>
             <div className="row" style={{ justifyContent: 'flex-end' }}>
               <button className="btn primary" onClick={proceed}>
-                Departure burn →
+                {s.settings.flightPractice ? 'Finish practice' : 'Departure burn →'}
               </button>
+              {s.settings.flightPractice && <button className="btn" onClick={() => startFlightPractice('ascent', s.settings.difficulty)}>Practise again</button>}
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function HoldBtn({ label, aria, on, big }: { label: string; aria: string; on: (v: boolean) => void; big?: boolean }) {
-  return (
-    <button
-      className={`btn ${big ? 'amber big' : 'icon-big'}`}
-      aria-label={aria}
-      onPointerDown={(e) => {
-        (e.target as Element).setPointerCapture?.(e.pointerId);
-        on(true);
-      }}
-      onPointerUp={() => on(false)}
-      onPointerCancel={() => on(false)}
-      onPointerLeave={() => on(false)}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      {label}
-    </button>
   );
 }

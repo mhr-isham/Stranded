@@ -87,7 +87,7 @@ export function ToastHost() {
  * Start a run. Building a solvable system can take a few seconds (the hard
  * chapters reject many), so say so on screen first instead of freezing.
  */
-export function startRun(seed: number, settings: Settings, chapter = 1) {
+export function startRun(seed: number, settings: Settings, chapter = 1, onStarted?: () => void) {
   const el = document.createElement('div');
   el.className = 'charting';
   el.textContent = 'Charting a new star system…';
@@ -112,6 +112,7 @@ export function startRun(seed: number, settings: Settings, chapter = 1) {
           });
           clock.emit();
         }
+        onStarted?.();
       } finally {
         el.remove();
       }

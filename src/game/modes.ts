@@ -41,6 +41,8 @@ export interface ModeRules {
   landingAssist: boolean;
   /** Δv in the descent tank (separate from the launch fuel). */
   landingDv: number;
+  /** New hard expeditions require manual ascent and destination landing. */
+  manualFlight?: boolean;
 }
 
 export const MODES: Record<Difficulty, ModeRules> = {
@@ -121,6 +123,7 @@ export const MODES: Record<Difficulty, ModeRules> = {
       'Thin spare fuel, about 6–13%: every error bar matters.',
       'Spare air roughly 1–5 months — often only one launch window.',
       'No mission list, hints or verify — you plan. Formula sheet off by default; you can enable it. One shot: no checkpoints or rewinds. Calculations, lessons and instrument warnings remain available.',
+      'Manual ascent and destination landing required. ECHO rescue preserves the journey as assisted, without a hard-mode score.',
     ],
     formulas: false,
     sanity: true,
@@ -135,6 +138,7 @@ export const MODES: Record<Difficulty, ModeRules> = {
     stormForecast: 0,
     landingAssist: false,
     landingDv: 750,
+    manualFlight: true,
   },
   legend: {
     name: 'Legend',
@@ -144,6 +148,7 @@ export const MODES: Record<Difficulty, ModeRules> = {
       'Spare fuel only about 5–9%; spare air roughly 1–4 months.',
       'Survival always on. No formula sheet, and no warnings about suspicious readings — check your own data.',
       'Everything Astronomer removes, removed. One shot.',
+      'Manual ascent and destination landing required. ECHO rescue preserves the journey as assisted, without a hard-mode score.',
     ],
     formulas: false,
     formulasLocked: true,
@@ -160,6 +165,7 @@ export const MODES: Record<Difficulty, ModeRules> = {
     stormForecast: 0,
     landingAssist: false,
     landingDv: 650,
+    manualFlight: true,
   },
 };
 

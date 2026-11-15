@@ -11,6 +11,7 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width': width, 'height': height})
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
+        page.on('dialog', lambda d: d.accept())
         page.goto('http://localhost:5173/', wait_until='networkidle')
         page.evaluate('''()=>{__game.getState().newGame(316,{difficulty:'navigator',survival:false,formulas:true,sound:false,campaignRun:false});__clock.t=1;__clock.paused=true;__game.setState({phase:'play',screen:'hub',savedT:1,seenEcho:['welcomeNavigator']})}''')
         page.locator('.mission-active').get_by_text('Measure the surface gravity g.', exact=True).wait_for()

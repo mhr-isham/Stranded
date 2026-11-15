@@ -11,6 +11,8 @@ import type { Prediction } from './predictions';
 import type { ChallengeId } from './challenges';
 import type { ProbeState } from './probeState';
 import type { AtlasCard, SystemNames } from './atlas';
+import type { FlightLeg, PilotingRecord } from './piloting';
+import { RULESET_VERSION } from './world';
 
 export type Screen =
   | 'map'
@@ -57,6 +59,10 @@ export interface Settings {
   freeRoamGuidance?: boolean;
   /** Optional Cadet objectives and unsolicited coaching; warnings remain available. */
   cadetGuidance?: boolean;
+  rulesetVersion?: number;
+  flightSensitivity?: number;
+  flightReducedMotion?: boolean;
+  flightPractice?: FlightLeg;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
   /** Astronomer Challenges chosen for this run. */
@@ -178,6 +184,8 @@ export interface GameState {
   pendingLaunch: { plan: LaunchPlan } | null;
   /** Fuel the hand-flown ascent cost beyond ECHO's profile (m/s; negative = saved). */
   ascentPenalty: number | null;
+  piloting: PilotingRecord;
+  practiceReturn: { state: Partial<GameState>; t: number; warpIndex: number } | null;
   /** How the landing at the blue planet went. */
   arrival: { landing: 'clean' | 'rough' | 'rescued' | 'skipped'; site: string } | null;
   /** Chapter 2: the probe sent past the blue planet. */
@@ -281,6 +289,8 @@ const initial = {
   hop: null as GameState['hop'],
   driveTarget: null as number | null,
   ascentPenalty: null as number | null,
+  piloting: { assisted: [] } as PilotingRecord,
+  practiceReturn: null as GameState['practiceReturn'],
   arrival: null as GameState['arrival'],
   probesLaunched: 0,
   probeLog: [],
@@ -321,7 +331,7 @@ export const useGame = create<GameState>()(
           names: chapter === 9 ? { star: 'the Sun', home: 'Mars', target: 'Earth', moon: 'the Moon' } : {},
           campaign: get().campaign ?? {},
           seed,
-          settings,
+          settings: { ...settings, rulesetVersion: RULESET_VERSION },
           codex: get().codex,
           achievements: get().achievements,
           atlas: get().atlas ?? [],

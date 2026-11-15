@@ -32,6 +32,8 @@ export interface AtlasCard {
   outcome: string;
   grade: string;
   score: number;
+  /** The journey is preserved, but excluded from scores and expert unlocks. */
+  assisted?: boolean;
   camp: GameState['camp'];
   predictions: { made: number; inside: number };
   rows: AtlasRow[];

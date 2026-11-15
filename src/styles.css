@@ -342,6 +342,69 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .prologue-controls .icon-big { width: 64px; height: 64px; font-size: 26px; border-radius: 16px; }
 .prologue-controls .big { min-width: 120px; min-height: 64px; }
 .prologue-keys { position: absolute; bottom: calc(92px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); font-size: 12px; }
+
+/* Shared flight deck: actual telemetry, large hold targets and visible input state. */
+.flight-screen { touch-action: none; }
+.flight-toolbar { position: absolute; top: calc(10px + var(--safe-top)); left: 12px; right: 12px; z-index: 12; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-color: #426b8d; background: rgba(7,19,36,.94); }
+.flight-toolbar > div:first-child { min-width: 0; }
+.flight-toolbar > .row { flex-wrap: nowrap; flex-shrink: 0; }
+.flight-toolbar .meter-label { display: block; font-size: 10px; }
+.flight-status { display: block; margin-top: 3px; color: #c9dfef; font-size: 12px; }
+.flight-screen .prologue-echo { top: calc(78px + var(--safe-top)); width: min(680px, calc(100% - 32px)); z-index: 5; font-size: 13px; background: rgba(6,17,31,.91); }
+.flight-screen .prologue-skip { top: auto; bottom: calc(210px + var(--safe-bottom)); right: 12px; background: rgba(7,19,36,.94); border-color: #426b8d; }
+.flight-screen .prologue-hud { top: calc(176px + var(--safe-top)); border-color: #426b8d; background: rgba(7,19,36,.94); font-variant-numeric: tabular-nums; }
+.flight-screen .prologue-hud dd { color: #e6f1ff; }
+.flight-screen .prologue-hud .kv { grid-template-columns: 1fr auto; gap: 5px 8px; font-size: inherit; }
+.flight-screen .prologue-hud dd { white-space: nowrap; }
+.flight-screen .prologue-hud dd.green { color: var(--green); }
+.flight-screen .prologue-hud dd.red { color: var(--red); }
+.flight-button { width: 88px; min-height: 90px; padding: 8px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 18px; border: 1px solid #4d779e; background: linear-gradient(155deg, #203c58, #0a182a); color: #eaf6ff; cursor: pointer; touch-action: none; user-select: none; box-shadow: 0 5px 16px #0008, inset 0 1px 0 #86c6ff30; font-size: 12px; font-weight: 600; }
+.flight-button-icon { font-size: 27px; line-height: 1; }
+.flight-button kbd { font: 10px var(--mono); color: #afc8df; }
+.flight-button.held { border-color: #a2e4ff; background: linear-gradient(155deg, #3679aa, #143954); box-shadow: 0 0 20px #5bbfff50, inset 0 0 0 2px #b2e9ff66; }
+.flight-button.flight-burn { width: 128px; border-color: #d7a15a; background: linear-gradient(155deg, #73502a, #30251c); }
+.flight-button.flight-burn.held { color: #25180b; background: linear-gradient(155deg, #ffe19c, #f2a340); box-shadow: 0 0 28px #ffae4855; }
+.flight-button.flight-burn.held kbd { color: #4c3015; }
+.flight-button:focus-visible { outline: 3px solid #b3eaff; outline-offset: 3px; }
+.flight-button:disabled { opacity: .45; cursor: default; }
+.flight-screen .prologue-controls { gap: 12px; z-index: 10; }
+.flight-assist-button { max-width: 180px; white-space: normal; background: rgba(7,19,36,.94); }
+.flight-attitude { position: absolute; top: calc(176px + var(--safe-top)); left: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center; width: 112px; background: rgba(7,19,36,.94); border-color: #426b8d; }
+.flight-attitude svg { width: 84px; height: 84px; }
+.flight-attitude strong { font-size: 19px; margin-top: 2px; }
+.flight-legend { position: absolute; left: 12px; bottom: calc(130px + var(--safe-bottom)); display: flex; flex-wrap: wrap; gap: 5px 12px; max-width: 300px; padding: 8px 12px; font-size: 11px; background: rgba(7,19,36,.94); }
+.flight-paused { position: absolute; left: 50%; top: 51%; transform: translate(-50%,-50%); z-index: 14; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 26px; background: rgba(7,19,36,.96); border-color: #7bb7df; box-shadow: 0 12px 50px #0008; }
+.flight-screen .prologue-corridor { top: calc(176px + var(--safe-top)); }
+@media (max-width: 860px) {
+  .flight-toolbar { left: 8px; right: 8px; padding: 8px; gap: 6px; }
+  .flight-toolbar .btn { padding: 6px 8px; font-size: 12px; }
+  .flight-toolbar .row { gap: 2px; }
+  .flight-toolbar .meter-label { font-size: 9px; letter-spacing: .06em; }
+  .flight-status { font-size: 10px; }
+  .flight-screen .prologue-echo { top: calc(78px + var(--safe-top)); width: calc(100% - 16px); padding: 8px; font-size: 11px; }
+  .flight-screen .prologue-hud { top: calc(174px + var(--safe-top)); width: 146px; font-size: 11px; }
+  .flight-screen .prologue-hud .kv { gap: 3px 6px; }
+  .flight-screen .prologue-controls { left: 8px; right: 8px; gap: 8px; }
+  .flight-screen .prologue-controls .row { gap: 6px; }
+  .flight-button { width: 74px; min-height: 82px; font-size: 11px; border-radius: 15px; }
+  .flight-button.flight-burn { width: 106px; }
+  .flight-assist-button { max-width: 142px; padding: 7px 8px; font-size: 11px; }
+  .flight-attitude { left: 8px; top: calc(174px + var(--safe-top)); width: 88px; }
+  .flight-attitude svg { width: 68px; height: 68px; }
+  .flight-attitude strong { font-size: 16px; }
+  .flight-legend { left: 8px; bottom: calc(130px + var(--safe-bottom)); max-width: 170px; font-size: 10px; padding: 6px 8px; }
+  .flight-screen .prologue-keys { display: none; }
+  .flight-screen .prologue-corridor { top: calc(174px + var(--safe-top)); }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  .flight-screen .prologue-echo { width: min(520px, 64%); left: 40%; }
+  .flight-screen .prologue-hud { top: calc(80px + var(--safe-top)); width: 160px; font-size: 11px; }
+  .flight-screen .prologue-skip { left: 124px; right: auto; bottom: calc(116px + var(--safe-bottom)); }
+  .flight-legend { max-width: 110px; }
+  .flight-attitude { top: calc(80px + var(--safe-top)); width: 88px; }
+  .flight-attitude svg { width: 60px; height: 60px; }
+  .flight-legend { bottom: calc(116px + var(--safe-bottom)); }
+}
 @media (max-width: 640px) {
   .prologue-echo { width: calc(100% - 24px); top: calc(54px + var(--safe-top)); font-size: 13px; }
   .prologue-hud { top: calc(150px + var(--safe-top)); right: 8px; width: 136px; font-size: 11px; padding: 8px; }

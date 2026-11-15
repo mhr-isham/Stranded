@@ -33,6 +33,7 @@ if (import.meta.env.DEV) {
 
 export default function App() {
   const phase = useGame((s) => s.phase);
+  const runId = useGame((s) => s.runId);
   const tutorial = useGame((s) => s.tutorial.active);
 
   // One simulation loop for the whole game, independent of which canvas is shown.
@@ -71,13 +72,13 @@ export default function App() {
   return (
     <>
       {phase === 'title' && <Title />}
-      {phase === 'prologue' && <Prologue />}
+      {phase === 'prologue' && <Prologue key={`${runId}-opening`} />}
       {phase === 'intro' && <Intro />}
       {phase === 'play' && <Game />}
-      {phase === 'ascent' && <Ascent />}
+      {phase === 'ascent' && <Ascent key={`${runId}-ascent`} />}
       {phase === 'flight' && <Flight />}
-      {phase === 'landing' && <Prologue arrival />}
-      {phase === 'hop' && <Prologue hop />}
+      {phase === 'landing' && <Prologue key={`${runId}-landing`} arrival />}
+      {phase === 'hop' && <Prologue key={`${runId}-hop`} hop />}
       {phase === 'results' && <Results />}
       {tutorial && <Tutorial />}
       {phase !== 'title' && phase !== 'prologue' && <StoryHost />}
