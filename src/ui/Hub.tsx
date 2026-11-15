@@ -3,6 +3,7 @@ import { DEG } from '../engine/constants';
 import { clock } from '../game/clock';
 import { activeMission } from '../game/missions';
 import { useMode } from '../game/modes';
+import { isCadetExpedition } from '../game/cadetGuidance';
 import { currentWorld } from '../game/sim';
 import { useGame, type Screen } from '../game/store';
 import { skyColors } from '../render/color';
@@ -24,7 +25,8 @@ export function Hub() {
   const freeRoam = useGame((s) => !!s.settings.freeRoam);
   const go = useGame((s) => s.go);
   const next = useGame((s) => activeMission(s));
-  const guidance = useMode().coaching;
+  const cadetQuiet = useGame((s) => isCadetExpedition(s) && s.settings.cadetGuidance === false);
+  const guidance = useMode().coaching && !cadetQuiet;
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const stations = useMemo<HubStation[]>(() => {
     const list: HubStation[] = [

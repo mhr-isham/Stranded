@@ -233,6 +233,7 @@ export function Hill() {
               <dd className="blue">{fmt(result.R / 1000, 0)} km</dd>
             </dl>
             <SanityWarning
+              attempt={result}
               msgs={[
                 result.untouched && 'You haven’t moved the instrument since arriving — the horizon is probably not on the crosshair. Drag the view first.',
                 (result.R < 1500e3 || result.R > 20000e3) && 'A planet this size is very unlikely. Check the horizon sits exactly on the red line.',

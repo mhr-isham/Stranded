@@ -3,6 +3,8 @@ import { activeMission, missionsFor } from '../game/missions';
 import { useMode } from '../game/modes';
 import { currentAct } from '../game/acts';
 import { useGame } from '../game/store';
+import { isCadetExpedition } from '../game/cadetGuidance';
+import { CadetGoal } from './CadetGoal';
 
 export function MissionPanel() {
   const s = useGame();
@@ -10,6 +12,7 @@ export function MissionPanel() {
   const mode = useMode();
   const MISSIONS = missionsFor(s);
   const cur = activeMission(s);
+  if (isCadetExpedition(s)) return <CadetGoal />;
   if (mode.missions === 'off') return null;
   const coach = mode.missions === 'coach';
   const curIdx = cur ? MISSIONS.indexOf(cur) : -1;

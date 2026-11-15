@@ -30,11 +30,16 @@ function WindGauge() {
   const v = windAt(s, t);
   const corrected = ANOMALIES[s.settings.difficulty].announce === 'corrected';
   return (
+    <div className="stack">
     <div className="row between" style={{ fontSize: 13 }}>
       <span className="muted">Wind gauge</span>
       <span className={v > 6 ? 'amber' : ''}>
         {fmt(v, 1)} m/s {v > 6 ? (corrected ? '— ECHO is steadying the rig for you' : '— strong') : '— calm'}
       </span>
+    </div>
+    {v > 6 && s.settings.difficulty === 'cadet' && <div className="muted" style={{ fontSize: 12 }}>
+      Wind pushes the bob sideways. Cadet assistance steadies the rig here; check your length and timing, and compare repeat readings.
+    </div>}
     </div>
   );
 }
@@ -365,6 +370,7 @@ export function Pendulum() {
               <dd className="blue">{fmt(result.g, 4)} m/s²</dd>
             </dl>
             <SanityWarning
+              attempt={result}
               msgs={[
                 (result.g < 2 || result.g > 40) && 'That is not a plausible gravity for a planet you can stand on. Did you enter the right number of swings?',
                 result.N < 5 && 'Fewer than 5 swings: your reaction time dominates this reading. Time more swings for a better result.',

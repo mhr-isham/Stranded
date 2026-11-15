@@ -12,6 +12,7 @@ import { hintsFor, nodeInfoFor } from './nodeInfo';
 import { flag } from '../../game/tutorial';
 import { NamesDialog } from '../Atlas';
 import { countText, useMode } from '../../game/modes';
+import { CadetGoal } from '../CadetGoal';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -129,6 +130,7 @@ export function Sheet() {
         </svg>
       </div>
       <div className="tool-side">
+        <CadetGoal inTool />
         <div className="panel panel-pad hide-phone">
           <div className="row between">
             <h2 style={{ fontSize: 16 }}>Progress sheet</h2>

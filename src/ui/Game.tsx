@@ -20,6 +20,7 @@ import { ProbeBay } from './tools/ProbeBay';
 import { RoverDrive } from './tools/RoverDrive';
 import { SurfaceMap } from './tools/SurfaceMap';
 import { Gnomon } from './tools/Gnomon';
+import { isCadetExpedition } from '../game/cadetGuidance';
 
 const NAV: { screen: Screen; label: string; ico: string }[] = [
   { screen: 'hub', label: 'Camp', ico: '⛺' },
@@ -36,7 +37,7 @@ export function Game() {
 
   useEffect(() => {
     const g = useGame.getState();
-    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
+    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(isCadetExpedition(g) ? ECHO.welcomeCadet : modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
     checkMissions();
   }, []);
 

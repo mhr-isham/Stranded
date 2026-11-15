@@ -13,6 +13,7 @@ import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
 import { quantityName, readiness } from '../game/readiness';
 import { flareAt } from '../engine/flares';
 import { AudioSettings } from './common/AudioSettings';
+import { isCadetExpedition } from '../game/cadetGuidance';
 
 export function Hud() {
   const t = useGameTime(6);
@@ -159,6 +160,12 @@ export function Hud() {
             label="Formula sheet"
             sub={mode.formulasLocked ? `Not available in ${mode.name}.` : 'Shown in tools and on the progress sheet.'}
           />
+          {isCadetExpedition(s) && <Toggle
+            on={s.settings.cadetGuidance !== false}
+            onChange={(v) => s.set({ settings: { ...s.settings, cadetGuidance: v }, echo: s.echo.filter((l) => !l.coach) })}
+            label="Cadet guidance"
+            sub="Optional next goal and coaching. Instrument warnings and requested hints remain available."
+          />}
           {s.settings.freeRoam && (
             <div className="stack">
               <Toggle

@@ -1,5 +1,5 @@
 import { Equation } from './Equation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
 import { fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions } from '../../game/sim';
@@ -7,6 +7,8 @@ import { currentMode, useMode } from '../../game/modes';
 import { hasChallenge } from '../../game/challenges';
 import { readingStats, useGame } from '../../game/store';
 import { toast } from './widgets';
+import { isCadetExpedition, noteCadetWarning } from '../../game/cadetGuidance';
+import { CadetGoal } from '../CadetGoal';
 
 /** Table of logged readings for one quantity, with keep/discard toggles. */
 export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: number) => string }) {
@@ -115,6 +117,7 @@ export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
 export function ToolHeader({ title, sub }: { title: string; sub: string }) {
   const go = useGame((s) => s.go);
   return (
+    <>
     <div className="panel panel-pad">
       <div className="row between">
         <h2>{title}</h2>
@@ -124,6 +127,8 @@ export function ToolHeader({ title, sub }: { title: string; sub: string }) {
       </div>
       <div className="muted" style={{ fontSize: 13 }}>{sub}</div>
     </div>
+    <CadetGoal inTool />
+    </>
   );
 }
 
@@ -138,12 +143,24 @@ export function outlierNote(value: number, others: number[], tolerance: number) 
   const sorted = [...others].sort((a, b) => a - b);
   const med = sorted[Math.floor(sorted.length / 2)];
   const off = Math.abs(value / med - 1);
-  return off > tolerance ? `This is ${Math.round(off * 100)}% away from your other readings (median ${sig(med, 4)}). Something may have gone wrong — consider discarding it.` : null;
+  if (off <= tolerance) return null;
+  const observation = `This is ${Math.round(off * 100)}% away from your other readings (median ${sig(med, 4)}).`;
+  return isCadetExpedition(useGame.getState())
+    ? `${observation} Repeat the measurement and check alignment, timing and conditions before deciding which readings to keep. Agreement alone does not establish accuracy.`
+    : `${observation} Something may have gone wrong — consider discarding it.`;
 }
 
-export function SanityWarning({ msgs }: { msgs: (string | null | false | undefined)[] }) {
+export function SanityWarning({ msgs, attempt }: { msgs: (string | null | false | undefined)[]; attempt?: object }) {
   const mode = useMode();
   const list = msgs.filter(Boolean) as string[];
+  const lastAttempt = useRef<object | undefined>(undefined);
+  const hasWarnings = list.length > 0 && mode.sanity;
+  useEffect(() => {
+    if (attempt && attempt !== lastAttempt.current && hasWarnings) {
+      lastAttempt.current = attempt;
+      noteCadetWarning();
+    }
+  }, [attempt, hasWarnings]);
   if (!list.length || !mode.sanity || hasChallenge(useGame.getState(), 'noSanity')) return null;
   return (
     <div className="callout warn" style={{ margin: 0 }}>

@@ -12,6 +12,7 @@ import { hash32 } from '../engine/rng';
 import { clock } from './clock';
 import { ECHO } from './echo';
 import { activeMission, missionsFor } from './missions';
+import { isCadetExpedition } from './cadetGuidance';
 import { MISSION_CODEX } from './codex';
 import { sfx } from './audio';
 import { WARPS } from './clock';
@@ -232,7 +233,9 @@ export function checkMissions() {
     sfx('unlock');
   }
   const next = activeMission(useGame.getState());
-  if (next && ECHO[next.id]) s.say(ECHO[next.id]);
+  // Cadet offers the method on demand in its goal card, using this chapter's
+  // mission text rather than a second, sometimes chapter-1-specific speech.
+  if (next && ECHO[next.id] && !isCadetExpedition(s)) s.say(ECHO[next.id]);
 }
 
 /**

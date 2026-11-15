@@ -1,0 +1,15 @@
+# Cadet guidance — MODE-05–07, 15 November 2026
+
+The review retains five difficulty levels and Stargazer’s scored, forgiving expeditions. This batch changes Cadet’s guidance presentation. It preserves the scientific model, reserves, paid hint rules, five fuel-cost verifications, checkpoint allowances and failed-flight rewind. Verification’s exact future contract remains explicitly open in GAME-REVIEW.md.
+
+Cadet now shows one short current objective at camp. Purpose and method are optional; walkthroughs step through instrument use without taking measurements or filling answers. Ground activities have specific walkthroughs; later activities retain their chapter-specific instructions and observation-review guidance. An optional expedition overview still opens other activities in any order. The active tool repeats its objective where relevant, including the progress sheet. Guidance can be hidden and restored from camp or the menu, and the preference survives saving/reloading.
+
+Completing three kept gravity or horizon readings offers a short next action and an optional explanation of scatter, random uncertainty and shared systematic errors. Warnings describe observations and useful checks. Cadet’s existing wind correction is explicitly described at the rig; the correction model is unchanged.
+
+Three explicit pendulum or horizon attempts with visible measurement warnings make a single optional walkthrough offer available for that goal. Re-renders do not count as extra attempts. Opening or declining the offer acknowledges it; the acknowledgement survives checkpoints and rewinds within the run. Idle time, pausing, exploring other tools and quiet guidance do not accumulate warnings. This is a deliberately limited first implementation of adaptive assistance, not a general detector of frustration or measurement correctness.
+
+Validation: 55 tests pass across 17 files. New tests exercise unrestricted navigation and goal progression, absence of duplicate automatic mission speeches, warning counts and dismissal, assistance boundaries, chapter-specific methods, and separation from paid hints/verification and answer entry. The production build passes with the existing large-bundle warning.
+
+`scripts/check_cadet.py` exercises real controls at 390×844 and 1440×900: optional explanations, walkthrough navigation, hide/reopen across reload, menu controls, freely opening another activity, measured string length and three short stopwatch attempts producing instrument warnings, offer dismissal, reading feedback, sheet guidance and goal progression. It also checks the original mission presentation or silence in the other four difficulties, browser errors and page overflow. Synthetic reading fixtures exercise completion; they are not evidence of human measurement accuracy or enjoyment. `scripts/check_entrypoints.py` separately checks Campaign/expedition/Free Roam boundaries after these shared UI changes.
+
+These checks cover the named flows in Chromium. They do not establish ideal pacing for every chapter, instrument, seed, device or player. Further playtesting and Flight School design remain separate review work.

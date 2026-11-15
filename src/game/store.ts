@@ -55,6 +55,8 @@ export interface Settings {
   /** Absent in legacy saves, which used expedition wins as campaign progress. */
   campaignRun?: boolean;
   freeRoamGuidance?: boolean;
+  /** Optional Cadet objectives and unsolicited coaching; warnings remain available. */
+  cadetGuidance?: boolean;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
   /** Astronomer Challenges chosen for this run. */
@@ -133,6 +135,7 @@ export interface GameState {
   oppPicks: number[]; // times the player marked as oppositions
   rover: { dist: number; target: number; departAt: number; arriveAt: number };
   missionsDone: string[];
+  cadetHelp: { warnings: Record<string, number>; offered: string[] };
   hintsUsed: number;
   /** How many hint levels each sheet quantity has opened (kept, so a hint is paid once). */
   hintsSeen: Partial<Record<string, number>>;
@@ -254,6 +257,7 @@ const initial = {
   oppPicks: [] as number[],
   rover: { dist: 0, target: 0, departAt: 0, arriveAt: 0 },
   missionsDone: [],
+  cadetHelp: { warnings: {}, offered: [] } as GameState['cadetHelp'],
   hintsUsed: 0,
   hintsSeen: {},
   lifeExtra: 0,
@@ -340,7 +344,7 @@ export const useGame = create<GameState>()(
         }),
       say: (line) =>
         set((s) =>
-          (s.settings.freeRoam && !s.settings.freeRoamGuidance) || (line.coach && !modeOf(s.settings.difficulty).coaching) ? s : (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
+          (s.settings.freeRoam && !s.settings.freeRoamGuidance) || (line.coach && (!modeOf(s.settings.difficulty).coaching || (s.settings.difficulty === 'cadet' && !s.tutorial.active && s.settings.cadetGuidance === false))) ? s : (s.seenEcho.includes(line.id) ? s : { echo: [...s.echo, line], seenEcho: [...s.seenEcho, line.id] })),
       dismissEcho: () => set((s) => ({ echo: s.echo.slice(1) })),
       unlock: (kind, id) => set((s) => (s[kind].includes(id) ? s : { [kind]: [...s[kind], id] } as Partial<GameState>)),
     }),
