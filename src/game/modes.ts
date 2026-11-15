@@ -97,12 +97,12 @@ export const MODES: Record<Difficulty, ModeRules> = {
     expect: [
       'Spare fuel about 10–20%: careful work succeeds, sloppy work does not.',
       'Spare air roughly 2–8 months — you can miss a window, but not many.',
-      'Missions show goals, not instructions. 1 hint level, 3 checkpoints, one rewind (costs score).',
+      'Missions show goals; choose your own method. Instrument warnings remain available. 1 hint level, 3 checkpoints, one rewind (costs 150 points).',
     ],
     formulas: true,
     sanity: true,
     missions: 'goals',
-    coaching: true,
+    coaching: false,
     hints: 1,
     hintsCost: true,
     verifies: 2,
@@ -120,7 +120,7 @@ export const MODES: Record<Difficulty, ModeRules> = {
     expect: [
       'Thin spare fuel, about 6–13%: every error bar matters.',
       'Spare air roughly 1–5 months — often only one launch window.',
-      'No mission list, hints or verify — you plan. ECHO stays quiet. Formula sheet off by default. One shot: no checkpoints or rewinds.',
+      'No mission list, hints or verify — you plan. Formula sheet off by default; you can enable it. One shot: no checkpoints or rewinds. Calculations, lessons and instrument warnings remain available.',
     ],
     formulas: false,
     sanity: true,

@@ -37,7 +37,7 @@ export function Game() {
 
   useEffect(() => {
     const g = useGame.getState();
-    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(isCadetExpedition(g) ? ECHO.welcomeCadet : modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
+    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(isCadetExpedition(g) ? ECHO.welcomeCadet : g.settings.difficulty === 'navigator' && !g.settings.freeRoam ? ECHO.welcomeNavigator : modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
     checkMissions();
   }, []);
 

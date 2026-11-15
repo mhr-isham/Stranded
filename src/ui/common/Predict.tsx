@@ -201,7 +201,7 @@ export function PredictCard(p: CardProps) {
           {p.axis === 'y' ? 'Tap or drag on the dashed line to place your guess.' : 'Tap or drag in the future area to place your guess.'}
         </div>
       )}
-      {mode.coaching && p.ownFit?.line && (
+      {mode.missions !== 'off' && p.ownFit?.line && (
         <label className="check-line">
           <input type="checkbox" checked={trend} onChange={(e) => setTrend(e.target.checked)} />
           <span>Show the straight line through my readings</span>

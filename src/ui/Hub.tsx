@@ -26,7 +26,7 @@ export function Hub() {
   const go = useGame((s) => s.go);
   const next = useGame((s) => activeMission(s));
   const cadetQuiet = useGame((s) => isCadetExpedition(s) && s.settings.cadetGuidance === false);
-  const guidance = useMode().coaching && !cadetQuiet;
+  const guidance = useMode().missions !== 'off' && !cadetQuiet;
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const stations = useMemo<HubStation[]>(() => {
     const list: HubStation[] = [

@@ -546,7 +546,7 @@ export function Observatory() {
               Log diameter
             </button>
             <div className="hint">The disk looks biggest — and is easiest to measure — near opposition, when the blue planet is closest.</div>
-            {currentMode().coaching && seeingFactor(s, clock.t) > 1.5 && (
+            {currentMode().sanity && !s.settings.challenges?.includes('noSanity') && seeingFactor(s, clock.t) > 1.5 && (
               <div className="amber" style={{ fontSize: 13 }}>The air is rough tonight — the image swims. Readings will scatter more; another night may be better.</div>
             )}
             <Formula>R₂ = d · tan(α₂ / 2)</Formula>
@@ -1098,7 +1098,7 @@ function TransitPanel({ onPoint }: { onPoint: () => void }) {
       <button className={`btn ${s.sunCamOn ? '' : 'primary'}`} onClick={() => s.set({ sunCamOn: !s.sunCamOn })}>
         {s.sunCamOn ? 'Solar camera: ON (hourly)' : 'Turn on the solar camera'}
       </button>
-      {mode.coaching && now && <div className="green" style={{ fontSize: 13 }}>A transit is happening now.</div>}
+      {(mode.coaching || mode.missions === 'goals') && now && <div className="green" style={{ fontSize: 13 }}>A transit is happening now.</div>}
       {pts.length > 1 && (
         <>
           <Chart

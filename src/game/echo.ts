@@ -27,6 +27,10 @@ export const INTRO: { title: string; text: string }[] = [
 ];
 
 export const ECHO: Record<string, EchoLine> = {
+  welcomeNavigator: {
+    id: 'welcomeNavigator',
+    text: 'ECHO online. Your expedition goals are at camp; choose your own methods. Calculations and instrument warnings are available. Request a hint on the sheet if you need one.',
+  },
   welcomeCadet: {
     id: 'welcomeCadet',
     coach: true,
