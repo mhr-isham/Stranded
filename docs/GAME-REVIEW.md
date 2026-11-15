@@ -73,7 +73,7 @@ The game has more implemented systems than its presentation currently connects. 
 
 ### DIR-04 — Recommended priority
 
-First repair progression and trust failures; then improve early discovery, event navigation and story pacing; then finish measurement-linked flight; then prototype the resource economy; only then broaden terrain, relocation and online features. This is my recommended order, not an implementation commitment. Building all proposed logistics first would be a large, risky diversion from the game's most memorable moments.
+**Implementation order agreed — 15 November 2026:** First repair progression and trust failures; then improve early discovery, event navigation and story pacing; then strengthen the story/characters according to the later discussion and complete measurement-linked flight; then develop the connected expedition economy; then broaden terrain, towing and relocation, followed by online features when hosting is available. Discussion can continue in report order. This establishes sequencing, not blanket approval of every proposed feature or an unresolved mode policy. Individual fixes/features still need concrete scope and acceptance criteria.
 
 ## 2. Ways to play, modes and teaching
 
