@@ -65,6 +65,7 @@ export function Rover() {
       return toast('The rover is out on the surface map. Bring it home first.');
     const dist = Math.abs(target * 1000 - s.rover.dist);
     s.set({ rover: { dist: s.rover.dist, target: target * 1000, departAt: clock.t, arriveAt: clock.t + (dist / speed) * DAY } });
+    sfx('radio');
     toast(`Rover underway: ${fmt(dist / speed, 1)} days`);
   };
 

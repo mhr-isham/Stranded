@@ -1,3 +1,4 @@
+import { Equation } from './Equation';
 import { useState } from 'react';
 import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
 import { fromDisplay, sig, toDisplay } from '../../game/format';
@@ -128,7 +129,7 @@ export function ToolHeader({ title, sub }: { title: string; sub: string }) {
 
 export function Formula({ children }: { children: string }) {
   const on = useGame((s) => s.settings.formulas);
-  return on ? <div className="formula">{children}</div> : null;
+  return on ? <div className="formula"><Equation text={children} /></div> : null;
 }
 
 /** Compare a new reading with the kept ones; returns a warning when it looks off. */

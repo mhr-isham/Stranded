@@ -11,7 +11,7 @@ import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
 import { Modal, useGameTime } from '../common/widgets';
-import { sfx } from '../../game/audio';
+import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { explain, makePrediction, resolveNow } from '../../game/predictions';
 import { hasChallenge } from '../../game/challenges';
@@ -65,6 +65,7 @@ export function Pendulum() {
     clock.realtime = true;
     clock.emit();
     return () => {
+      stopInstrument();
       clock.realtime = false;
       clock.emit();
     };
@@ -126,9 +127,11 @@ export function Pendulum() {
     phys.current.om = 0;
     phys.current.swinging = true;
     phys.current.trail = [];
+    sfx('metal');
     flag('pend-released');
   };
   const stopSwing = () => {
+    sfx('metal');
     phys.current.swinging = false;
     phys.current.th = 0;
     phys.current.om = 0;
@@ -169,6 +172,7 @@ export function Pendulum() {
               phys.current.om = 0;
               phys.current.swinging = true;
               phys.current.trail = [];
+              sfx('metal');
               flag('pend-released');
             }
           }}
@@ -206,6 +210,7 @@ export function Pendulum() {
               }
             }
             const { px, py, ppm } = layout(w, h);
+            setInstrument('pendulum', P.swinging ? Math.min(0.6, Math.abs(P.om) * 0.8) : 0, Math.min(1, Math.abs(P.th) / (20 * DEG)));
             // Ground under the rig.
             const gy = py + 3.25 * ppm;
             const gr = ctx.createLinearGradient(0, gy - 10 * dpr, 0, h);

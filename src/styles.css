@@ -401,3 +401,12 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 
 /* Shown while a new star system is generated. */
 .charting { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(2, 4, 10, 0.82); color: var(--amber); font-weight: 600; letter-spacing: 0.04em; animation: fade 0.2s; }
+
+/* Equations keep semantic MathML and locally bundled mathematical fonts. */
+.formula, .lesson-formula { display: block; max-width: 100%; min-width: 0; padding: 10px 12px; }
+.equation { min-width: 0; max-width: 100%; font-family: Georgia, serif; }
+.equation-line { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 4px 2px; }
+.equation .katex-display { margin: 0.35em 0; text-align: left; }
+.equation .katex-display > .katex { text-align: left; }
+.equation .katex { font-size: 1.08em; }
+@media (max-width: 600px) { .equation .katex { font-size: 1em; } }

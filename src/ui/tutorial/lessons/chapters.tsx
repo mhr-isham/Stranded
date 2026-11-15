@@ -1,3 +1,4 @@
+import { Equation } from '../../common/Equation';
 // Optional Flight School modules, one per campaign chapter.
 
 import { useState } from 'react';
@@ -76,13 +77,7 @@ export function FlybyLesson() {
           </Note>
         </Demo>
       }
-      formula={
-        <>
-          Energy is conserved along the flyby: ½vₚ² − GM/rₚ = ½v∞²
-          <br />
-          so M = rₚ (vₚ² − v∞²) / (2G)
-        </>
-      }
+      formula={<Equation tex={"\\frac12v_{\\mathrm p}^2-\\frac{GM}{r_{\\mathrm p}}=\\frac12v_\\infty^2 \\\\ M=\\frac{r_{\\mathrm p}(v_{\\mathrm p}^2-v_\\infty^2)}{2G}"} />}
       keyIdea="A probe speeds up as it falls toward a planet and slows again as it climbs away. How much it speeds up — measured by its radio signal’s Doppler shift — weighs the planet, no moon needed. Mariner 10 weighed Mercury this way."
       tip="A closer pass gives a bigger speed-up and a more precise mass — but aim too close and the probe hits the planet. Your aim is only as good as your measured radius R₂."
       warn="vₚ² − v∞² is a small difference of two big numbers when the pass is far away. Small errors in the speeds become big errors in the mass."
@@ -159,7 +154,7 @@ export function RefractionLesson() {
           </Note>
         </Demo>
       }
-      formula={<>R = d / Δ, with Δ in radians (d = distance between the sites, due north–south)</>}
+      formula={<Equation tex={"R=\\frac d\\Delta\\quad(\\Delta\\text{ in radians}) \\\\ d=\\text{distance between sites, north–south}"} />}
       keyIdea="Near the horizon, light skims through the thickest air and bends, so the horizon looks higher than it is — the dip shrinks and the planet seems bigger. At noon the sun is high, its light crosses little air, and two stick shadows a known distance apart give the planet’s size directly."
       tip="Drive the rover due north so both sticks see noon at the same moment. Measure the shortest shadow of the day at each site — that is noon."
       warn="If two methods disagree badly, one of them has a systematic error. Repeating the bad one doesn’t fix it."
@@ -233,13 +228,7 @@ export function InnerLesson() {
           <Note>Move the planet until the elongation is largest: the line from us just grazes its orbit, at a right angle to the planet–star line.</Note>
         </Demo>
       }
-      formula={
-        <>
-          sin ε(max) = a₂ / a₁,   1/P₂ = 1/P₁ + 1/S
-          <br />
-          S = time from one transit to the next
-        </>
-      }
+      formula={<Equation tex={"\\sin\\varepsilon_{\\max}=\\frac{a_2}{a_1} \\\\ \\frac1{P_2}=\\frac1{P_1}+\\frac1S \\\\ S=\\text{time between transits}"} />}
       keyIdea="An inner planet never strays far from the star: it swings out to its greatest elongation and back, so you only see it in twilight. When it passes exactly between us and the star you can watch it cross the star’s face — a transit — and time it to the minute."
       tip="Transits come once per synodic period. Two of them give S; the moment of either one fixes where the planets are. Measure its distance by parallax when it is high in a dark twilight sky, near greatest elongation."
       warn="Never look for an inner planet near the star without the solar filter. And it laps us, so its year comes from 1/P₂ = 1/P₁ + 1/S — a plus, not a minus."
@@ -324,13 +313,7 @@ export function EllipseLesson() {
           <Note>Both wedges are swept in the same time. Near the star the wedge is short and wide; far away it is long and thin — the areas match.</Note>
         </Demo>
       }
-      formula={
-        <>
-          r = a(1 − e²) / (1 + e cos θ),   v² = GM(2/r − 1/a)
-          <br />
-          P² = 4π²a³/(GM) — the period depends only on a, not on e
-        </>
-      }
+      formula={<Equation tex={"r=\\frac{a(1-e^2)}{1+e\\cos\\theta}\\,,\\quad v^2=GM\\left(\\frac2r-\\frac1a\\right) \\\\ P^2=\\frac{4\\pi^2a^3}{GM}\\quad\\text{(depends on }a\\text{, not }e\\text{)}"} />}
       keyIdea="Planets move on ellipses with the star at one focus (first law), sweeping equal areas in equal times (second law): fast near the star, slow far away. So oppositions come unevenly, the planet’s distance at opposition changes, and a transfer aimed at the circle you assumed will miss."
       tip="Log the blue planet every clear night for most of its orbit. In the Orbit tab, the fit finds the one ellipse that matches every sight line — Kepler’s own method — and gives P₂, e and the direction of perihelion ϖ."
       warn="The period still follows Kepler’s third law with a = the semi-major axis (half the long axis), so P₂ still gives a₂. What changes is where on the ellipse the planet is, and how fast it moves there."
@@ -414,13 +397,7 @@ export function LockedLesson() {
           <Note>Short gaps are the most common, and long quiet spells still happen. Each run differs; the average barely moves.</Note>
         </Demo>
       }
-      formula={
-        <>
-          locked: rotation period = orbital period,   P₁ = 360° / (sky turn rate)
-          <br />
-          chance of no flare for t days = e^(−t / mean gap)
-        </>
-      }
+      formula={<Equation tex={"P_{\\mathrm{rotation}}=P_{\\mathrm{orbit}} \\\\ P_1=\\frac{360^\\circ}{\\text{sky turn rate}} \\\\ \\Pr(\\text{no flare in }t)=e^{-t/\\text{mean gap}}"} />}
       keyIdea="Tides slow a planet close to its star until it turns once per orbit — tidally locked, like our Moon facing Earth. The star then stands still in the sky, so there is no day to measure the year with; but the planet still turns once per orbit relative to the stars, so the starry sky wheels round once a year."
       tip="Log the sky’s turn every few days and fit the rate, just like the star’s drift elsewhere. Flares come at random: plan with the rate (about one every 2–3 days, lasting hours), not with a schedule."
       warn="A flare tells you nothing about when the next one comes — the gaps are random. Long gaps are rarer than short ones, but they never become ‘due’."
@@ -507,13 +484,7 @@ export function SlingshotLesson() {
           <Note>Pass closer and the giant turns you more. A heavier giant than you measured turns you more than you planned.</Note>
         </Demo>
       }
-      formula={
-        <>
-          turn δ = 2 asin(1 / (1 + r_p v∞² / GM_G))
-          <br />
-          relative to the giant: |v∞,out| = |v∞,in|; relative to the star: v = v_giant + v∞
-        </>
-      }
+      formula={<Equation tex={"\\delta=2\\arcsin\\left(\\frac1{1+r_{\\mathrm p}v_\\infty^2/(GM_G)}\\right) \\\\ |\\mathbf v_{\\infty,\\mathrm{out}}|=|\\mathbf v_{\\infty,\\mathrm{in}}| \\\\ \\mathbf v=\\mathbf v_{\\mathrm{giant}}+\\mathbf v_\\infty"} />}
       keyIdea="Relative to the giant, a flyby only changes your direction — you leave as fast as you came. But the giant itself is moving around the star, so turning your velocity towards its direction of motion adds its speed to yours. You leave faster, relative to the star, than you arrived: speed borrowed from the giant’s orbit."
       tip="The bend depends on the giant’s mass and on how close you pass. ECHO aims the flyby with YOUR mass. Weigh the giant carefully (its moon), and pin down where it will be (its oppositions, sharpened with the orbit fit)."
       warn="The giant pays for your speed by slowing down a tiny, tiny bit. It never notices — but your error bars will."
@@ -584,13 +555,7 @@ export function StellarLesson() {
           <Note>The farther the star, the smaller its yearly swing. Our orbit is the longest baseline we have.</Note>
         </Demo>
       }
-      formula={
-        <>
-          d = a₁ / tan p,   1 parsec = the distance where p = 1″ for a₁ = 1 AU (3.26 light-years)
-          <br />
-          offset(t) = A sin(2πt/P₁) + B cos(2πt/P₁) + C + μt,   p = √(A² + B²)
-        </>
-      }
+      formula={<Equation tex={"d=\\frac{a_1}{\\tan p}\\,,\\quad 1\\,\\mathrm{pc}\\approx3.26\\ \\text{light-years} \\\\ \\text{offset}(t)=A\\sin\\frac{2\\pi t}{P_1}+B\\cos\\frac{2\\pi t}{P_1}+C+\\mu t \\\\ p=\\sqrt{A^2+B^2} \\\\ \\text{One parsec: }p=1^{\\prime\\prime}\\text{ at }a_1=1\\,\\mathrm{AU}"} />}
       keyIdea="A near star seen from opposite sides of our orbit points in slightly different directions, so against the far background it swings to and fro once a year. The size of the swing, with our orbit radius as the baseline, gives its distance. Stars also drift on their own (proper motion): a slow straight line under the yearly wobble."
       tip="Log each star every few weeks for most of a year (it hides near the star for a season). The fit uses YOUR year P₁ — and the distance uses YOUR a₁: errors there pass straight through."
       warn="Stellar parallaxes are tiny: a few tenths of an arcsecond. Bad-seeing nights add scatter, so log many nights and fit them all."

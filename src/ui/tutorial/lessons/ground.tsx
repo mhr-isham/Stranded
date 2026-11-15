@@ -1,3 +1,4 @@
+import { Equation } from '../../common/Equation';
 import { useState } from 'react';
 import { DEG, G, M_EARTH } from '../../../engine/constants';
 import { pendulumPeriod } from '../../../engine/measure';
@@ -67,12 +68,7 @@ export function PendulumLesson() {
           <Note>Assumes ±0.15 s of human scatter on each button press.</Note>
         </Demo>
       }
-      formula={
-        <>
-          T = 2π √(L / g)  →  g = 4π² L / T²<br />
-          T = (time on the stopwatch) / (number of swings N)
-        </>
-      }
+      formula={<Equation tex={"T=2\\pi\\sqrt{\\frac{L}{g}}\\ \\Rightarrow\\ g=\\frac{4\\pi^2 L}{T^2} \\\\ T=\\frac{\\text{stopwatch time}}{\\text{number of swings }N}"} />}
       keyIdea="Stronger gravity pulls the bob back faster, so the swing gets quicker. Time the swing and measure the string, and you know g."
       warn="Two traps: (1) timing a single swing — your reaction time swamps it; (2) a big release angle — the simple formula assumes small swings and gives too small a g. Keep the release under ~10°."
       tip="Your reaction error is the same whether you time 1 swing or 20, so time 20 and divide: the error in T drops twenty-fold. Because g ∝ 1/T², each 1% error in T becomes 2% in g."
@@ -155,12 +151,7 @@ export function HorizonLesson() {
           </dl>
         </Demo>
       }
-      formula={
-        <>
-          cos θ = R / (R + h)<br />
-          R = h·cos θ / (1 − cos θ)  ≈  2h / θ²   (θ in radians)
-        </>
-      }
+      formula={<Equation tex={"\\cos\\theta=\\frac{R}{R+h} \\\\ R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}\\quad(\\theta\\text{ in radians})"} />}
       keyIdea="On a curved world the horizon sits a little below level, and the higher you stand the more it dips. The triangle formed by the planet’s centre, your eye and the horizon point turns that dip into the radius."
       warn="Near the ground the dip is tiny, so a small reading error becomes a huge error in R (try h = 2 m). Always climb to the summit. Your hands shake, too — brace and wait for a steady moment before reading."
       tip="Because R ≈ 2h/θ², the relative error in R is twice the relative error in θ. Zoom the instrument in and repeat readings to shrink it."
@@ -221,13 +212,7 @@ export function MassLesson() {
           </dl>
         </Demo>
       }
-      formula={
-        <>
-          g = G·M / R²   →   M = g·R² / G<br />
-          escape speed v = √(2GM/R) = √(2gR)<br />
-          G = 6.674 × 10⁻¹¹ (Newton’s gravitational constant)
-        </>
-      }
+      formula={<Equation tex={"g=\\frac{GM}{R^2}\\ \\Rightarrow\\ M=\\frac{gR^2}{G} \\\\ v_{\\mathrm{esc}}=\\sqrt{\\frac{2GM}{R}}=\\sqrt{2gR} \\\\ G=6.674\\times10^{-11}\\ \\mathrm{m^3\\,kg^{-1}\\,s^{-2}}"} />}
       keyIdea="Newton’s law of gravity links the pull at the surface (g) to the planet’s mass and size. Measure g and R, and the whole planet is weighed."
       warn="R appears squared, so a 1% error in radius makes a 2% error in mass. Measure the hill carefully."
       tip="The escape speed is the biggest single item in your fuel bill. That is why ECHO starts with gravity and radius."

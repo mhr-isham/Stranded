@@ -1,6 +1,23 @@
 // Bounded, disposable Web Audio voices; also usable with OfflineAudioContext.
 import type { Note } from './score';
-export type Cue = 'click' | 'tick' | 'good' | 'bad' | 'log' | 'launch' | 'unlock' | 'shutter' | 'measure' | 'radio' | 'chute' | 'touchdown';
+export type Cue =
+  | 'click'
+  | 'tick'
+  | 'good'
+  | 'bad'
+  | 'log'
+  | 'launch'
+  | 'unlock'
+  | 'shutter'
+  | 'measure'
+  | 'radio'
+  | 'chute'
+  | 'touchdown'
+  | 'metal'
+  | 'detent'
+  | 'wood'
+  | 'scan';
+export type Texture = 'wind' | 'pendulum' | 'rover' | 'scope';
 export const midiHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 export class Synth {
@@ -129,6 +146,24 @@ export class Synth {
   }
   cue(kind: Cue, at = this.ctx.currentTime) {
     switch (kind) {
+      case 'metal':
+        // Inharmonic resonances of a small metal bob/clamp, not a musical bell.
+        [1, 2.76, 5.4].forEach((ratio, i) => this.tone(730 * ratio, at, 0.55 / (i + 1), 0.09 / (i + 1), 'sine', 0.998));
+        this.burst(at, 0.025, 0.12, 3200);
+        break;
+      case 'detent':
+        this.burst(at, 0.018, 0.16, 2400);
+        this.tone(390, at, 0.04, 0.06, 'triangle', 0.8);
+        break;
+      case 'wood':
+        this.tone(480, at, 0.09, 0.12, 'sine', 0.8);
+        this.tone(1210, at, 0.045, 0.04);
+        this.burst(at, 0.025, 0.08, 900);
+        break;
+      case 'scan':
+        this.tone(1050, at, 0.15, 0.08, 'sine', 1.8);
+        this.tone(1850, at + 0.12, 0.12, 0.06);
+        break;
       case 'click':
         this.burst(at, 0.025, 0.15, 2700);
         this.tone(620, at, 0.045, 0.07, 'triangle', 0.72);
@@ -182,6 +217,68 @@ export class Synth {
         this.cue('good', at + 0.25);
         break;
     }
+  }
+  /** Quiet, motion-driven instrument textures. All sources fade and disconnect. */
+  texture(kind: Texture) {
+    const c = this.ctx;
+    const noise = c.createBufferSource();
+    noise.buffer = this.noise;
+    noise.loop = true;
+    const high = c.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = kind === 'wind' ? 130 : 300;
+    const filter = c.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = kind === 'pendulum' ? 3 : 0.65;
+    const grit = c.createGain();
+    grit.gain.value = 0;
+    const motor = c.createOscillator();
+    motor.type = kind === 'rover' ? 'sawtooth' : 'sine';
+    const motorGain = c.createGain();
+    motorGain.gain.value = 0;
+    const output = c.createGain();
+    output.gain.value = 0;
+    noise.connect(high).connect(filter).connect(grit).connect(output);
+    motor.connect(motorGain).connect(output);
+    output.connect(this.out);
+    // Slow natural gusts for wind; faster mechanical/gravel modulation elsewhere.
+    const lfo = c.createOscillator();
+    const depth = c.createGain();
+    depth.gain.value = 0;
+    lfo.frequency.value = kind === 'wind' ? 0.17 : kind === 'rover' ? 19 : 7;
+    lfo.connect(depth).connect(grit.gain);
+    noise.start();
+    motor.start();
+    lfo.start();
+    let stopped = false;
+    return {
+      set: (level: number, detail = 0.5) => {
+        if (stopped) return;
+        const t = c.currentTime;
+        const v = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
+        const d = Number.isFinite(detail) ? Math.max(0, Math.min(1, detail)) : 0.5;
+        output.gain.setTargetAtTime(v, t, 0.06);
+        const wind = kind === 'wind',
+          rover = kind === 'rover',
+          pend = kind === 'pendulum';
+        filter.frequency.setTargetAtTime(wind ? 450 + d * 850 : rover ? 450 + d * 1300 : pend ? 1500 + d * 450 : 1900, t, 0.08);
+        grit.gain.setTargetAtTime(wind ? 0.085 : rover ? 0.055 : pend ? 0.018 : 0.008, t, 0.08);
+        depth.gain.setTargetAtTime(wind ? 0.025 : rover ? 0.012 : 0.003, t, 0.08);
+        motor.frequency.setTargetAtTime(rover ? 100 + d * 260 : pend ? 1060 + d * 200 : 420 + d * 350, t, 0.07);
+        motorGain.gain.setTargetAtTime(wind ? 0 : rover ? 0.018 : pend ? 0.008 : 0.018, t, 0.07);
+      },
+      stop: () => {
+        if (stopped) return;
+        stopped = true;
+        output.gain.setTargetAtTime(0, c.currentTime, 0.02);
+        const nodes = [high, filter, grit, motorGain, output, depth];
+        noise.onended = () => nodes.forEach((n) => n.disconnect());
+        [noise, motor, lfo].forEach((source) => {
+          source.addEventListener('ended', () => source.disconnect());
+          source.stop(c.currentTime + 0.15);
+        });
+      },
+    };
   }
   engine(destination: AudioNode) {
     const c = this.ctx,

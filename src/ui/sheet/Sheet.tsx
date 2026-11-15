@@ -1,3 +1,4 @@
+import { Equation } from '../common/Equation';
 import { useState } from 'react';
 import { PRIMARY_KEYS, QUANTITY_INFO, derivedFor, deriveAll, edgesFor, keysFor, labelFor, truthValues, type PrimaryKey, type QuantityKey } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
@@ -210,7 +211,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
         </h2>
       </div>
       <div className="muted" style={{ fontSize: 13 }}>{node.what}</div>
-      {s.settings.formulas && node.formula && <div className="formula">{node.formula}</div>}
+      {s.settings.formulas && node.formula && <div className="formula"><Equation text={node.formula} /></div>}
 
       {isPrimary ? (
         <>

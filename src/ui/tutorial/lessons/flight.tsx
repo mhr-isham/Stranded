@@ -1,3 +1,4 @@
+import { Equation } from '../../common/Equation';
 import { useState } from 'react';
 import { ArrowDefs, Demo, LessonShell, P, Slider, fmtN, useAnimTime } from './common';
 
@@ -84,12 +85,7 @@ export function HohmannLesson() {
           </div>
         </Demo>
       }
-      formula={
-        <>
-          transfer time t = π √((a₁ + a₂)³ / (8 G M★))<br />
-          lead angle φ = 180° − 360° · t / P₂
-        </>
-      }
+      formula={<Equation tex={"t=\\pi\\sqrt{\\frac{(a_1+a_2)^3}{8GM_\\star}} \\\\ \\phi=180^\\circ-\\frac{360^\\circ t}{P_2}"} />}
       keyIdea="The cheapest route between two circular orbits is half an ellipse that just touches both: a Hohmann transfer. Burn once to stretch your orbit out to the blue planet’s, coast for half an orbit, then brake."
       warn="It only works if the blue planet arrives at the meeting point when you do — so at launch it must lead you by the angle φ. That geometry repeats only once per synodic period: that is the launch window. Leaving at another time needs a faster, more expensive orbit."
       tip="In the launch planner the cost map shows the window as a cool green patch. The planner computes φ and the window date from your own numbers — if they’re wrong, the window is wrong too."

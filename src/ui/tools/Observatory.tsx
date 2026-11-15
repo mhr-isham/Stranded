@@ -4,7 +4,7 @@ import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
 import { starLongitude } from '../../engine/measure';
 import { unit, type Vec3 } from '../../engine/vec';
-import { sfx } from '../../game/audio';
+import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
 import { moonFit, trackedPhase } from '../../game/fits';
@@ -49,6 +49,8 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function Observatory() {
+  useEffect(() => stopInstrument, []);
+  const lastMotion = useRef(-Infinity);
   const { system: sys, catalog } = currentWorld();
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const s = useGame();
@@ -72,6 +74,7 @@ export function Observatory() {
 
   /** Point the telescope at an object (used by the "point at" buttons and Flight School). */
   const pointAt = (kind: 'star' | 'target', fovDeg: number, tabId?: Tab) => {
+    sfx('detent');
     setSel({ kind });
     const off = Math.min(0.12, fovDeg / 12) * DEG;
     aim.current = { a: (Math.random() - 0.5) * off, b: (Math.random() - 0.5) * off };
@@ -200,6 +203,7 @@ export function Observatory() {
               gesture.current = { ...cam.current, x: e.clientX, y: e.clientY, dist: pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0 };
             }}
             onPointerMove={(e) => {
+              if (gesture.current) lastMotion.current = performance.now();
               if (!ptr.current.has(e.pointerId)) return;
               ptr.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
               const g = gesture.current;
@@ -226,6 +230,7 @@ export function Observatory() {
             }}
             onWheel={(e) => (cam.current.fov = Math.max(15 * DEG, Math.min(120 * DEG, cam.current.fov * (e.deltaY > 0 ? 1.1 : 0.9))))}
             draw={({ ctx, w, h, dpr, now, canvas }) => {
+              setInstrument('scope', now - lastMotion.current < 120 ? 0.6 : 0);
               const camera = { az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w, h };
               const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { showEcliptic: showEcl });
               // Let Flight School point at the blue planet.
@@ -301,6 +306,7 @@ export function Observatory() {
               (C.start as { y?: number }).y = p.y;
             }}
             onPointerMove={(e) => {
+              if (calip.current.dragging) lastMotion.current = performance.now();
               const C = calip.current;
               if (!C.dragging) return;
               const p = canvasPoint(e);
@@ -317,6 +323,7 @@ export function Observatory() {
             onPointerUp={() => (calip.current.dragging = 0)}
             onWheel={(e) => setFovLog((v) => Math.max(Math.log10(0.015), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
             draw={({ ctx, w, h, dpr, now }) => {
+              setInstrument('scope', now - lastMotion.current < 120 ? 0.5 : 0);
               const tt = clock.t;
               const center = pointing(tt) ?? [1, 0, 0];
               const tgtV = topocentric(sys, 'target', tt, sys.site);

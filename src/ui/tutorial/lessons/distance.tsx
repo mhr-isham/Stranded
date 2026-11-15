@@ -1,3 +1,4 @@
+import { Equation } from '../../common/Equation';
 import { useState } from 'react';
 import { DAY, G, M_EARTH } from '../../../engine/constants';
 import { ArrowDefs, Demo, LessonShell, Note, P, Slider, fmtN, useAnimTime } from './common';
@@ -100,12 +101,7 @@ export function ParallaxLesson() {
           <Note>Drawing exaggerated; ″ = arcsecond = 1/3600 of a degree.</Note>
         </Demo>
       }
-      formula={
-        <>
-          p = B / d   →   d = B / p   (p in radians)<br />
-          1″ = 1/3600° = 4.85 × 10⁻⁶ rad
-        </>
-      }
+      formula={<Equation tex={"p=\\frac{B}{d}\\ \\Rightarrow\\ d=\\frac{B}{p}\\quad(p\\text{ in radians}) \\\\ 1^{\\prime\\prime}=\\frac{1}{3600}{}^\\circ\\approx4.85\\times10^{-6}\\ \\mathrm{rad}"} />}
       keyIdea="Hold up a finger and blink one eye, then the other: the finger jumps against the background. Nearer things jump more. Measure the jump and the distance between your eyes, and you know how far away the finger is."
       warn="The shift is tiny — a few arcseconds. A longer baseline (send the rover further) and imaging near opposition (planet closest) both make the shift bigger and your error smaller. Image both sites at the same instant, when the planet is high."
       tip="In the blink comparator, background stars stay put while the planet jumps. Zoom in and click the centre of the planet’s disk in each frame."
@@ -162,7 +158,7 @@ export function AngularLesson() {
           </dl>
         </Demo>
       }
-      formula={<>R₂ = d · tan(α / 2)   ≈   d · α / 2</>}
+      formula={<Equation tex={"R_2=d\\tan\\left(\\frac{\\alpha}{2}\\right)\\approx\\frac{d\\alpha}{2}"} />}
       keyIdea="A coin held at arm’s length can cover the Moon: something small and near can look as big as something huge and far. If you know the distance, the angle tells you the true size."
       warn="The disk is only tens of arcseconds across and its edge is blurred by the air (“seeing”). Measure it several times and average."
       tip="Measure the disk on the same night as your parallax images — then the distance you use is right for that moment."
@@ -226,12 +222,7 @@ export function MoonLesson() {
           <Note>Heavier planet → faster moon at the same distance.</Note>
         </Demo>
       }
-      formula={
-        <>
-          aₘ = d · tan θₘ<br />
-          M₂ = 4π² aₘ³ / (G · Pₘ²)
-        </>
-      }
+      formula={<Equation tex={"a_{\\mathrm m}=d\\tan\\theta_{\\mathrm m} \\\\ M_2=\\frac{4\\pi^2a_{\\mathrm m}^3}{GP_{\\mathrm m}^2}"} />}
       keyIdea="We see the moon’s orbit edge-on, so the moon just swings back and forth beside the planet. The size of the swing (θₘ) times the distance gives the orbit radius; the time for one swing gives the period. Kepler’s law then weighs the planet."
       warn="The swing looks bigger when the planet is closer, so fit only a few weeks of data around opposition. aₘ is cubed: a 1% error in the swing gives 3% in mass."
       tip="Fit several full swings — a longer run pins down the period much better."

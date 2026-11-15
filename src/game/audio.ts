@@ -1,6 +1,6 @@
 import { useGame, type Settings } from './store';
 import { sceneFor, scoreStep, STEP_SECONDS } from './score';
-import { Synth, type Cue } from './synth';
+import { Synth, type Cue, type Texture } from './synth';
 
 export type Sfx = Cue;
 export const AUDIO_DEFAULTS = { musicVolume: 0.65, effectsVolume: 0.8 };
@@ -19,11 +19,41 @@ let wanted = false;
 let engine: ReturnType<Synth['engine']> | null = null;
 let unsubscribe: (() => void) | null = null;
 const lastCue = new Map<Cue, number>();
+let instrument: { kind: Texture; voice: ReturnType<Synth['texture']>; touched: number } | null = null;
+let instrumentTimer: ReturnType<typeof setInterval> | null = null;
+
+export function stopInstrument() {
+  instrument?.voice.stop();
+  instrument = null;
+  if (instrumentTimer) clearInterval(instrumentTimer);
+  instrumentTimer = null;
+}
+
+/** Called from visible tool motion, never advances physics or counts swings. */
+export function setInstrument(kind: Texture, level: number, detail = 0.5) {
+  // Frame callbacks must not create/resume an AudioContext before a gesture.
+  if (!ctx || !useGame.getState().settings.sound || document.hidden || useGame.getState().storyQueue.length || !(level > 0.01)) {
+    stopInstrument();
+    return;
+  }
+  if (instrument?.kind !== kind) {
+    stopInstrument();
+    instrument = { kind, voice: effects.texture(kind), touched: performance.now() };
+    instrumentTimer = setInterval(() => {
+      if (instrument && performance.now() - instrument.touched > 250) stopInstrument();
+    }, 100);
+  }
+  instrument!.touched = performance.now();
+  instrument!.voice.set(level, detail);
+}
 
 function sync(settings: Settings) {
   if (!ctx) return;
   const audible = settings.sound && !document.hidden;
-  if (!audible) stopRumble();
+  if (!audible) {
+    stopRumble();
+    stopInstrument();
+  }
   // Mute the shared bus, including already scheduled notes and engine tails.
   master.gain.setTargetAtTime(audible ? 0.8 : 0, ctx.currentTime, 0.015);
   musicGain.gain.setTargetAtTime(volume(settings.musicVolume, AUDIO_DEFAULTS.musicVolume), ctx.currentTime, 0.1);
@@ -105,7 +135,7 @@ export function sfx(kind: Sfx) {
   const a = ac();
   if (!a) return;
   // Mission batches may award several unlocks together. Keep the reward clear.
-  if (a.currentTime - (lastCue.get(kind) ?? -Infinity) < (kind === 'unlock' ? 0.45 : 0.035)) return;
+  if (a.currentTime - (lastCue.get(kind) ?? -Infinity) < (kind === 'unlock' ? 0.45 : kind === 'detent' ? 0.09 : 0.035)) return;
   lastCue.set(kind, a.currentTime);
   effects.cue(kind, a.currentTime + 0.002);
 }
@@ -137,6 +167,7 @@ export function stopRumble() {
 export function disposeAudio() {
   stopAmbient();
   stopRumble();
+  stopInstrument();
   unsubscribe?.();
   unsubscribe = null;
   document.removeEventListener('visibilitychange', onVisibility);

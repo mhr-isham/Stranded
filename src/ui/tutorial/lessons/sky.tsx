@@ -1,3 +1,4 @@
+import { Equation } from '../../common/Equation';
 import { useRef, useState } from 'react';
 import { ArrowDefs, Demo, LessonShell, Note, P, Slider, fmtN, useAnimTime } from './common';
 
@@ -123,7 +124,7 @@ export function YearLesson() {
           </dl>
         </Demo>
       }
-      formula={<>P₁ = 360° × (days between logs) / (drift in degrees)</>}
+      formula={<Equation tex={"P_1=\\frac{360^\\circ\\times\\text{days between logs}}{\\text{drift in degrees}}"} />}
       keyIdea="As we circle the star, we see it against different background stars. It drifts all the way round the sky in exactly one year."
       warn="You can only see background stars near the star at sunrise or sunset, so logs are made at twilight. Two logs a day apart give a tiny drift that your aiming error swamps."
       tip="Spread your logs over weeks. A 60-day baseline gives a drift of ~100°, so a 0.03° aiming error hardly matters."
@@ -273,11 +274,7 @@ export function SynodicLesson() {
           <Note>Each overtake is an opposition.</Note>
         </Demo>
       }
-      formula={
-        <>
-          1/S = 1/P₁ − 1/P₂   →   1/P₂ = 1/P₁ − 1/S
-        </>
-      }
+      formula={<Equation tex={"\\frac1S=\\frac1{P_1}-\\frac1{P_2}\\ \\Rightarrow\\ \\frac1{P_2}=\\frac1{P_1}-\\frac1S"} />}
       keyIdea="We can’t time the blue planet’s year directly — we are moving too. But we can time how often we overtake it (opposition to opposition) and combine that with our own year."
       warn="One synodic period is long — often more than a year. You’ll need to warp time and wait for the second opposition. Waiting costs life support."
       tip="1/P is “laps per day”. The difference between the two runners’ laps per day is how fast the faster one gains: one full lap gained every S days."
@@ -318,12 +315,7 @@ export function KeplerLesson() {
           </dl>
         </Demo>
       }
-      formula={
-        <>
-          P² ∝ a³   →   a₂/a₁ = (P₂/P₁)^(2/3)<br />
-          with masses:  M★ = 4π² a³ / (G P²)
-        </>
-      }
+      formula={<Equation tex={"P^2\\propto a^3\\ \\Rightarrow\\ \\frac{a_2}{a_1}=\\left(\\frac{P_2}{P_1}\\right)^{2/3} \\\\ M_\\star=\\frac{4\\pi^2a^3}{GP^2}"} />}
       keyIdea="Kepler found that the square of a planet’s year is proportional to the cube of its orbit size. Knowing both years gives you the shape of the system — how much bigger one orbit is than the other."
       warn="Periods alone give only ratios. To know the actual size (in km) you need one real distance — that is what the rover parallax is for."
       tip="Once a₁ is known in metres, the same law with Newton’s G weighs the star: M★ = 4π²a₁³/(GP₁²). The cube makes your distance error count three times."

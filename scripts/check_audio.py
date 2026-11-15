@@ -36,8 +36,8 @@ with sync_playwright() as p:
    const {scoreStep,STEP_SECONDS}=await import('/src/game/score.ts');
    const outputs={};
    const scenes=['explore','focus','flight','story','success','failure','flight-mix','flight-max'];
-   const cues=['click','tick','measure','shutter','radio','log','good','bad','unlock','launch','chute','touchdown'];
-   for(const kind of [...scenes,...cues,'engine']) {
+   const cues=['click','tick','measure','shutter','radio','log','good','bad','unlock','launch','chute','touchdown','metal','detent','wood','scan'];
+   for(const kind of [...scenes,...cues,'engine','texture-wind','texture-rover','texture-pendulum','texture-scope']) {
      const isScene=scenes.includes(kind), length=isScene ? 128*STEP_SECONDS+2 : kind==='engine'?5:3;
      const c=new OfflineAudioContext(2,Math.ceil(length*24000),24000);
      const comp=c.createDynamicsCompressor(); comp.threshold.value=-12; comp.knee.value=12; comp.ratio.value=5; comp.attack.value=.003; comp.release.value=.18;comp.connect(c.destination);
@@ -47,6 +47,7 @@ with sync_playwright() as p:
      const s=new Synth(c,bus,isScene);
      if(isScene) { s.out.gain.value=1.8*(kind==='focus'?.7:kind==='story'?.38:1);for(let i=0;i<128;i++)scoreStep(kind.startsWith('flight-')?'flight':kind,i).forEach(n=>s.note(n,.05+i*STEP_SECONDS)); }
      if(kind.startsWith('flight-')){const fx=c.createGain();fx.gain.value=kind==='flight-max'?1:.8;fx.connect(master);const effects=new Synth(c,fx);const e=effects.engine(fx);e.set(.85,.4);effects.cue('launch',.05);effects.cue('unlock',.15);}
+     else if(kind.startsWith('texture-')) {const e=s.texture(kind.slice(8));e.set(.8,.6);}
      else if(kind==='engine') {const e=s.engine(bus);e.set(.85,.35);}
      else if(!isScene) s.cue(kind,.05);
      const b=await c.startRendering();
@@ -111,6 +112,35 @@ with sync_playwright() as p:
  assert page.evaluate('window.__audio.length')==1,'duplicate audio contexts'
  assert meter()['live']<64,'voices not being released'
  page.get_by_role('button',name='Resume',exact=True).click()
+ # Actual instrument motion, mute and teardown (music off for waveform isolation).
+ page.evaluate("__game.setState({settings:{...__game.getState().settings,musicVolume:0,effectsVolume:1},screen:'hill'})")
+ page.wait_for_timeout(1200);assert meter()['rms']>.0005,'hill wind silent'
+ page.evaluate("__game.setState({settings:{...__game.getState().settings,effectsVolume:0}})")
+ page.wait_for_timeout(600);assert meter()['rms']<.0001,'wind ignores effects slider'
+ page.evaluate("__game.setState({settings:{...__game.getState().settings,effectsVolume:1},screen:'pendulum',echo:[]})")
+ page.wait_for_timeout(500)
+ if page.get_by_role('button',name='Got it',exact=True).count():page.get_by_role('button',name='Got it',exact=True).click()
+ page.get_by_role('button',name='Release',exact=True).click()
+ page.wait_for_timeout(220);assert meter()['rms']>.0002,'metallic pendulum silent'
+ page.evaluate("__game.setState({screen:'drive'})")
+ page.wait_for_timeout(600)
+ page.keyboard.down('ArrowRight');page.wait_for_timeout(1200)
+ assert meter()['rms']>.0005,'moving rover silent'
+ page.keyboard.up('ArrowRight')
+ page.evaluate("__game.setState({screen:'codex'})")
+ page.wait_for_timeout(800);assert meter()['rms']<.0001,'instrument voice leaked after navigation'
+ assert meter()['live']<64,'instrument sources leaked'
+ page.set_viewport_size({'width':1440,'height':900})
+ page.evaluate("__game.setState({screen:'observatory',echo:[]})")
+ page.wait_for_timeout(500)
+ page.mouse.move(250,350);page.mouse.down()
+ for i in range(12):
+  page.mouse.move(250+i*5,350+i*2);page.wait_for_timeout(20)
+ assert meter()['rms']>.0002,'telescope servo silent while dragging'
+ page.mouse.up();page.wait_for_timeout(650)
+ assert meter()['rms']<.0001,'telescope motor kept running at rest'
+
+ page.evaluate("__game.setState({settings:{...__game.getState().settings,musicVolume:.3,effectsVolume:.55}})")
  # A real computed transfer drives the actual Flight component and its engine cues.
  page.set_viewport_size({'width':1440,'height':900})
  page.evaluate('''async()=>{const{useGame}=await import('/src/game/store.ts');const{currentWorld}=await import('/src/game/sim.ts');const{botPlay,PERFECT}=await import('/src/engine/solver.ts');const r=botPlay(currentWorld().system,PERFECT,7);if(!r.result)throw Error('No transfer');const{bestTransfer}=await import('/src/engine/planner.ts');const p=bestTransfer(r.model,r.departTime);useGame.setState({phase:'flight',outcome:{plan:p.plan,result:r.result,sheet:r.primaries}});}''')

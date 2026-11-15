@@ -20,6 +20,10 @@ It runs as a single web page on phones and laptops, with no sign-in. Progress is
 
 **Audio:** an original electronic score changes arrangement for exploration, precision tools, flight and endings. Mechanical tool cues, discovery flourishes and thrust-responsive ship audio give actions distinct feedback. Music starts after a click or key press; adjust **Music** and **Sound effects** separately in setup or the ☰ menu. Both preferences are saved. Audio pauses in the background. All music and effects are synthesized locally, with no streaming or audio downloads.
 
+Instruments also have physical sound: metallic pendulum hardware, wind and angle-tool detents on the hill, a telescope adjustment servo, rover motor/gravel and scanner pings, a wooden gnomon tap and probe/rover radio cues. Moving mechanisms respond to actual instrument motion and become silent when stopped or left behind.
+
+Tool formula panels, progress-sheet equations and lesson formula blocks use locally bundled KaTeX typography with semantic MathML: proper fractions, roots, powers and subscripts. Long equations scroll inside their own panel on narrow screens.
+
 ## The campaign
 
 | # | Chapter | What changes | New method |

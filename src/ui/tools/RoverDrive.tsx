@@ -19,6 +19,7 @@ import { drawRover } from '../../render/rover';
 import { drawStarship } from '../../render/ship';
 import { CanvasView } from '../common/CanvasView';
 import { toast } from '../common/widgets';
+import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 
 const WARPS = [1, 10, 60, 240];
 const WHEEL_R = 0.35; // m
@@ -78,6 +79,7 @@ export function RoverDrive() {
     // The rover is out of the camp while we drive (it doesn't charge).
     useGame.setState((g0) => ({ surface: { ...g0.surface, roverX: st.current.x, task: null } }));
     return () => {
+      stopInstrument();
       window.removeEventListener('keydown', dn);
       window.removeEventListener('keyup', up);
       clearInterval(id);
@@ -147,6 +149,7 @@ export function RoverDrive() {
     const g0 = useGame.getState();
     const seen = finds.filter((f) => !g0.surface.found.includes(f.id) && Math.abs(f.x - S.x) < SCAN_RANGE);
     if (seen.length) {
+      sfx('scan');
       useGame.setState({ surface: { ...g0.surface, found: [...g0.surface.found, ...seen.map((f) => f.id)] } });
       for (const f of seen) toast(`Scanner: ${FIND_TEXT[f.kind].name.toLowerCase()} ${fmt(Math.abs(f.x - S.x) / 1000, 1)} km ${f.x > S.x ? 'ahead to the east' : 'to the west'}`);
     }
@@ -166,6 +169,7 @@ export function RoverDrive() {
     <div className="screen drive">
       <CanvasView
         draw={({ ctx, w, h, dpr, dt, now }) => {
+          setInstrument('rover', Math.min(0.85, Math.abs(st.current.v) / vmax), Math.min(1, Math.abs(st.current.v) / vmax + Math.abs(climbSlope(st.current.x)) * 0.25));
           step(Math.min(dt, 0.05));
           const R = st.current;
           const span = 60 * (1 + (warp - 1) / 20); // metres across the screen

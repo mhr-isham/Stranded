@@ -7,9 +7,9 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
-import { humidK } from '../../game/anomalies';
+import { humidK, windAt } from '../../game/anomalies';
 import { css, skyColors } from '../../render/color';
-import { sfx } from '../../game/audio';
+import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { CanvasView } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
@@ -18,6 +18,7 @@ import { toast } from '../common/widgets';
 const EYE = 1.7;
 
 export function Hill() {
+  useEffect(() => stopInstrument, []);
   const hillMode = useMode();
   const { system: sys } = currentWorld();
   const s = useGame();
@@ -80,6 +81,7 @@ export function Hill() {
       <div className="tool-stage" data-tut="hill-stage">
         <CanvasView
           onPointerDown={(e) => {
+            sfx('detent');
             (e.target as Element).setPointerCapture(e.pointerId);
             view.current.drag = { y: e.clientY, p: view.current.pitch };
           }}
@@ -90,10 +92,13 @@ export function Hill() {
             const ppd = ppdFor(c.height) / (window.devicePixelRatio || 1);
             // Fine control: drag moves the instrument a quarter of the apparent motion.
             view.current.pitch = d.p + ((e.clientY - d.y) / ppd) * 0.25;
+            sfx('detent');
           }}
           onPointerUp={() => (view.current.drag = null)}
           onWheel={(e) => setZoom((z) => Math.max(1, Math.min(60, z * (e.deltaY < 0 ? 1.15 : 0.87))))}
           draw={({ ctx, w, h: hp, dpr, now, dt }) => {
+            const wind = windAt(useGame.getState(), clock.t);
+            setInstrument('wind', 0.22 + Math.min(0.4, wind / 30) + (at / 3) * 0.15, Math.min(1, wind / 12));
             const V = view.current;
             const tt = now / 1000;
             // Hand sway: smooth, quasi-periodic. Bracing and a tripod steady it.

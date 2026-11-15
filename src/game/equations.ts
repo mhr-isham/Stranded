@@ -1,0 +1,41 @@
+// Explicit typesetting of authored equations; no inference or evaluation of player input.
+export const EQUATIONS: Record<string, string> = {
+  'g = 4π² L / T²': 'g=\\frac{4\\pi^2 L}{T^2}',
+  'g = 4π² L / T², T = time / N': 'g=\\frac{4\\pi^2 L}{T^2} \\\\ T=\\frac{\\text{time}}{N}',
+  'R = h·cos θ / (1 − cos θ) ≈ 2h/θ²': 'R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}',
+  'R = h·cos θ / (1 − cos θ) ≈ 2h / θ²': 'R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}',
+  'P₁ = 360° / daily drift of the star': 'P_1=\\frac{360^\\circ}{\\text{daily drift of the star}}',
+  'P₁ = 360° / (daily drift)': 'P_1=\\frac{360^\\circ}{\\text{daily drift}}',
+  'P₁ = 360° / (sky turn rate)': 'P_1=\\frac{360^\\circ}{\\text{sky turn rate}}',
+  'S = t(opp 2) − t(opp 1)': 'S=t_{\\mathrm{opp}\\,2}-t_{\\mathrm{opp}\\,1}',
+  'S = t(transit 2) − t(transit 1)': 'S=t_{\\mathrm{transit}\\,2}-t_{\\mathrm{transit}\\,1}',
+  'd = B / p': 'd=\\frac{B}{p}',
+  'd = B / p (p in radians)': 'd=\\frac{B}{p}\\quad(p\\text{ in radians})',
+  'M₁ = g R₁² / G': 'M_1=\\frac{gR_1^2}{G}',
+  '1/P₂ = 1/P₁ − 1/S': '\\frac{1}{P_2}=\\frac{1}{P_1}-\\frac{1}{S}',
+  '1/P₂ = 1/P₁ + 1/S': '\\frac{1}{P_2}=\\frac{1}{P_1}+\\frac{1}{S}',
+  'a₂/a₁ = (P₂/P₁)^(2/3)': '\\frac{a_2}{a_1}=\\left(\\frac{P_2}{P_1}\\right)^{2/3}',
+  'a₁ = d / √(1 + r² − 2r cos ψ), ψ = 360°(t − t₀)/S': 'a_1=\\frac{d}{\\sqrt{1+r^2-2r\\cos\\psi}} \\\\ \\psi=\\frac{360^\\circ(t-t_0)}{S}',
+  'a₂ = (a₂/a₁) · a₁': 'a_2=\\left(\\frac{a_2}{a_1}\\right) a_1',
+  'M★ = 4π² a₁³ / (G P₁²)': 'M_\\star=\\frac{4\\pi^2 a_1^3}{G P_1^2}',
+  'R₂ = d(t) · tan(α₂/2)': 'R_2=d(t)\\tan\\left(\\frac{\\alpha_2}{2}\\right)',
+  'R₂ = d · tan(α₂ / 2)': 'R_2=d\\tan\\left(\\frac{\\alpha_2}{2}\\right)',
+  'aₘ = d(t) · tan θₘ': 'a_{\\mathrm m}=d(t)\\tan\\theta_{\\mathrm m}',
+  'M₂ = 4π² aₘ³ / (G Pₘ²)': 'M_2=\\frac{4\\pi^2 a_{\\mathrm m}^3}{G P_{\\mathrm m}^2}',
+  'a_G = a₁ (P_G/P₁)^⅔, 1/P_G = 1/P₁ − 1/S_G':
+    'a_G=a_1\\left(\\frac{P_G}{P_1}\\right)^{2/3} \\\\ \\frac{1}{P_G}=\\frac{1}{P_1}-\\frac{1}{S_G}',
+  'M_G = 4π² a³ / (G P²) for its moon': 'M_G=\\frac{4\\pi^2 a^3}{GP^2}\\quad\\text{(its moon)}',
+  'M₂ = rₚ (vₚ² − v∞²) / (2G)': 'M_2=\\frac{r_{\\mathrm p}(v_{\\mathrm p}^2-v_\\infty^2)}{2G}',
+  'd = a₁ / tan p': 'd=\\frac{a_1}{\\tan p}',
+  'a₂ = a₁ (P₂/P₁)^⅔, r = a₂(1 − e²) / (1 + e cos(θ − ϖ))':
+    'a_2=a_1\\left(\\frac{P_2}{P_1}\\right)^{2/3} \\\\ r=\\frac{a_2(1-e^2)}{1+e\\cos(\\theta-\\varpi)}',
+  'aₘ = d · tan θₘ, M₂ = 4π² aₘ³ / (G Pₘ²)':
+    'a_{\\mathrm m}=d\\tan\\theta_{\\mathrm m} \\\\ M_2=\\frac{4\\pi^2 a_{\\mathrm m}^3}{GP_{\\mathrm m}^2}',
+  'sun altitude = atan(stick / shadow)': '\\text{sun altitude}=\\arctan\\left(\\frac{\\text{stick}}{\\text{shadow}}\\right)',
+  'R₁ = d / Δ (Δ in radians)': 'R_1=\\frac{d}{\\Delta}\\quad(\\Delta\\text{ in radians})',
+  '1/S_G = 1/P₁ − 1/P_G': '\\frac{1}{S_G}=\\frac{1}{P_1}-\\frac{1}{P_G}',
+  'M_G = 4π² (d_G tan θ_G)³ / (G P²)': 'M_G=\\frac{4\\pi^2(d_G\\tan\\theta_G)^3}{GP^2}',
+  't = π√((a₁+a₂)³ / 8GM★), φ = 180° − 360°·t/P₂':
+    't=\\pi\\sqrt{\\frac{(a_1+a_2)^3}{8GM_\\star}} \\\\ \\phi=180^\\circ-\\frac{360^\\circ t}{P_2}',
+};
+export const equationKey = (text: string) => text.trim().replace(/\s+/g, ' ');

@@ -50,6 +50,7 @@ export function ProbeBay() {
     const aim = aimR * R2.value;
     useGame.setState({ ...launchProbe(sys, s, aim, clock.t), probesLaunched: s.probesLaunched + 1 });
     sfx('launch');
+    sfx('radio');
     toast(`Probe away — ${fmt(probeTransitDays(sys), 0)} days to the blue planet.`);
   };
 
