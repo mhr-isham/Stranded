@@ -330,13 +330,12 @@ function Debrief() {
           <div className="panel panel-pad stack">
             <h2 style={{ fontSize: 18 }}>Anomalies in your data</h2>
             <div className="muted" style={{ fontSize: 13 }}>
-              Real effects bent some readings the same way every time. A careful observer spots them — by the wind gauge, by the haze, by readings that
-              disagree with the rest — and leaves them out.
+              These readings were taken in exposed or uncorrected conditions. Compare the wind gauge, haze and your other observations. Shelter the rig, remeasure in better conditions, or use a justified correction with an uncertainty; excluding a reading is another option.
             </div>
             {affected.map((r) => (
               <div key={r.id} className="row between" style={{ fontSize: 13 }}>
                 <span>
-                  {r.key === 'g' ? '🌬 Pendulum on a windy day' : '🌫 Horizon dip on a humid morning'} · day {fmt(r.at / DAY, 1)}
+                  {r.key === 'g' ? '🌬 Exposed pendulum in wind' : '🌫 Uncorrected horizon in damp air'} · day {fmt(r.at / DAY, 1)}
                 </span>
                 <span className={r.kept ? 'amber' : 'green'}>{r.kept ? 'kept' : scored ? 'left out · Sharp Eye +15' : 'left out'}</span>
               </div>

@@ -1,7 +1,6 @@
-// Real anomalies (docs/DESIGN-V2.md §12.2): physical effects that bend some
-// readings in a consistent direction. Each can be noticed and dealt with by a
-// careful player. Easy modes correct them; Navigator points them out in the
-// debrief; Astronomer and Legend leave them unannounced (Legend, more often).
+// Environmental episodes and assistance policy. New readings preserve chosen
+// mitigation/corrections; instruments expose conditions in every mode, with
+// optional methods. Legacy readings retain their original debrief fallback.
 
 import { DAY, HOUR } from '../engine/constants';
 import { unitHash } from '../engine/rng';
@@ -41,19 +40,36 @@ export function windAt(s: S, t: number) {
 export const windPush = (v: number) => 0.12 * (v / 10) ** 2;
 
 /** Does the wind actually bias the swing? (Easy modes: ECHO steadies the rig and says so.) */
-export const windBiases = (s: S, t: number) => windAt(s, t) > 6 && ANOMALIES[s.settings.difficulty].announce !== 'corrected';
+export const windBiases = (s: S, t: number, windscreen = false) => !windscreen && windAt(s, t) > 6 && ANOMALIES[s.settings.difficulty].announce !== 'corrected';
 
 /** Extra refraction near the horizon on humid mornings (the dip looks smaller). */
-export function humidK(s: S, t: number) {
+export function rawHumidK(s: S, t: number) {
   const day = Math.floor(t / DAY);
   const hourOfDay = (t % DAY) / HOUR;
-  if (ANOMALIES[s.settings.difficulty].announce === 'corrected') return 0;
   return hourOfDay < 12 && u(s.seed, day, 0x5b1) < ANOMALIES[s.settings.difficulty].humid ? 0.12 + 0.1 * u(s.seed, day, 0x5b2) : 0;
+}
+
+/** Legacy saves keep their compensated sight; new runs record the apparent angle first. */
+export const humidK = (s: S, t: number) => ANOMALIES[s.settings.difficulty].announce === 'corrected' ? 0 : rawHumidK(s, t);
+export const instrumentHumidK = (s: S, t: number) => (s.settings.rulesetVersion ?? 1) >= 3 ? rawHumidK(s, t) : humidK(s, t);
+
+/** A local air-probe calibration, with a shared calibration uncertainty.
+ * It estimates episodic humidity only, not the full atmospheric profile.
+ */
+export function humidityCalibration(s: S, t: number) {
+  const wet = rawHumidK(s, t);
+  const offset = (u(s.seed, Math.floor(t / DAY), 0x5b3) - .5) * .02;
+  return { k: Math.max(0, wet + offset), sigmaK: .02 };
 }
 
 /** Readings that a real anomaly bent (for the debrief and the Sharp Eye bonus). */
 export function affectedReadings(s: S & Pick<GameState, 'readings'>): Reading[] {
-  return s.readings.filter((r) => (r.key === 'g' && windBiases(s, r.at)) || (r.key === 'R1' && humidK(s, r.at) > 0));
+  return s.readings.filter((r) => {
+    const e = r.environment;
+    if (e?.wind) return (e.wind.speed > 6 || (e.wind.endSpeed ?? 0) > 6) && e.wind.protection === 'none';
+    if (e?.horizon) return e.horizon.damp && !e.horizon.correction;
+    return (r.key === 'g' && windBiases(s, r.at)) || (r.key === 'R1' && humidK(s, r.at) > 0);
+  });
 }
 
 /** Sharp Eye: points for each affected reading the player left out. */

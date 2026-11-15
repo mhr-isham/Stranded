@@ -197,6 +197,12 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .log td, .log th { padding: 5px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: left; }
 .log th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
 .log td.num { font-family: var(--mono); text-align: right; }
+.measurement-notes, .measurement-help { font-size: 12px; overflow-wrap: anywhere; }
+.measurement-notes { margin-top: 4px; min-width: 90px; }
+.measurement-notes summary, .measurement-help summary { cursor: pointer; color: var(--blue); }
+.measurement-notes > div { margin-top: 5px; }
+.measurement-help p { font-size: 12px; margin: 8px 0 0; }
+[aria-label="Horizon conditions"] .field { min-width: 0; flex: 1; }
 .log tr.off td { opacity: 0.4; text-decoration: line-through; }
 
 /* Modal */

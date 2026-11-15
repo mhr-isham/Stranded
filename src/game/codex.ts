@@ -96,19 +96,19 @@ export const CODEX: CodexCard[] = [
     id: 'windAnom',
     title: 'Wind on the pendulum',
     year: 'anomaly',
-    text: 'A steady wind pushes the bob sideways. The pendulum then swings about a tilted line, and faster, as if gravity were a little stronger — so g reads high. Gravity surveyors timed their pendulums in sheltered huts, and on calm days.',
+    text: 'A steady wind pushes the bob sideways. The pendulum then swings about a tilted line, and faster, as if gravity were a little stronger — so g reads high. Fit the instrument-kit windscreen before timing or return in calmer conditions. The windscreen blocks the modeled steady crosswind; length, timing and large-angle errors still matter. ECHO stabilization in easier modes is a physical intervention, not a numerical replacement of your reading. Kept readings record which protection was used.',
   },
   {
     id: 'humidAnom',
     title: 'Looming horizons',
     year: 'anomaly',
-    text: 'Damp or cold air near the ground bends light from the horizon downwards, lifting distant objects into view — sailors call it looming. A horizon that looks higher dips less, and the planet seems bigger than it is. Al-Bīrūnī’s method works best in dry, still air.',
+    text: 'Damp or cold air near the ground lifts the apparent horizon: the dip looks smaller and the planet seems larger. Recheck after a damp episode passes. Bracing controls hand sway, not atmospheric refraction. For a justified coefficient k, the model uses geometric dip ≈ apparent dip / √(1−k); uncertainty in k contributes a shared radius error that repeated angles do not average away. The local air probe estimates episodic humidity, not persistent thick-air layering. Compare the independent noon-shadow method in Thick Air, then use its radius and the known eye height to investigate the horizon model. Preserve the apparent angle, chosen coefficient and corrected result.',
   },
   {
     id: 'seeingAnom',
     title: 'Bad seeing',
     year: 'anomaly',
-    text: 'On some nights the air is turbulent and star images boil and smear. Observatories are built on high, dry mountains to escape it; modern telescopes measure the turbulence and flex their mirrors to cancel it (adaptive optics). On a bad night, a careful observer measures less, or not at all.',
+    text: 'Turbulent air makes images boil and smear. Compare observing sessions or make independent readings after the image changes, using their scatter for random repeatability. Allow separately for edge placement, blur and shared alignment errors; a mean does not remove these. Repeated marks on one frozen image pair are not independent exposures. A bigger apparent disk or a longer parallax baseline improves relative precision. During a bad-seeing season the background blur stays elevated even on otherwise calmer nights; there is no promised perfect night.',
   },
 ];
 

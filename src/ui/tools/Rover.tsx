@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { parallaxSite, targetSkyLimits } from '../../engine/measure';
 import { localFrame, observerPos, toHorizontal, topocentric } from '../../engine/sky';
+import { flareAt } from '../../engine/flares';
 import { norm, sub, unit, type Vec3 } from '../../engine/vec';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
@@ -16,6 +17,7 @@ import { drawScope } from '../../render/telescope';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { SeeingConditions } from '../common/MeasurementNotes';
 
 interface Capture {
   at: number;
@@ -23,6 +25,7 @@ interface Capture {
   dirB: Vec3;
   radius: number; // planet angular radius
   baseline: number; // m, laser-link straight-line distance
+  seeing: number;
 }
 
 export function Rover() {
@@ -57,7 +60,9 @@ export function Rover() {
   const lim = targetSkyLimits(sys);
   // On a locked planet the rover drives south for parallax (engine/measure.ts parallaxSite).
   const heading = sys.features.locked ? 'south' : 'east';
-  const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > lim.par / DEG && B.alt > lim.par / DEG && A.sun < lim.sun / DEG && B.sun < lim.sun / DEG && !(s.settings.survival && isCloudy(s.seed, t));
+  const cloudy = s.settings.survival && isCloudy(s.seed, t);
+  const flare = !!flareAt(sys, t);
+  const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > lim.par / DEG && B.alt > lim.par / DEG && A.sun < lim.sun / DEG && B.sun < lim.sun / DEG && !cloudy && !flare;
 
   const drive = () => {
     if (s.northTrip.dist > 0 || s.northTrip.arriveAt > clock.t) return toast('The rover is out north at the shadow stick. Bring it back first.');
@@ -71,6 +76,8 @@ export function Rover() {
 
   const capture = () => {
     const tt = clock.t;
+    if (flareAt(sys, tt)) return toast('A stellar flare is washing out the cameras. Wait for it to fade.');
+    if (s.settings.survival && isCloudy(s.seed, tt)) return toast('Clouds obscure the target. Try a later observing session.');
     const vA = topocentric(sys, body, tt, sys.site);
     const vB = topocentric(sys, body, tt, roverSite);
     setCap({
@@ -79,6 +86,7 @@ export function Rover() {
       dirB: unit(vB),
       radius: Math.asin((sys.giant ?? sys.target).radius / norm(vA)),
       baseline: norm(sub(observerPos(sys, tt, sys.site), observerPos(sys, tt, roverSite))),
+      seeing: seeingFactor(s, tt),
     });
     setMarks({ A: null, B: null });
     flag('rover-captured');
@@ -126,7 +134,7 @@ export function Rover() {
                   moonDir: null,
                   moonRadius: 0,
                   skyBrightness: 0,
-                  seeing: 1.2 * ARCSEC * seeingFactor(useGame.getState(), cap.at),
+                  seeing: 1.2 * ARCSEC * cap.seeing,
                   realTime: 0,
                   filter: false,
                 },
@@ -200,10 +208,12 @@ export function Rover() {
           </button>
           {!canImage && (
             <div className="amber" style={{ fontSize: 13 }}>
-              {!s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : `Both sites need ${lim.sun > -10 * DEG ? 'twilight or darker' : 'a dark sky'} with the planet above ${Math.round(lim.par / DEG)}°.`}
+              {!s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : flare ? 'A stellar flare is washing out the cameras. Wait for it to fade; an absent image cannot be recovered by a numerical correction.' : cloudy ? 'Clouds obscure the target. Try a later observing session; time and air continue to pass.' : `Both sites need ${lim.sun > -10 * DEG ? 'twilight or darker' : 'a dark sky'} with the planet above ${Math.round(lim.par / DEG)}°.`}
             </div>
           )}
         </div>
+
+        <SeeingConditions frozenAt={cap?.at} />
 
         {cap && (
           <div className="panel panel-pad stack" data-tut="rover-blink">
@@ -248,7 +258,7 @@ export function Rover() {
                 className="btn primary"
                 disabled={!p}
                 onClick={() => {
-                  s.addReading({ key: 'dPar', value: cap.baseline / p!, at: cap.at, note: `day ${fmt(cap.at / DAY, 1)} · B ${fmt(cap.baseline / 1000, 0)} km` });
+                  s.addReading({ key: 'dPar', value: cap.baseline / p!, at: cap.at, note: `day ${fmt(cap.at / DAY, 1)} · B ${fmt(cap.baseline / 1000, 0)} km`, environment: { instrument: 'telescope', at: cap.at, rawValue: cap.baseline / p!, seeing: { factor: cap.seeing, frozen: true } } });
                   sfx('good');
                   setMarks({ A: null, B: null });
                   toast('Distance reading logged');

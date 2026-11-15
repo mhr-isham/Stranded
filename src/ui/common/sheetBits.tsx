@@ -1,5 +1,5 @@
 import { Equation } from './Equation';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
 import { fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions } from '../../game/sim';
@@ -9,6 +9,8 @@ import { readingStats, useGame } from '../../game/store';
 import { toast } from './widgets';
 import { isCadetExpedition, noteCadetWarning } from '../../game/cadetGuidance';
 import { CadetGoal } from '../CadetGoal';
+import { MeasurementNotes } from './MeasurementNotes';
+import { conditionUncertainty } from '../../game/measurementEnvironment';
 
 /** Table of logged readings for one quantity, with keep/discard toggles. */
 export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: number) => string }) {
@@ -29,8 +31,8 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
         </tr>
       </thead>
       <tbody>
-        {readings.map((r, i) => (
-          <tr key={r.id} className={r.kept ? '' : 'off'}>
+        {readings.map((r, i) => <Fragment key={r.id}>
+          <tr className={r.kept ? '' : 'off'}>
             <td>{i + 1}</td>
             <td className="muted" style={{ fontSize: 12 }}>{r.note}</td>
             <td className="num">{render ? render(r.value) : sig(toDisplay(k, r.value), 5)}</td>
@@ -43,7 +45,8 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
               </button>
             </td>
           </tr>
-        ))}
+          <tr><td colSpan={4}><MeasurementNotes reading={r} /></td></tr>
+        </Fragment>)}
       </tbody>
     </table>
   );
@@ -53,7 +56,7 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
  * Put a value on the progress sheet. The player always states the error bar
  * themselves; the spread of their own readings is offered as a guide.
  */
-export function SendToSheet({ k, value, at, spread, label = 'Send to progress sheet', tut }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; label?: string; tut?: string }) {
+export function SendToSheet({ k, value, at, spread, modelContribution = 0, label = 'Send to progress sheet', tut }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; modelContribution?: number; label?: string; tut?: string }) {
   const info = QUANTITY_INFO[k];
   const current = useGame((s) => s.sheet[k]);
   const setSheet = useGame((s) => s.setSheet);
@@ -61,7 +64,7 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
   const mode = useMode();
   if (value === null || !Number.isFinite(value)) return null;
   const errNum = Number(err);
-  const ok = err !== '' && errNum > 0;
+  const ok = err !== '' && Number.isFinite(errNum) && errNum > 0 && fromDisplay(k, errNum) >= modelContribution;
   return (
     <div className="stack" style={{ marginTop: 6 }} data-tut={tut}>
       <div className="row" style={{ alignItems: 'flex-end' }}>
@@ -81,6 +84,10 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
           Standard error from the scatter of your readings: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Systematic errors are not included — that part is up to you.
         </div>
       )}
+      {modelContribution > 0 && <div className="stack">
+        <div className="muted" style={{ fontSize: 12 }}>Shared condition-model contribution: ±{sig(toDisplay(k, modelContribution), 4)} {info.unit}. Include at least this much; repeats do not average it away. Allow separately for other shared errors.</div>
+        <button className="btn small ghost" onClick={() => setErr(String(Math.ceil(toDisplay(k, Math.hypot(Number.isFinite(spread) ? spread! : 0, modelContribution)) * 1e6) / 1e6))}>Use scatter + model estimate</button>
+      </div>}
       <button
         className="btn primary"
         disabled={!ok}
@@ -100,6 +107,12 @@ export function SendToSheet({ k, value, at, spread, label = 'Send to progress sh
 export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
   const readings = useGame((s) => s.readings);
   const st = readingStats(readings, k);
+  const treatments = new Set(readings.filter((r) => r.key === k && r.kept && r.environment).map((r) => {
+    const e = r.environment!;
+    if (e.wind) return e.wind.protection === 'none' ? 'exposed' : 'protected';
+    if (e.horizon) return e.horizon.correction ? 'corrected' : 'displayed';
+    return 'optical';
+  }));
   if (!st) return null;
   return (
     <div data-tut={tut}>
@@ -109,7 +122,8 @@ export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
           {sig(toDisplay(k, st.mean), 5)} {QUANTITY_INFO[k].unit}
         </span>
       </div>
-      <SendToSheet k={k} value={st.mean} at={st.at} spread={st.n > 1 ? st.se : undefined} />
+      {treatments.size > 1 && <div className="muted" style={{ fontSize: 12 }}>These kept readings mix treatments or protection. Check their conditions and compatibility before averaging; use the include/exclude controls to choose the observations supporting your estimate.</div>}
+      <SendToSheet k={k} value={st.mean} at={st.at} spread={st.n > 1 ? st.se : undefined} modelContribution={conditionUncertainty(readings.filter((r) => r.key === k))} />
     </div>
   );
 }

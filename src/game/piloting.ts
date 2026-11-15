@@ -4,7 +4,7 @@ import { useGame, type GameState } from './store';
 export type FlightLeg = 'ascent' | 'landing';
 export interface PilotingRecord { ascent?: 'manual'; landing?: 'manual'; assisted: FlightLeg[] }
 
-/** Old saves keep their original contract; new scored hard runs use ruleset 2. */
+/** Old saves keep their original contract; scored hard runs require this from ruleset 2 onward. */
 export const manualFlightRequired = (s: Pick<GameState, 'settings' | 'tutorial'>) =>
   (s.settings.rulesetVersion ?? 1) >= 2 && !!modeOf(s.settings.difficulty).manualFlight && !s.settings.freeRoam && !s.tutorial.active;
 

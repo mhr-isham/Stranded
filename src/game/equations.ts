@@ -1,6 +1,8 @@
 // Explicit typesetting of authored equations; no inference or evaluation of player input.
 export const EQUATIONS: Record<string, string> = {
   'g = 4π² L / T²': 'g=\\frac{4\\pi^2 L}{T^2}',
+  'θ_true ≈ θ_apparent / √(1 − k)': '\\theta_{\\mathrm{geometric}}\\approx\\frac{\\theta_{\\mathrm{apparent}}}{\\sqrt{1-k}}',
+  'k ≈ 1 − [θ_apparent / arccos(R_ref / (R_ref + h))]²': 'k\\approx1-\\left[\\frac{\\theta_{\\mathrm{apparent}}}{\\arccos\\left(R_{\\mathrm{ref}}/(R_{\\mathrm{ref}}+h)\\right)}\\right]^2',
   'g = 4π² L / T², T = time / N': 'g=\\frac{4\\pi^2 L}{T^2} \\\\ T=\\frac{\\text{time}}{N}',
   'R = h·cos θ / (1 − cos θ) ≈ 2h/θ²': 'R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}',
   'R = h·cos θ / (1 − cos θ) ≈ 2h / θ²': 'R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}',

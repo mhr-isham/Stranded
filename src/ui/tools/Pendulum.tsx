@@ -18,6 +18,7 @@ import { hasChallenge } from '../../game/challenges';
 import { useMode } from '../../game/modes';
 import { pendulumPeriod } from '../../engine/measure';
 import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
+import type { MeasurementEnvironment } from '../../game/measurementEnvironment';
 import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { toast } from '../common/widgets';
@@ -29,16 +30,17 @@ function WindGauge() {
   const s = useGame();
   const t = useGameTime(1);
   const v = windAt(s, t);
-  const corrected = ANOMALIES[s.settings.difficulty].announce === 'corrected';
+  const screened = !!s.instrumentSetup?.pendulumScreen;
+  const corrected = ANOMALIES[s.settings.difficulty].announce === 'corrected' && !screened;
   return (
     <div className="stack">
     <div className="row between" style={{ fontSize: 13 }}>
       <span className="muted">Wind gauge</span>
       <span className={v > 6 ? 'amber' : ''}>
-        {fmt(v, 1)} m/s {v > 6 ? (corrected ? '— ECHO is steadying the rig for you' : '— strong') : '— calm'}
+        {fmt(v, 1)} m/s {v > 6 ? (screened ? '— windscreen fitted' : corrected ? '— ECHO stabilization active' : '— strong') : '— calm'}
       </span>
     </div>
-    {v > 6 && s.settings.difficulty === 'cadet' && <div className="muted" style={{ fontSize: 12 }}>
+    {v > 6 && s.settings.difficulty === 'cadet' && corrected && <div className="muted" style={{ fontSize: 12 }}>
       Wind pushes the bob sideways. Cadet assistance steadies the rig here; check your length and timing, and compare repeat readings.
     </div>}
     </div>
@@ -60,12 +62,14 @@ export function Pendulum() {
   const [taps, setTaps] = useState(0);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [ask, setAsk] = useState<null | { time: number }>(null);
+  const [ask, setAsk] = useState<null | { time: number; environment: MeasurementEnvironment }>(null);
   const [nInput, setNInput] = useState('');
-  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number }>(null);
+  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number; amp: number; environment: MeasurementEnvironment }>(null);
 
   const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, trail: [] as { x: number; y: number }[] });
   const watch = useRef({ start: 0, running: false });
+  const timingConditions = useRef<MeasurementEnvironment | null>(null);
+  const screen = !!useGame((s) => s.instrumentSetup?.pendulumScreen);
 
   useEffect(() => {
     clock.realtime = true;
@@ -92,6 +96,8 @@ export function Pendulum() {
     // Worn stopwatch challenge: the button registers up to 0.2 s late.
     const lag = hasChallenge(useGame.getState(), 'stopwatch') ? Math.random() * 200 : 0;
     if (!watch.current.running) {
+      const s = useGame.getState();
+      timingConditions.current = { instrument: 'pendulum', at: clock.t, rawValue: 0, wind: { speed: windAt(s, clock.t), protection: s.instrumentSetup?.pendulumScreen ? 'windscreen' : ANOMALIES[s.settings.difficulty].announce === 'corrected' ? 'echo' : 'none' } };
       watch.current = { start: performance.now() + lag, running: true };
       setTaps(0);
       setElapsed(0);
@@ -104,7 +110,9 @@ export function Pendulum() {
       setRunning(false);
       setElapsed(time);
       setNInput(taps ? String(taps) : '');
-      setAsk({ time });
+      const environment = timingConditions.current!;
+      const endSpeed = windAt(useGame.getState(), clock.t);
+      setAsk({ time, environment: { ...environment, wind: { ...environment.wind!, endSpeed, changed: Math.abs(endSpeed - environment.wind!.speed) > .1 } } });
       flag('pend-timed');
       sfx('click');
     }
@@ -118,7 +126,7 @@ export function Pendulum() {
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
+      if (e.target instanceof HTMLInputElement || ask) return;
       if (e.code === 'Space') {
         e.preventDefault();
         toggleWatch();
@@ -191,16 +199,17 @@ export function Pendulum() {
             ctx.fillStyle = 'rgba(4,6,12,0.35)';
             ctx.fillRect(0, 0, w, h);
             const P = phys.current;
+            const tw = clock.t;
+            const push = windBiases(useGame.getState(), tw, screen) ? windPush(windAt(useGame.getState(), tw)) : 0;
+            const tilt = Math.atan(push);
+            if (!P.swinging && !P.dragging) P.th = tilt;
             // RK4 integration of the full (non-linear) pendulum.
             if (P.swinging) {
               const n = Math.max(1, Math.ceil(dt * 600));
               const hstep = dt / n;
               // A strong steady wind pushes the bob sideways: the swing centres off vertical and
               // quickens, as if gravity were a little stronger (anomaly, harder modes only).
-              const tw = clock.t;
-              const push = windBiases(useGame.getState(), tw) ? windPush(windAt(useGame.getState(), tw)) : 0;
               const gEff = g * Math.sqrt(1 + push * push);
-              const tilt = Math.atan(push);
               const f = (th: number) => (-gEff / trueL) * Math.sin(th - tilt);
               for (let i = 0; i < n; i++) {
                 const k1t = P.om;
@@ -216,6 +225,23 @@ export function Pendulum() {
               }
             }
             const { px, py, ppm } = layout(w, h);
+            if (screen) {
+              ctx.fillStyle = 'rgba(112,151,179,.12)';
+              ctx.fillRect(px - 1.18 * ppm, py + .7 * ppm, 2.36 * ppm, 2.5 * ppm);
+              ctx.strokeStyle = 'rgba(134,180,207,.25)';
+              ctx.lineWidth = dpr;
+              for (let seam = .9; seam < 3.2; seam += .35) {
+                ctx.beginPath(); ctx.moveTo(px - 1.18 * ppm, py + seam * ppm); ctx.lineTo(px + 1.18 * ppm, py + seam * ppm); ctx.stroke();
+              }
+              ctx.fillStyle = 'rgba(112,151,179,.35)';
+              ctx.strokeStyle = '#86b4cf';
+              ctx.lineWidth = 2 * dpr;
+              for (const side of [-1, 1]) {
+                const x = px + side * 1.18 * ppm;
+                ctx.fillRect(x - .08 * ppm, py + .7 * ppm, .16 * ppm, 2.5 * ppm);
+                ctx.strokeRect(x - .08 * ppm, py + .7 * ppm, .16 * ppm, 2.5 * ppm);
+              }
+            }
             setInstrument('pendulum', P.swinging ? Math.min(0.6, Math.abs(P.om) * 0.8) : 0, Math.min(1, Math.abs(P.th) / (20 * DEG)));
             // Ground under the rig.
             const gy = py + 3.25 * ppm;
@@ -324,6 +350,12 @@ export function Pendulum() {
 
       <div className="tool-side">
         <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. Clock runs in real time here." />
+        <div className="panel panel-pad stack" aria-label="Pendulum conditions">
+          <b>Wind protection</b>
+          <button className="btn small" aria-pressed={screen} disabled={running || !!ask} onClick={() => { const s = useGame.getState(); s.set({ instrumentSetup: { ...s.instrumentSetup, pendulumScreen: !screen } }); stopSwing(); }}>{screen ? 'Remove windscreen' : 'Fit windscreen'}</button>
+          <div className="muted" style={{ fontSize: 12 }}>{screen ? 'The fitted screen shelters the bob from the modeled crosswind. Length, timing and release-angle errors still need care.' : 'A folding windscreen is in the instrument kit. Fit it before timing, or return in calmer conditions.'}</div>
+          <details className="measurement-help"><summary>Conditions and methods</summary><p>A steady wind tilts the swing and can bias gravity high. Compare sheltered and exposed timings at the same length, or return to camp and use the clock to wait for calmer conditions. Average independent timings for random scatter; shared ruler or counting errors need separate care.</p></details>
+        </div>
         <div className="panel panel-pad stack">
           <b>1 · Set the string length</b>
           <input data-tut="pend-length" type="range" min={0.6} max={3} step={0.1} value={nominal} onChange={(e) => setNominal(Number(e.target.value))} disabled={running} />
@@ -366,16 +398,18 @@ export function Pendulum() {
               <dt>Period T</dt>
               <dd>{fmt(result.T, 4)} s</dd>
               <dt>Length L</dt>
-              <dd>{fmt(lRead ?? 0, 4)} m</dd>
+              <dd>{fmt(result.L, 4)} m</dd>
               <dt>Gravity g</dt>
               <dd className="blue">{fmt(result.g, 4)} m/s²</dd>
             </dl>
+            <div className="muted" style={{ fontSize: 12 }}>Instrument result with {result.environment.wind?.protection === 'windscreen' ? 'your windscreen' : result.environment.wind?.protection === 'echo' ? 'ECHO physical stabilization' : 'an exposed rig'}; no numerical wind correction was applied.</div>
             <SanityWarning
               attempt={result}
               msgs={[
                 (result.g < 2 || result.g > 40) && 'That is not a plausible gravity for a planet you can stand on. Did you enter the right number of swings?',
                 result.N < 5 && 'Fewer than 5 swings: your reaction time dominates this reading. Time more swings for a better result.',
-                amp > 15 && `A ${fmt(amp, 0)}° release makes the swing slower than the formula assumes, so this g is too small.`,
+                result.amp > 15 && `A ${fmt(result.amp, 0)}° release makes the swing slower than the formula assumes, so this g is too small.`,
+                result.environment.wind?.changed && 'Wind conditions changed during this timing. Repeat in stable conditions or fit the windscreen.',
                 outlierNote(result.g, keptG, 0.08),
               ]}
             />
@@ -383,7 +417,7 @@ export function Pendulum() {
               <button
                 className="btn primary"
                 onClick={() => {
-                  addReading({ key: 'g', value: result.g, at: clock.t, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(amp, 0)}°`, pendulum: { length: result.L, period: result.T } });
+                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T }, environment: result.environment });
                   setResult(null);
                   sfx('good');
                 }}
@@ -425,7 +459,8 @@ export function Pendulum() {
               onClick={() => {
                 const N = Number(nInput);
                 const T = ask.time / N;
-                setResult({ N, T, time: ask.time, L: lRead!, g: (4 * Math.PI ** 2 * lRead!) / (T * T) });
+                const measuredG = (4 * Math.PI ** 2 * lRead!) / (T * T);
+                setResult({ N, T, time: ask.time, L: lRead!, amp, g: measuredG, environment: { ...ask.environment, rawValue: measuredG } });
                 setAsk(null);
                 flag('pend-result');
               }}

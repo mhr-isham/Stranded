@@ -15,6 +15,7 @@ import type { FlightLeg, PilotingRecord } from './piloting';
 import { RULESET_VERSION } from './world';
 import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
+import type { MeasurementEnvironment } from './measurementEnvironment';
 
 export type Screen =
   | 'map'
@@ -41,11 +42,13 @@ export interface Reading {
   note: string;
   /** Observed quantities retained for optional prediction training. */
   pendulum?: { length: number; period: number };
+  environment?: MeasurementEnvironment;
 }
 
 export interface TimedValue {
   at: number;
   v: number;
+  environment?: MeasurementEnvironment;
 }
 
 export interface Settings {
@@ -163,6 +166,7 @@ export interface GameState {
   tutorial: TutorialState;
   training: TrainingHistory;
   readingPredictions: ReadingPredictions;
+  instrumentSetup: { pendulumScreen: boolean };
   schoolOpen: { chapter?: number } | null;
   schoolSession: { id: ExerciseId; start: number; end: number; completedSteps: string[]; assisted: boolean } | null;
   /** Identifies this run, so checkpoints from an older run are ignored. */
@@ -289,6 +293,7 @@ const initial = {
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
   readingPredictions: {} as ReadingPredictions,
+  instrumentSetup: { pendulumScreen: false },
   schoolOpen: null as GameState['schoolOpen'],
   schoolSession: null as GameState['schoolSession'],
   runId: 0,

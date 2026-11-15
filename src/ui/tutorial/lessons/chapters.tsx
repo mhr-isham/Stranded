@@ -165,6 +165,9 @@ export function RefractionLesson() {
         cities.
       </P>
       <P>Raise the air thickness on the left: the horizon method goes badly wrong. The shadow method on the right doesn’t care.</P>
+      <P>A refraction correction needs a justified coefficient and uncertainty. The local air probe estimates episodic humidity only. Persistent atmospheric layering can require the independent shadow experiment; bracing your hands cannot remove it.</P>
+      <Equation tex={"\\theta_{\\mathrm{geometric}}\\approx\\frac{\\theta_{\\mathrm{apparent}}}{\\sqrt{1-k}} \\\\ \\frac{\\sigma_R}{R}\\approx\\frac{\\sigma_k}{1-k}\\quad\\text{(small dip; contribution from }k\\text{ only)}"} />
+      <P>Repeated readings reduce random scatter, while a shared calibration error remains. With an independently measured reference radius and known eye height, compare its predicted geometric dip with your observed dip to estimate k. Do not calibrate a method against its own uncorrected result.</P>
     </LessonShell>
   );
 }

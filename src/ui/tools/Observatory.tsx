@@ -24,6 +24,7 @@ import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from 
 import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
+import { SeeingConditions } from '../common/MeasurementNotes';
 import { currentMode, useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
@@ -350,7 +351,7 @@ export function Observatory() {
                   realTime: now,
                   filter,
                   targetInFront: sys.features.inner && Math.hypot(...tgtV) < Math.hypot(...sunV),
-                  shimmer: { x: 0.35 * ARCSEC * Math.sin(ts * 2.1) * Math.sin(ts * 0.7), y: 0.35 * ARCSEC * Math.sin(ts * 1.7 + 1) },
+                  shimmer: { x: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 2.1) * Math.sin(ts * 0.7), y: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 1.7 + 1) },
                 },
                 dpr,
               );
@@ -426,6 +427,7 @@ export function Observatory() {
 
       <div className="tool-side">
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
+        {mode === 'scope' && <SeeingConditions />}
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
             {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e || !!sys.giant) && (tb.id !== 'giant' || !!sys.giant) && (tb.id !== 'stars' || !!sys.features.stars)).map((tb) => (
@@ -508,7 +510,8 @@ export function Observatory() {
               if (!c) return;
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v: eclLon(c) }] }));
+              const v = eclLon(c);
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(st, clock.t), frozen: false } } }] }));
               toast('Star position logged');
               sfx('shutter');
             }}
@@ -538,7 +541,7 @@ export function Observatory() {
                 const altNow = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site)).alt;
                 if (altNow < 0) return toast('The blue planet is below the horizon — wait for it to rise.');
                 if (a < 0.3 * ARCSEC) return toast('The wires are on top of each other. Set them on opposite edges of the disk.');
-                s.addReading({ key: 'alpha2', value: a, at: clock.t, note: `day ${fmt(clock.t / DAY, 1)}` });
+                s.addReading({ key: 'alpha2', value: a, at: clock.t, note: `day ${fmt(clock.t / DAY, 1)}`, environment: { instrument: 'telescope', at: clock.t, rawValue: a, seeing: { factor: seeingFactor(s, clock.t), frozen: false } } });
                 const warn = outlierNote(a, s.readings.filter((r) => r.key === 'alpha2' && r.kept).map((r) => r.value), 0.15);
                 toast(warn ? `Logged ${fmt(a / ARCSEC, 2)}″ — but it is far from your other readings. Check the wires.` : `Diameter ${fmt(a / ARCSEC, 2)}″ logged`);
                 sfx('shutter');
@@ -547,9 +550,6 @@ export function Observatory() {
               Log diameter
             </button>
             <div className="hint">The disk looks biggest — and is easiest to measure — near opposition, when the blue planet is closest.</div>
-            {currentMode().sanity && !s.settings.challenges?.includes('noSanity') && seeingFactor(s, clock.t) > 1.5 && (
-              <div className="amber" style={{ fontSize: 13 }}>The air is rough tonight — the image swims. Readings will scatter more; another night may be better.</div>
-            )}
             <Formula>R₂ = d · tan(α₂ / 2)</Formula>
             <ReadingsTable k="alpha2" render={(v) => `${fmt(v / ARCSEC, 2)}″`} />
             <SendReadings k="alpha2" tut="micro-send" />
@@ -626,6 +626,9 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog:
         />
       )}
       {pts.length > 0 && <div className="faint" style={{ fontSize: 12 }}>Drag across the chart to choose which logs to fit. Double-tap to use all.</div>}
+      {pts.length > 0 && <details className="measurement-help"><summary>Observation log and conditions</summary>
+        <table className="log"><thead><tr><th>Day</th><th>Position (°)</th><th>Image</th></tr></thead><tbody>{obs.map((o, i) => <tr key={`${o.at}:${i}`}><td>{fmt(o.at / DAY, 2)}</td><td>{fmt(lon[i], 3)}</td><td>{o.environment?.seeing ? o.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Not recorded'}</td></tr>)}</tbody></table>
+      </details>}
       {fit && hasChallenge(useGame.getState(), 'handFit') && (
         <div className="hint">Fit by hand: read the drift per day off your chart (rise over run), work out P₁ = 360° / drift, and type it on the progress sheet.</div>
       )}
