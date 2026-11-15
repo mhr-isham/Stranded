@@ -22,6 +22,7 @@ import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
 import { PredictCard } from '../common/Predict';
+import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { currentMode, useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
@@ -641,6 +642,7 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog:
       <Formula>{locked ? 'P₁ = 360° / (sky turn rate)' : 'P₁ = 360° / (daily drift)'}</Formula>
       {P1 && !hasChallenge(useGame.getState(), 'handFit') && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
       </div>
+      {!locked && <ReadingPredictionPractice kind="star" />}
       {pts.length >= 2 && !locked && <StarPrediction pts={pts} fit={fit} />}
     </div>
   );

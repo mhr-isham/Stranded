@@ -25,6 +25,8 @@ export const EXERCISES = [
   { id: 'opposition', group: 'navigation', title: 'Mark an opposition', first: 'lesson-retro', last: 'opp-send', description: 'Find the retrograde loop and estimate its middle.' },
   { id: 'synodic', group: 'navigation', title: 'Measure the synodic period', first: 'lesson-synodic', last: 'opp2-send', description: 'Use a second opposition to estimate the repeating interval.' },
   { id: 'planning', group: 'navigation', title: 'Plan a transfer', first: 'lesson-hohmann', last: 'launch-window', description: 'Compare departure dates, flight time, fuel and uncertainty.' },
+  { id: 'estimate-pendulum', group: 'predictions', title: 'Predict a measured swing', first: 'pend-send', last: 'pend-send', description: 'Use your timed baseline and a new measured length, commit a range, then time it.' },
+  { id: 'estimate-star', group: 'predictions', title: 'Predict from your star logs', first: 'year-send', last: 'year-send', description: 'Log a drift, commit a position and range two weeks ahead, then observe it.' },
 ] as const satisfies readonly { id: string; group: TrainingGroup; title: string; first: string; last: string; description: string }[];
 export type ExerciseId = typeof EXERCISES[number]['id'];
 export interface TrainingProgress { status: 'started' | 'completed' | 'skipped'; updated: number; assisted?: boolean }

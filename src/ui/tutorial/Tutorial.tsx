@@ -25,7 +25,7 @@ interface Box {
 let lastScroll = 0;
 
 /** Find the on-screen box of a step's target (first visible match), scrolling it into view if needed. */
-function targetBox(target: string | undefined): Box | null {
+function targetBox(target: string | undefined, follow = true): Box | null {
   if (!target) return null;
   for (const id of target.split(' ')) {
     if (id.startsWith('anchor:')) {
@@ -41,7 +41,7 @@ function targetBox(target: string | undefined): Box | null {
       // Keep the target clear of the HUD (top) and the nav bar (bottom).
       const navTop = document.querySelector('nav.nav')?.getBoundingClientRect().top ?? window.innerHeight;
       const hidden = r.top > navTop - 12 || r.bottom < 70 || (r.bottom > navTop && r.height < navTop * 0.5);
-      if (hidden && performance.now() - lastScroll > 800) {
+      if (follow && hidden && performance.now() - lastScroll > 800) {
         lastScroll = performance.now();
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
@@ -90,8 +90,16 @@ export function LessonModal({ id, onClose }: { id: LessonId; onClose: () => void
 export function Tutorial() {
   const s = useGame();
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
-  const step = STEPS[idx];
   const session = s.schoolSession;
+  const originalStep = STEPS[idx];
+  const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
+  const step: TutStep = predictionKind ? {
+    ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
+    target: `training-prediction-${predictionKind}`, screen: predictionKind === 'pendulum' ? 'pendulum' : 'observatory', dim: false, compact: true,
+    body: [predictionKind === 'pendulum' ? 'Keep a baseline period using the rig. Measure a different string length, commit your prediction and range, then time and keep a new reading to compare.' : 'Open the Year tab and log the star at two different dusks. Commit a position and range about two weeks ahead, then advance to the target time and log again.'],
+    done: (state) => state.readingPredictions[predictionKind]?.comparison !== undefined,
+    doIt: undefined, action: undefined, warn: undefined, lesson: undefined,
+  } : originalStep;
   const first = session?.start ?? 0;
   const last = session?.end ?? STEPS.length - 1;
   const [box, setBox] = useState<Box | null>(null);
@@ -114,7 +122,7 @@ export function Tutorial() {
   useEffect(() => {
     let raf = 0;
     const loop = () => {
-      const b = targetBox(step.target);
+      const b = targetBox(step.target, step.followTarget !== false);
       setBox((prev) => (prev && b && Math.abs(prev.x - b.x) < 0.5 && Math.abs(prev.y - b.y) < 0.5 && prev.w === b.w && prev.h === b.h ? prev : b));
       raf = requestAnimationFrame(loop);
     };
@@ -136,7 +144,7 @@ export function Tutorial() {
     // Scroll the target into view if it lives in a scrolling side panel.
     setTimeout(() => {
       const id = step.target?.split(' ')[0];
-      if (id && !id.startsWith('anchor:')) document.querySelector(`[data-tut~="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (step.followTarget !== false && id && !id.startsWith('anchor:')) document.querySelector(`[data-tut~="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 250);
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -234,6 +242,7 @@ export function Tutorial() {
         </h3>
         <div className="body">
           {session && <p className="school-context">Unscored practice. Prerequisite observations may be supplied for this exercise; your expedition is preserved. Completing this guide records practice, not a skill certification.</p>}
+          {session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send') && <p className="school-context">Optional: try the prediction practice in this instrument’s panel before continuing. It is skippable and has no points.</p>}
           {(session && step.id === 'debrief-grade' ? ['This practice run is unscored. Inspect the fuel and measurement feedback, then finish the exercise to restore your expedition.'] : step.body).map((p, i) => (
             <p key={i}>{rich(p)}</p>
           ))}
@@ -275,6 +284,11 @@ export function Tutorial() {
           </div>
         )}
         <div className="row" style={{ marginTop: 8, gap: 6 }}>
+          {(predictionKind || (session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send'))) && <button className="btn small" onClick={() => {
+            const kind = predictionKind ?? (step.id === 'pend-send' ? 'pendulum' : 'star');
+            document.querySelector(`[data-tut="training-prediction-${kind}"]`)?.scrollIntoView({ block: 'center' });
+            setMini(true);
+          }}>{predictionKind ? 'Prediction panel' : 'Optional prediction exercise'}</button>}
           {missingTarget && (
             <button className="btn small amber" onClick={() => s.go(step.screen!)}>
               Take me there

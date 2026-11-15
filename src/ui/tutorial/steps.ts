@@ -40,6 +40,8 @@ export interface TutStep {
   warn?: string;
   /** data-tut id(s) to spotlight, or "anchor:name" for something drawn on a canvas. */
   target?: string;
+  /** Some optional exercises need free scrolling between controls and a prediction panel. */
+  followTarget?: boolean;
   /** The screen the target lives on (offers a "take me there" button). */
   screen?: Screen;
   lesson?: LessonId;
@@ -254,6 +256,8 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'pend-send',
+    noAuto: true,
+    followTarget: false,
     chapter: 'Gravity',
     title: 'Send g to the progress sheet',
     target: 'pend-send',
@@ -551,6 +555,8 @@ export const STEPS: TutStep[] = [
   },
   {
     id: 'year-send',
+    noAuto: true,
+    followTarget: false,
     chapter: 'Year',
     title: 'Fit the drift and send P₁',
     target: 'year-fit',

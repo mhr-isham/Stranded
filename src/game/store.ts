@@ -14,6 +14,7 @@ import type { AtlasCard, SystemNames } from './atlas';
 import type { FlightLeg, PilotingRecord } from './piloting';
 import { RULESET_VERSION } from './world';
 import type { ExerciseId, TrainingHistory } from './training';
+import type { ReadingPredictions } from './readingPredictions';
 
 export type Screen =
   | 'map'
@@ -38,6 +39,8 @@ export interface Reading {
   at: number;
   kept: boolean;
   note: string;
+  /** Observed quantities retained for optional prediction training. */
+  pendulum?: { length: number; period: number };
 }
 
 export interface TimedValue {
@@ -159,6 +162,7 @@ export interface GameState {
   lastNightLog: number;
   tutorial: TutorialState;
   training: TrainingHistory;
+  readingPredictions: ReadingPredictions;
   schoolOpen: { chapter?: number } | null;
   schoolSession: { id: ExerciseId; start: number; end: number; completedSteps: string[]; assisted: boolean } | null;
   /** Identifies this run, so checkpoints from an older run are ignored. */
@@ -284,6 +288,7 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
+  readingPredictions: {} as ReadingPredictions,
   schoolOpen: null as GameState['schoolOpen'],
   schoolSession: null as GameState['schoolSession'],
   runId: 0,

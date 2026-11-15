@@ -119,7 +119,8 @@ const noisy = (v: number, rel: number) => v * (1 + rng.normal(0, rel));
 
 export function doPendulum() {
   const sys = sysNow();
-  useGame.getState().addReading({ key: 'g', value: noisy(surfaceGravity(sys), 0.003), at: clock.t, note: 'ECHO · 20 swings' });
+  const value = noisy(surfaceGravity(sys), 0.003);
+  useGame.getState().addReading({ key: 'g', value, at: clock.t, note: 'ECHO · 20 swings', pendulum: { length: 2, period: 2 * Math.PI * Math.sqrt(2 / value) } });
 }
 
 export function doHill() {

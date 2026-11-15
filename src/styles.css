@@ -130,6 +130,11 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .school-card .row:last-child { margin-top: auto; }
 .school-context { color: var(--amber); font-size: 11px; }
 .hotspot[data-training-focus] { z-index: 22; }
+.modal:has(.estimation-workshop) { background: #08111f; width: min(760px, 100%); }
+.estimation-workshop .field, .reading-practice .field { min-width: 0; flex: 1; }
+.estimate-ranges { width: 100%; max-height: 130px; background: #102033; border-radius: 10px; padding: 6px; }
+.reading-practice h3 { font-size: 17px; margin: 0; }
+.reading-practice p, .estimation-workshop p { margin: 3px 0; font-size: 13px; }
 @media (max-width: 600px) { .school-filters { grid-template-columns: 1fr; } }
 .missions { position: absolute; left: 8px; top: calc(var(--hud-h) - 2px + var(--safe-top)); width: 300px; max-height: calc(100% - 160px); overflow: auto; z-index: 15; }
 .mission-active h3 { font-size: 16px; margin: 2px 0 6px; }

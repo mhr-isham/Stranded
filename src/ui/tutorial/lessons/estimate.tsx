@@ -160,7 +160,7 @@ function RatioDemo() {
   );
 }
 
-/** A retrograde loop is symmetric: the turn-around before opposition mirrors the one after. */
+/** An idealized symmetric loop; real orbital geometry can break this symmetry. */
 function BracketDemo() {
   const [guess, setGuess] = useState(150);
   const start = 70; // day it turned backwards
@@ -194,12 +194,13 @@ function BracketDemo() {
       <div style={{ fontSize: 13 }}>
         {Math.abs(guess - truth) <= 3 ? (
           <span className="green">
-            Yes — {opp - start} days before opposition, so about {opp - start} days after: day {truth}. The loop is a mirror image.
+            In this symmetric teaching model: {opp - start} days before opposition, so about {opp - start} days after: day {truth}.
           </span>
         ) : (
-          <span className="muted">It can’t be before opposition (day {opp}). How far before opposition did it turn back? Mirror that.</span>
+          <span className="muted">In this model, it can’t be before opposition (day {opp}). How far before opposition did it turn back? Mirror that.</span>
         )}
       </div>
+      <Note>Real retrograde loops can be asymmetric. Use observed bounds or an appropriate orbital model rather than assuming this mirror rule always applies.</Note>
     </>
   );
 }

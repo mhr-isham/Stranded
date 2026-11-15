@@ -22,7 +22,7 @@ with sync_playwright() as p:
         page.evaluate('''()=>{__game.getState().newGame(91,{difficulty:'navigator',sound:false,survival:false,formulas:true});__clock.t=123;__clock.paused=true;__game.setState({phase:'title',savedT:123,sheet:{g:{value:9.81,sigma:.2}}})}''')
         page.get_by_role('button', name='Flight School', exact=False).click()
         lib = library(page)
-        assert lib.locator('[data-training]').count() == 38
+        assert lib.locator('[data-training]').count() == 47
         assert lib.get_by_role('combobox', name='Skill group', exact=True).locator('option').count() == 7
         assert lib.get_by_role('button', name='Open · The distances of the stars', exact=True).is_enabled()
         stellar = lib.locator('[data-training="lesson:stellar"]')
@@ -31,7 +31,7 @@ with sync_playwright() as p:
         page.reload(wait_until='networkidle')
         library(page).locator('[data-training="lesson:stellar"]').get_by_text('Skipped for now', exact=True).wait_for()
         lib.get_by_role('combobox', name='Skill group', exact=True).select_option('predictions')
-        assert lib.locator('[data-training]').count() == 3
+        assert lib.locator('[data-training]').count() == 12
         estimate = lib.locator('[data-training="lesson:estimate"]')
         estimate.get_by_role('button', name='Open · Making a good estimate', exact=True).click()
         page.get_by_role('button', name='Close lesson', exact=True).click()
@@ -142,4 +142,4 @@ with sync_playwright() as p:
         assert not errors, errors
         page.close()
     browser.close()
-print('PASS 38-module library, filters/search, skip/view/complete/repeat, guided exercise and assisted completion, chapter recommendations, optional campaign start, safe return to title/live expedition at phone/desktop widths')
+print('PASS 47-module library, filters/search, skip/view/complete/repeat, guided exercise and assisted completion, chapter recommendations, optional campaign start, safe return to title/live expedition at phone/desktop widths')

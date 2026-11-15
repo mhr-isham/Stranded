@@ -5,7 +5,7 @@ import { clock } from '../../game/clock';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import type { GameState } from '../../game/store';
-import { darkNightNear, doOpposition, jumpTo, tutorialOppositions } from '../../game/tutorial';
+import { darkNightNear, doOpposition, jumpTo, nextDusk, tutorialOppositions } from '../../game/tutorial';
 import { EXERCISES, recordTraining, type ExerciseId } from '../../game/training';
 import { leaveFlightPractice, practiceSnapshot } from '../common/flightPractice';
 import { startRun } from '../common/widgets';
@@ -21,6 +21,8 @@ export function exerciseRange(id: ExerciseId) {
 
 /** Supply only prerequisites, in an isolated unscored teaching system. */
 export function prepareExercise(id: ExerciseId) {
+  if (id === 'estimate-pendulum') { useGame.getState().go('pendulum'); return; }
+  if (id === 'estimate-star') { useGame.getState().go('observatory'); jumpTo(nextDusk(clock.t)); return; }
   if (id === 'basic' || id === 'gravity' || id === 'radius' || id === 'sky') return;
   const { system: sys } = currentWorld();
   const s = useGame.getState();
@@ -63,6 +65,8 @@ export function startSchoolExercise(id: ExerciseId) {
 export function schoolExerciseComplete(s: GameState) {
   const session = s.schoolSession;
   if (!session) return false;
+  if (session.id === 'estimate-pendulum') return s.readingPredictions.pendulum?.comparison !== undefined;
+  if (session.id === 'estimate-star') return s.readingPredictions.star?.comparison !== undefined;
   const required = STEPS.slice(session.start, session.end + 1).filter((step) => step.done);
   return required.every((step) => session.completedSteps.includes(step.id) || step.done!(s));
 }

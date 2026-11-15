@@ -76,7 +76,7 @@ export default function App() {
       {phase === 'title' && <Title />}
       {phase === 'prologue' && <Prologue key={`${runId}-opening`} />}
       {phase === 'intro' && <Intro />}
-      {phase === 'play' && <Game />}
+      {phase === 'play' && <Game key={runId} />}
       {phase === 'ascent' && <Ascent key={`${runId}-ascent`} />}
       {phase === 'flight' && <Flight />}
       {phase === 'landing' && <Prologue key={`${runId}-landing`} arrival />}

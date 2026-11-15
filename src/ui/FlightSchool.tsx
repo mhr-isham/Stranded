@@ -9,6 +9,8 @@ import { startSchoolExercise } from './tutorial/schoolPractice';
 import { startFlightPractice } from './common/flightPractice';
 import { Modal } from './common/widgets';
 import { clock } from '../game/clock';
+import { ESTIMATION_DRILLS, type EstimationId } from '../game/estimation';
+import { EstimationWorkshop } from './tutorial/EstimationWorkshop';
 
 export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => void; recommendedChapter?: number }) {
   const s = useGame();
@@ -22,12 +24,14 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
   const [group, setGroup] = useState<TrainingGroup | 'all'>('all');
   const [search, setSearch] = useState('');
   const [lesson, setLesson] = useState<LessonId | null>(null);
+  const [estimation, setEstimation] = useState<EstimationId | null>(null);
   const recommended = recommendedChapter ? recommendedTraining(recommendedChapter) : [];
   const query = search.trim().toLocaleLowerCase();
   const matches = (title: string) => !query || title.toLocaleLowerCase().includes(query);
   const groups = TRAINING_GROUPS.filter((g) => (group === 'all' || group === g.id) && (
     g.lessons.some((id) => matches(LESSONS[id].title)) || EXERCISES.some((m) => m.group === g.id && matches(m.title)) ||
-    (g.id === 'ascent' && matches('Practice ascent')) || (g.id === 'landing' && matches('Practice entry and landing'))
+    (g.id === 'ascent' && matches('Practice ascent')) || (g.id === 'landing' && matches('Practice entry and landing')) ||
+    (g.id === 'predictions' && ESTIMATION_DRILLS.some((drill) => matches(drill.title)))
   ));
 
   const card = (id: string, title: string, description: string, action: () => void, kind: string) => {
@@ -69,6 +73,7 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
           <div className="school-grid">
             {EXERCISES.filter((m) => m.group === g.id).map((m) => card(`exercise:${m.id}`, m.title, m.description, () => startSchoolExercise(m.id), 'Guided exercise'))}
             {g.lessons.map((id) => card(`lesson:${id}`, LESSONS[id].title, 'Interactive explanation. Close to return, or use “Got it” to record completion.', () => setLesson(id), 'Interactive lesson'))}
+            {g.id === 'predictions' && ESTIMATION_DRILLS.map((drill) => card(`estimate:${drill.id}`, drill.title, drill.description, () => { recordTraining(`estimate:${drill.id}`, 'started'); setEstimation(drill.id); }, 'Estimation exercise'))}
             {g.id === 'ascent' && card('flight:ascent', 'Practice ascent', 'Control pitch and thrust, reach parking orbit and inspect your fuel use.', () => startFlightPractice('ascent', difficulty), 'Flight drill')}
             {g.id === 'landing' && card('flight:landing', 'Practice entry and landing', 'Fly the entry corridor, deploy a parachute and control the touchdown.', () => startFlightPractice('landing', difficulty), 'Flight drill')}
           </div>
@@ -76,5 +81,6 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
       </div>
     </Modal>
     {lesson && <LessonModal key={lesson} id={lesson} onClose={() => setLesson(null)} />}
+    {estimation && <EstimationWorkshop key={estimation} id={estimation} onClose={() => setEstimation(null)} />}
   </>;
 }

@@ -19,6 +19,7 @@ import { useMode } from '../../game/modes';
 import { pendulumPeriod } from '../../engine/measure';
 import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
 import { PredictCard } from '../common/Predict';
+import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { toast } from '../common/widgets';
 
 const BOB_R = 0.025; // m
@@ -61,7 +62,7 @@ export function Pendulum() {
   const [elapsed, setElapsed] = useState(0);
   const [ask, setAsk] = useState<null | { time: number }>(null);
   const [nInput, setNInput] = useState('');
-  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number }>(null);
+  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number }>(null);
 
   const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, trail: [] as { x: number; y: number }[] });
   const watch = useRef({ start: 0, running: false });
@@ -382,7 +383,7 @@ export function Pendulum() {
               <button
                 className="btn primary"
                 onClick={() => {
-                  addReading({ key: 'g', value: result.g, at: clock.t, note: `L ${fmt(lRead ?? 0, 3)} m · ${result.N} sw · ${fmt(amp, 0)}°` });
+                  addReading({ key: 'g', value: result.g, at: clock.t, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(amp, 0)}°`, pendulum: { length: result.L, period: result.T } });
                   setResult(null);
                   sfx('good');
                 }}
@@ -401,6 +402,7 @@ export function Pendulum() {
           <ReadingsTable k="g" />
           <SendReadings k="g" tut="pend-send" />
         </div>
+        <ReadingPredictionPractice kind="pendulum" currentLength={lRead} resultPending={!!result || running} />
         {keptG.length > 0 && !running && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
       </div>
 
@@ -423,7 +425,7 @@ export function Pendulum() {
               onClick={() => {
                 const N = Number(nInput);
                 const T = ask.time / N;
-                setResult({ N, T, time: ask.time, g: (4 * Math.PI ** 2 * (lRead ?? 0)) / (T * T) });
+                setResult({ N, T, time: ask.time, L: lRead!, g: (4 * Math.PI ** 2 * lRead!) / (T * T) });
                 setAsk(null);
                 flag('pend-result');
               }}
