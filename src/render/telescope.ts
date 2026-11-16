@@ -5,6 +5,7 @@ import { ARCSEC, DEG, TAU } from '../engine/constants';
 import { hash32, mulberry32 } from '../engine/rng';
 import { cross, dot, unit, type Vec3 } from '../engine/vec';
 import { css, mix, type RGB } from './color';
+import type { CatalogStar } from '../engine/sky';
 
 export interface ScopeView {
   center: Vec3; // pointing direction (ecliptic frame, unit)
@@ -103,6 +104,10 @@ export interface ScopeScene {
   /** The planet is nearer than the star (an inner planet): through the filter it shows as a black dot in transit. */
   targetInFront?: boolean;
   shimmer?: { x: number; y: number }; // tip-tilt offset in rad
+  brightStars?: CatalogStar[];
+  reduceFlicker?: boolean;
+  targetStyle?: 'blue' | 'giant';
+  extraLights?: { dir: Vec3; radius: number; style?: 'giant'; color: RGB }[];
 }
 
 export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: ScopeScene, dpr: number): ScopeProjector {
@@ -122,15 +127,16 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
   if (!sc.filter && day < 0.6) {
     const radius = view.fov * 0.75 * Math.max(1, h / w);
     const stars = deepStars(sc.seed, view.center, radius);
-    const lim = 15.5 - day * 12;
+    // Narrow fields reveal fainter stars; wide fields retain a readable hierarchy.
+    const lim = Math.min(15.5, Math.max(8.5, 9 - 2.5 * Math.log10(view.fov / DEG / 2))) - day * 12;
     const tw = sc.realTime / 1000;
     for (let i = 0; i < stars.length; i++) {
       const s = stars[i];
       if (s.mag > lim) continue;
       const p = P.project(s.dir);
       if (!p || p.x < -10 || p.y < -10 || p.x > w + 10 || p.y > h + 10) continue;
-      const flux = Math.pow(10, -0.4 * (s.mag - lim + 2.5));
-      const twinkle = 1 + 0.25 * Math.sin(tw * 9 + i * 1.7) * Math.sin(tw * 3.1 + i);
+      const flux = Math.pow(10, -0.4 * (s.mag - lim + 3));
+      const twinkle = sc.reduceFlicker ? 1 : 1 + 0.25 * Math.sin(tw * 9 + i * 1.7) * Math.sin(tw * 3.1 + i);
       const a = Math.min(1, flux * twinkle);
       const r = Math.max(0.8 * dpr, seeingPx * 0.5 * (0.6 + Math.min(1.6, flux * 0.6)));
       const tint: RGB = s.tint < 0.3 ? [255, 214, 170] : s.tint > 0.85 ? [180, 205, 255] : [245, 245, 255];
@@ -172,10 +178,32 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
     }
   }
 
+  // Preserve the bright stars selected in the wide view at narrow fields too.
+  if (!sc.filter && day < .6) for (const star of sc.brightStars ?? []) {
+    if (star.mag > 5.5) continue;
+    const p = P.project(star.dir);
+    if (!p || p.x < -12 || p.y < -12 || p.x > w + 12 || p.y > h + 12) continue;
+    const variation = sc.reduceFlicker ? 1 : 1 + .16 * Math.sin(sc.realTime / 140 + star.twinklePhase) * Math.sin(sc.realTime / 430 + star.twinklePhase);
+    const r = Math.max((1.3 + Math.max(0, 2.6 - star.mag) * .25) * dpr, seeingPx * .55);
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
+    glow.addColorStop(0, css(star.color.map((v) => v * 255) as RGB, Math.min(1, variation * (1 - day))));
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow; ctx.fillRect(p.x - r * 3, p.y - r * 3, r * 6, r * 6);
+  }
+  if (!sc.filter) for (const light of sc.extraLights ?? []) {
+    const p = P.project(light.dir);
+    if (!p) continue;
+    if (light.style === 'giant') drawPlanet(ctx, p.x, p.y, light.radius * P.k, seeingPx, sc.realTime, dpr, day, true);
+    else {
+      const r = Math.max(1.2 * dpr, seeingPx * .55), glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
+      glow.addColorStop(0, css(light.color, 1)); glow.addColorStop(1, css(light.color, 0));
+      ctx.fillStyle = glow; ctx.fillRect(p.x - r * 3, p.y - r * 3, r * 6, r * 6);
+    }
+  }
   // Blue planet.
   if (sc.targetDir && !sc.filter) {
     const p = P.project(sc.targetDir);
-    if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day);
+    if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day, sc.targetStyle === 'giant');
   }
   // Its moon: grey, too small to resolve.
   if (sc.moonDir && !sc.filter) {
@@ -200,13 +228,13 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
   return P;
 }
 
-function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seeingPx: number, now: number, dpr: number, day: number) {
+function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seeingPx: number, now: number, dpr: number, day: number, giant = false) {
   if (r < 1.5 * dpr) {
     const rr = Math.max(1.4 * dpr, seeingPx * 0.6);
     const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.5);
-    g.addColorStop(0, 'rgba(225,240,255,1)');
-    g.addColorStop(0.35, 'rgba(140,195,255,0.6)');
-    g.addColorStop(1, 'rgba(120,180,255,0)');
+    g.addColorStop(0, giant ? 'rgba(255,244,222,1)' : 'rgba(225,240,255,1)');
+    g.addColorStop(0.35, giant ? 'rgba(255,220,170,.6)' : 'rgba(140,195,255,0.6)');
+    g.addColorStop(1, giant ? 'rgba(255,220,170,0)' : 'rgba(120,180,255,0)');
     ctx.fillStyle = g;
     ctx.fillRect(x - rr * 2.5, y - rr * 2.5, rr * 5, rr * 5);
     return;
@@ -224,15 +252,15 @@ function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.arc(x, y, r, 0, TAU);
   ctx.clip();
   const ocean = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.1, x, y, r);
-  ocean.addColorStop(0, '#7ec8ff');
-  ocean.addColorStop(0.6, '#2f7fd0');
-  ocean.addColorStop(1, '#0d2c5a');
+  ocean.addColorStop(0, giant ? '#efe0bc' : '#7ec8ff');
+  ocean.addColorStop(0.6, giant ? '#c19b6d' : '#2f7fd0');
+  ocean.addColorStop(1, giant ? '#67503e' : '#0d2c5a');
   ctx.fillStyle = ocean;
   ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
   // Continents and cloud bands, slowly rotating.
   const rot = now / 60000;
   const rnd = mulberry32(99);
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < (giant ? 0 : 7); i++) {
     const lon = rnd() * TAU + rot;
     const lat = (rnd() - 0.5) * 1.6;
     const vis = Math.cos(lon);
@@ -244,7 +272,7 @@ function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
     ctx.ellipse(cx, cy, r * (0.18 + rnd() * 0.2) * Math.max(0.2, vis), r * (0.1 + rnd() * 0.14), 0, 0, TAU);
     ctx.fill();
   }
-  ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+  ctx.strokeStyle = giant ? 'rgba(99,65,38,.4)' : 'rgba(255,255,255,0.32)';
   ctx.lineWidth = r * 0.07;
   for (let i = -3; i <= 3; i++) {
     const yy = y + (i / 3.5) * r * 0.9;

@@ -33,9 +33,13 @@ export function leaveFlightPractice() {
   const settings = back.state.settings ?? s.settings;
   useGame.setState({
     ...back.state, practiceReturn: null,
+    skySightings: back.state.skySightings ?? [],
+    verificationHistory: back.state.verificationHistory ?? [],
+    readingPredictions: back.state.readingPredictions ?? {},
+    instrumentSetup: back.state.instrumentSetup ?? { pendulumScreen: false },
     training: s.training,
     tutorial: { ...(back.state.tutorial ?? { active: false, step: 0, flags: [], lessons: [] }), lessons: [...new Set([...(back.state.tutorial?.lessons ?? []), ...s.tutorial.lessons])] },
-    settings: { ...settings, flightSensitivity: s.settings.flightSensitivity, flightReducedMotion: s.settings.flightReducedMotion },
+    settings: { ...settings, flightSensitivity: s.settings.flightSensitivity, flightReducedMotion: s.settings.flightReducedMotion, skyReducedFlicker: s.settings.skyReducedFlicker },
   });
   clock.emit();
 }

@@ -19,6 +19,7 @@ export interface SkyOptions {
   /** Martian sky colours (chapter 9). */
   mars?: boolean;
   dpr: number;
+  reduceFlicker?: boolean;
 }
 
 export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene, catalog: CatalogStar[], land: Landscape | null, o: SkyOptions): Projector {
@@ -82,7 +83,7 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
       if (!P.projectXYZ(s[i * 3], s[i * 3 + 1], up, p) || p.x < -4 || p.y < -4 || p.x > w + 4 || p.y > h + 4) continue;
       // Scintillation grows near the horizon where the air path is longer.
       const air = 1 / Math.max(0.12, up);
-      const twinkle = 1 + Math.min(0.6, 0.12 * air) * Math.sin(tw * (7 + (i % 5)) + st.twinklePhase) * Math.sin(tw * 2.3 + i);
+      const twinkle = o.reduceFlicker ? 1 : 1 + Math.min(0.6, 0.12 * air) * Math.sin(tw * (7 + (i % 5)) + st.twinklePhase) * Math.sin(tw * 2.3 + i);
       const a = Math.max(0, Math.min(1, (lim - st.mag) / 2.2)) * twinkle;
       const r = Math.max(0.55, 1.9 - 0.32 * st.mag) * sizeK;
       const c = st.color;

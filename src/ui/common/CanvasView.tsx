@@ -19,6 +19,10 @@ interface Props {
   onPointerCancel?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   onWheel?: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   style?: React.CSSProperties;
+  tabIndex?: number;
+  role?: React.AriaRole;
+  'aria-label'?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLCanvasElement>) => void;
 }
 
 /** Device-pixel-ratio aware canvas that redraws every animation frame. */

@@ -153,8 +153,8 @@ with sync_playwright() as p:
         assert page.evaluate('Object.keys(__game.getState().readingPredictions).length') == 0
         page.get_by_role('dialog', name='Flight School', exact=True).get_by_role('button', name='Next', exact=True).click()
         assert page.evaluate("__game.getState().tutorial.step") > 0
-        if page.get_by_role('button', name='Close lesson', exact=True).count():
-            page.get_by_role('button', name='Close lesson', exact=True).click()
+        # Next opens the horizon lesson in an effect; await it before exiting.
+        page.get_by_role('button', name='Close lesson', exact=True).click()
         page.get_by_role('button', name='Exit tutorial', exact=True).click()
         page.get_by_role('button', name='Return to library', exact=True).click()
         restore_check(page)

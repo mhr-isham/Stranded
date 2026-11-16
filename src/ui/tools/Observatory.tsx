@@ -12,8 +12,7 @@ import { fmt } from '../../game/format';
 import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { paintSky, starRGB } from '../../render/paint';
-import { makeProjector } from '../../render/projection';
-import { drawScope, SEEING } from '../../render/telescope';
+import { drawScope, scopeProjector, SEEING } from '../../render/telescope';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Chart, unwrapDeg } from '../common/Chart';
@@ -34,8 +33,11 @@ import { GiantPanel } from './GiantPanel';
 import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
+import { isCloudy } from '../../game/survival';
+import { makeSkySighting, skyCode, skyDirection, skyKey, skyline, visibleSkyLights, type SkyRef } from '../../game/skyObservation';
+import { SkyExplorer, SkyNotebook } from './SkyExplorer';
 
-type Sel = { kind: 'star' } | { kind: 'target' } | { kind: 'relay' } | { kind: 'catalog'; i: number };
+type Sel = SkyRef;
 type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'giant' | 'stars' | 'micro' | 'moon';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -69,6 +71,20 @@ export function Observatory() {
   const calip = useRef({ x1: -15 * ARCSEC, x2: 15 * ARCSEC, dragging: 0 as 0 | 1 | 2 | 3, start: { x: 0, a: 0, b: 0 } });
   const scopeK = useRef(1);
   const fov = Math.pow(10, fovLog) * DEG;
+  const [labels, setLabels] = useState(false);
+  const [, refreshCamera] = useState(0);
+  const viewSize = useRef({ w: 1000, h: 600, dpr: 1 });
+  const rules = useMode();
+  const obscured = (at: number) => !!flareAt(sys, at) || (s.settings.survival && isCloudy(s.seed, at));
+  const skyLights = visibleSkyLights(sys, catalog, t, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land, obscured(t));
+  const panSky = (az: number, alt: number) => { cam.current.az += az * DEG; cam.current.alt = Math.max(-5 * DEG, Math.min(85 * DEG, cam.current.alt + alt * DEG)); lastMotion.current = performance.now(); refreshCamera((n) => n + 1); };
+  const zoomSky = (factor: number) => { cam.current.fov = Math.max(15 * DEG, Math.min(120 * DEG, cam.current.fov * factor)); refreshCamera((n) => n + 1); };
+  const selectLight = (ref: SkyRef) => {
+    if (!visibleSkyLights(sys, catalog, clock.t, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land, obscured(clock.t)).some((light) => light.key === skyKey(ref))) return;
+    setSel(ref); aim.current = { a: (Math.random() - .5) * .4 * DEG, b: (Math.random() - .5) * .4 * DEG };
+    if (ref.kind === 'target') flag('obs-sel-target');
+    sfx('click');
+  };
   // A rough night seen through the eyepiece earns the Codex card on seeing.
   useEffect(() => {
     if (mode === 'scope' && seeingFactor(useGame.getState(), clock.t) > 1.5) useGame.getState().unlock('codex', 'seeingAnom');
@@ -111,10 +127,7 @@ export function Observatory() {
   }, [mode, sel, fov]);
 
   const objDir = (sl: Sel, tt: number): Vec3 => {
-    if (sl.kind === 'star') return unit(topocentric(sys, 'star', tt, sys.site));
-    if (sl.kind === 'target') return unit(topocentric(sys, 'target', tt, sys.site));
-    if (sl.kind === 'relay') return unit(relayTopocentric(sys, tt, sys.site));
-    return catalog[sl.i].dir;
+    return skyDirection(sys, catalog, sl, tt);
   };
   const pointing = (tt: number): Vec3 | null => {
     if (!sel) return null;
@@ -131,9 +144,9 @@ export function Observatory() {
   const selLabel = (sl: Sel | null) => {
     if (!sl) return 'Nothing selected';
     if (sl.kind === 'star') return 'The star (our sun)';
-    if (sl.kind === 'target') return s.identified ? 'The blue planet' : 'Unknown light';
-    if (sl.kind === 'relay') return s.logs.includes('relay') ? 'The Halcyon relay' : 'A moving light';
-    return 'Unknown light';
+    if (sl.kind === 'target' && s.identified) return `The blue planet · ${skyCode(sys.seed, sl)}`;
+    if (sl.kind === 'relay' && s.logs.includes('relay')) return `The Halcyon relay · ${skyCode(sys.seed, sl)}`;
+    return skyCode(sys.seed, sl);
   };
 
   const frameNow = localFrame(sys, t, sys.site);
@@ -141,34 +154,63 @@ export function Observatory() {
   const starAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), frameNow).alt / DEG;
   const twilight = starAlt > -1 && starAlt < 8;
   const filter = sel?.kind === 'star';
+  const inspectable = (sl: Sel | null, at: number) => {
+    if (!sl || obscured(at)) return false;
+    const frame = localFrame(sys, at, sys.site), dir = objDir(sl, at), position = toHorizontal(dir, frame);
+    if (position.alt <= skyline(land, position.az)) return false;
+    if (sl.kind === 'relay' && !relayVisible(at)) return false;
+    if (mode === 'sky') return visibleSkyLights(sys, catalog, at, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land).some((light) => light.key === skyKey(sl));
+    const sun = toHorizontal(topocentric(sys, 'star', at, sys.site), frame).alt / DEG;
+    if (sl.kind === 'catalog' && sun >= -1.6) return false;
+    const center = pointing(at);
+    if (!center) return false;
+    const p = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }).project(dir);
+    return !!p && p.x >= 0 && p.y >= 0 && p.x <= viewSize.current.w && p.y <= viewSize.current.h;
+  };
+  const available = inspectable(sel, t);
+  const notebookAllowed = available && sel?.kind !== 'star' && starAlt < -1.6;
+  const logSighting = (note: string) => {
+    if (!sel || sel.kind === 'star' || !inspectable(sel, clock.t) || toHorizontal(topocentric(sys, 'star', clock.t, sys.site), localFrame(sys, clock.t, sys.site)).alt >= -1.6 * DEG) return false;
+    const ray = pointing(clock.t);
+    if (!ray) return false;
+    const sighting = makeSkySighting(skyKey(sel), skyCode(sys.seed, sel), clock.t, ray, mode === 'scope' ? 'scope' : 'wide', note);
+    if (!sighting) return false;
+    const current = useGame.getState(), previous = (current.skySightings ?? []).at(-1);
+    if (previous && previous.key === sighting.key && previous.at === sighting.at && previous.lon === sighting.lon && previous.lat === sighting.lat && previous.note === sighting.note) { toast('That paused pointing is already in your notebook.'); return false; }
+    current.set({ skySightings: [...(current.skySightings ?? []), sighting] });
+    toast(`${sighting.code}: sighting logged`); sfx('shutter'); return true;
+  };
+  const focusWide = () => {
+    if (!sel || obscured(clock.t)) return;
+    const p = toHorizontal(objDir(sel, clock.t), localFrame(sys, clock.t, sys.site));
+    if (p.alt <= skyline(land, p.az)) return;
+    cam.current.az = p.az; cam.current.alt = Math.max(-5 * DEG, Math.min(85 * DEG, p.alt)); refreshCamera((n) => n + 1);
+  };
+  const nudgeImage = (x: number, y: number) => { aim.current = { a: aim.current.a + x * fov * .06, b: aim.current.b + y * fov * .06 }; lastMotion.current = performance.now(); refreshCamera((n) => n + 1); };
+  const selectionCue = () => {
+    if (!sel || !available) return 'The selected light is outside the observable field or obscured.';
+    const variation = sel.kind === 'catalog' ? 'Brightness variation is visible (also provided as a text cue).' : 'Brightness is comparatively steady.';
+    if (mode === 'sky') { const light = skyLights.find((v) => v.key === skyKey(sel)); return `${light?.tint ?? 'Selected light'} · ${light?.variation ?? ''}.`; }
+    const center = pointing(t)!;
+    const projection = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }), point = projection.project(objDir(sel, t))!;
+    const dx = point.x - viewSize.current.w / 2, dy = point.y - viewSize.current.h / 2, tolerance = Math.max(12 * viewSize.current.dpr, viewSize.current.w * .04);
+    const alignment = Math.abs(dx) < tolerance && Math.abs(dy) < tolerance ? 'Near the crosshair.' : `${Math.abs(dx) >= tolerance ? dx < 0 ? 'Left of crosshair. ' : 'Right of crosshair. ' : ''}${Math.abs(dy) >= tolerance ? dy < 0 ? 'Above crosshair.' : 'Below crosshair.' : ''}`;
+    if (sel.kind === 'star') return `Solar-filter disk. ${alignment}`;
+    let image = 'Point-like image at this scale.';
+    if (sel.kind === 'target' || sel.kind === 'giant') {
+      const body = sel.kind === 'giant' ? sys.giant! : sys.target;
+      const radius = Math.asin(body.radius / Math.hypot(...topocentric(sys, sel.kind, t, sys.site))) * projection.k;
+      image = radius >= Math.max(1.5 * viewSize.current.dpr, SEEING * seeingFactor(s, t) * projection.k) ? 'Resolved disk at this scale.' : 'A point-like or blurred image at this scale.';
+    }
+    return `${image} ${variation} ${alignment}`;
+  };
 
   // Pick the light nearest a tap in the wide view.
   const pick = (px: number, py: number, w: number, h: number) => {
-    const camera = { ...cam.current, w, h };
-    const P = makeProjector(camera);
-    const f = localFrame(sys, clock.t, sys.site);
-    const toLoc = (v: Vec3): [number, number, number] => {
-      const u = unit(v);
-      return [u[0] * f.east[0] + u[1] * f.east[1] + u[2] * f.east[2], u[0] * f.north[0] + u[1] * f.north[1] + u[2] * f.north[2], u[0] * f.up[0] + u[1] * f.up[1] + u[2] * f.up[2]];
-    };
     let best: Sel | null = null;
-    let bd = 30 * (window.devicePixelRatio || 1);
-    const test = (sl: Sel, v: Vec3) => {
-      const p = P.project(toLoc(v));
-      if (!p || toLoc(v)[2] < 0) return;
-      const d = Math.hypot(p.x - px, p.y - py);
-      if (d < bd) [bd, best] = [d, sl];
-    };
-    test({ kind: 'star' }, topocentric(sys, 'star', clock.t, sys.site));
-    test({ kind: 'target' }, topocentric(sys, 'target', clock.t, sys.site));
-    if (relayVisible(clock.t)) test({ kind: 'relay' }, relayTopocentric(sys, clock.t, sys.site));
-    catalog.forEach((c, i) => c.mag < 2.6 && test({ kind: 'catalog', i }, c.dir));
-    if (best) {
-      setSel(best);
-      if ((best as Sel).kind === 'target') flag('obs-sel-target');
-      aim.current = { a: (Math.random() - 0.5) * 0.4 * DEG, b: (Math.random() - 0.5) * 0.4 * DEG };
-      sfx('click');
-    }
+    let bd = 30 * Math.min(2, window.devicePixelRatio || 1);
+    for (const light of visibleSkyLights(sys, catalog, clock.t, { ...cam.current, w, h }, land, obscured(clock.t))) { const distance = Math.hypot(light.x - px, light.y - py); if (distance < bd) [bd, best] = [distance, light.ref]; }
+    if (best) selectLight(best);
   };
 
   /** The relay shows only in a dark sky while it is still in sunlight, above the horizon. */
@@ -180,6 +222,7 @@ export function Observatory() {
   }
 
   const identify = () => {
+    if (!inspectable(sel, clock.t)) return toast('Bring an observable light into the telescope first.');
     if (sel?.kind === 'target') {
       useGame.setState({ identified: true });
       useGame.getState().unlock('codex', 'twinkle');
@@ -188,8 +231,8 @@ export function Observatory() {
       checkMissions();
       useGame.getState().say(ECHO.track);
     } else {
-      toast('It flickers and stays a point however far you zoom — a star.');
-      sfx('bad');
+      toast(sel?.kind === 'giant' ? 'An extended disk, but this candidate has different visible features. Keep comparing your observations.' : 'Target not confirmed. Compare the point-like image, brightness variation and your recorded sightings.');
+      sfx('detent');
     }
   };
 
@@ -198,6 +241,8 @@ export function Observatory() {
       <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
+            tabIndex={0} role="img" aria-label="Wide sky; arrow keys pan and plus or minus zoom"
+            onKeyDown={(e) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(e.key)) { e.preventDefault(); if (e.key === 'ArrowLeft') panSky(-5, 0); else if (e.key === 'ArrowRight') panSky(5, 0); else if (e.key === 'ArrowUp') panSky(0, 5); else if (e.key === 'ArrowDown') panSky(0, -5); else zoomSky(e.key === '+' || e.key === '=' ? .8 : 1.25); } }}
             onPointerDown={(e) => {
               (e.target as Element).setPointerCapture(e.pointerId);
               ptr.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -230,11 +275,18 @@ export function Observatory() {
               }
               gesture.current = null;
             }}
+            onPointerCancel={(e) => { ptr.current.delete(e.pointerId); gesture.current = null; }}
             onWheel={(e) => (cam.current.fov = Math.max(15 * DEG, Math.min(120 * DEG, cam.current.fov * (e.deltaY > 0 ? 1.1 : 0.9))))}
             draw={({ ctx, w, h, dpr, now, canvas }) => {
+              viewSize.current = { w, h, dpr };
               setInstrument('scope', now - lastMotion.current < 120 ? 0.6 : 0);
               const camera = { az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w, h };
-              const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { showEcliptic: showEcl });
+              const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { showEcliptic: showEcl, reduceFlicker: !!s.settings.skyReducedFlicker });
+              if (obscured(clock.t)) {
+                ctx.fillStyle = flareAt(sys, clock.t) ? 'rgba(40,8,12,.92)' : 'rgba(54,61,73,.97)'; ctx.fillRect(0, 0, w, h);
+                ctx.fillStyle = '#e2e8f3'; ctx.textAlign = 'center'; ctx.font = `600 ${14 * dpr}px Inter`;
+                ctx.fillText(flareAt(sys, clock.t) ? 'Flare glare — wait for clear observing conditions' : 'Cloud cover — comparison lights are obscured', w / 2, h / 2); return;
+              }
               // Let Flight School point at the blue planet.
               const tp = P.project(scene.target);
               if (tp && scene.target[2] > 0 && tp.x > 0 && tp.y > 0 && tp.x < w && tp.y < h) {
@@ -245,7 +297,7 @@ export function Observatory() {
               // Selection ring and labels.
               const label = (d: [number, number, number], text: string, color: string) => {
                 const p = P.project(d);
-                if (!p || d[2] < 0) return;
+                if (!p || Math.asin(Math.max(-1, Math.min(1, d[2]))) <= skyline(land, Math.atan2(d[0], d[1]))) return;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.5 * dpr;
                 ctx.beginPath();
@@ -256,30 +308,22 @@ export function Observatory() {
                 ctx.textAlign = 'left';
                 ctx.fillText(text, p.x + 16 * dpr, p.y + 4 * dpr);
               };
-              if (s.identified) label(scene.target, 'Blue planet', 'rgba(108,196,255,0.9)');
+              const visible = visibleSkyLights(sys, catalog, clock.t, camera, land);
+              if (s.identified && sel?.kind !== 'target' && visible.some((v) => v.ref.kind === 'target')) label(scene.target, 'Blue planet', 'rgba(108,196,255,0.9)');
+              if (labels) for (const light of visible.filter((v) => (!sel || v.key !== skyKey(sel)) && !(s.identified && v.ref.kind === 'target') && !(s.logs.includes('relay') && v.ref.kind === 'relay'))) label(toLocalDir(light.dir, scene.frame), `${light.variation === 'steadier' ? '—' : '≈'} ${light.code}`, 'rgba(218,229,248,.85)');
               // The Halcyon relay: a faint light that moves across the sky in minutes.
               if (relayVisible(clock.t)) {
                 const rd = toLocalDir(relayTopocentric(sys, clock.t, sys.site), scene.frame);
                 const rp = P.project(rd);
-                if (rp && rd[2] > 0) {
+                if (rp && Math.asin(Math.max(-1, Math.min(1, rd[2]))) > skyline(land, Math.atan2(rd[0], rd[1]))) {
                   ctx.fillStyle = 'rgba(235,240,255,0.85)';
                   ctx.beginPath();
                   ctx.arc(rp.x, rp.y, 1.4 * dpr, 0, Math.PI * 2);
                   ctx.fill();
-                  if (s.logs.includes('relay')) label(rd, 'Halcyon relay', 'rgba(181,156,255,0.9)');
+                  if (s.logs.includes('relay') && sel?.kind !== 'relay') label(rd, 'Halcyon relay', 'rgba(181,156,255,0.9)');
                 }
               }
-              if (sel) {
-                const d =
-                  sel.kind === 'star'
-                    ? scene.sun
-                    : sel.kind === 'target'
-                      ? scene.target
-                      : sel.kind === 'relay'
-                        ? toLocalDir(relayTopocentric(sys, clock.t, sys.site), scene.frame)
-                        : ([scene.stars[sel.i * 3], scene.stars[sel.i * 3 + 1], scene.stars[sel.i * 3 + 2]] as [number, number, number]);
-                label(d, '', 'rgba(255,196,107,0.95)');
-              }
+              if (sel && visible.some((v) => v.key === skyKey(sel))) label(toLocalDir(objDir(sel, clock.t), scene.frame), skyCode(sys.seed, sel), 'rgba(255,196,107,0.95)');
               // Compass.
               ctx.fillStyle = 'rgba(255,255,255,0.55)';
               ctx.font = `600 ${11 * dpr}px Inter`;
@@ -292,6 +336,8 @@ export function Observatory() {
           />
         ) : (
           <CanvasView
+            tabIndex={0} role="img" aria-label="Telescope; arrow keys nudge the image and plus or minus zoom"
+            onKeyDown={(e) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(e.key)) { e.preventDefault(); if (e.key === 'ArrowLeft') nudgeImage(1, 0); else if (e.key === 'ArrowRight') nudgeImage(-1, 0); else if (e.key === 'ArrowUp') nudgeImage(0, -1); else if (e.key === 'ArrowDown') nudgeImage(0, 1); else setFovLog((v) => Math.max(Math.log10(.015), Math.min(Math.log10(4), v + (e.key === '+' || e.key === '=' ? -.1 : .1)))); } }}
             onPointerDown={(e) => {
               (e.target as Element).setPointerCapture(e.pointerId);
               const p = canvasPoint(e);
@@ -323,8 +369,10 @@ export function Observatory() {
               }
             }}
             onPointerUp={() => (calip.current.dragging = 0)}
+            onPointerCancel={() => (calip.current.dragging = 0)}
             onWheel={(e) => setFovLog((v) => Math.max(Math.log10(0.015), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
             draw={({ ctx, w, h, dpr, now }) => {
+              viewSize.current = { w, h, dpr };
               setInstrument('scope', now - lastMotion.current < 120 ? 0.5 : 0);
               const tt = clock.t;
               const center = pointing(tt) ?? [1, 0, 0];
@@ -349,6 +397,12 @@ export function Observatory() {
                   skyBrightness: Math.max(0, Math.min(1, (sunAlt + 10) / 14)),
                   seeing: SEEING * seeingFactor(useGame.getState(), tt),
                   realTime: now,
+                  brightStars: catalog,
+                  reduceFlicker: !!s.settings.skyReducedFlicker,
+                  extraLights: [
+                    ...(sys.giant ? [{ dir: unit(topocentric(sys, 'giant', tt, sys.site)), radius: Math.asin(sys.giant.radius / Math.hypot(...topocentric(sys, 'giant', tt, sys.site))), style: 'giant' as const, color: [255, 236, 200] as [number, number, number] }] : []),
+                    ...(relayVisible(tt) ? [{ dir: unit(relayTopocentric(sys, tt, sys.site)), radius: 0, color: [235, 240, 255] as [number, number, number] }] : []),
+                  ],
                   filter,
                   targetInFront: sys.features.inner && Math.hypot(...tgtV) < Math.hypot(...sunV),
                   shimmer: { x: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 2.1) * Math.sin(ts * 0.7), y: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 1.7 + 1) },
@@ -356,15 +410,27 @@ export function Observatory() {
                 dpr,
               );
               scopeK.current = P.k;
-              // Below the horizon?
-              const alt = toHorizontal(center, f).alt;
-              if (alt < 0) {
+              if (obscured(tt)) {
                 ctx.fillStyle = 'rgba(10,8,6,0.94)';
                 ctx.fillRect(0, 0, w, h);
                 ctx.fillStyle = '#c9a';
                 ctx.font = `600 ${15 * dpr}px Inter`;
                 ctx.textAlign = 'center';
-                ctx.fillText('Below the horizon — wait for it to rise', w / 2, h / 2);
+                ctx.fillText('Observing conditions obscure the field', w / 2, h / 2);
+              } else {
+                // Mask the actual ridge through the field, including when the
+                // crosshair is above it but an object is below it.
+                const below = (x: number, y: number) => { const p = toHorizontal(P.unproject(x, y), f); return p.alt <= skyline(land, p.az); };
+                const ridge: { x: number; y: number }[] = [];
+                if (toHorizontal(center, f).alt < Math.atan(sys.hillHeight / 5200) + 4 * DEG + fov * h / w) for (let i = 0; i <= 24; i++) {
+                  const x = w * i / 24;
+                  let lo = 0, hi = h;
+                  if (below(x, 0)) hi = 0;
+                  else if (!below(x, h)) lo = h;
+                  else for (let j = 0; j < 11; j++) { const mid = (lo + hi) / 2; if (below(x, mid)) hi = mid; else lo = mid; }
+                  ridge.push({ x, y: (lo + hi) / 2 });
+                }
+                if (ridge.some((p) => p.y < h)) { ctx.fillStyle = '#100e0e'; ctx.beginPath(); ctx.moveTo(0, h); for (const p of ridge) ctx.lineTo(p.x, p.y); ctx.lineTo(w, h); ctx.closePath(); ctx.fill(); }
               }
               // Reticle.
               ctx.strokeStyle = 'rgba(255,90,90,0.85)';
@@ -419,7 +485,8 @@ export function Observatory() {
               <span className="muted" style={{ fontSize: 13 }}>Field of view</span>
               <span className="mono">{fov > 0.1 * DEG ? `${fmt(fov / DEG, 2)}°` : `${fmt(fov / ARCSEC, 0)}″`}</span>
             </div>
-            <input type="range" min={Math.log10(0.015)} max={Math.log10(4)} step={0.01} value={fovLog} onChange={(e) => setFovLog(Number(e.target.value))} />
+            <input type="range" aria-label="Telescope field of view" aria-valuetext={`${Math.pow(10, fovLog).toFixed(3)} degrees`} min={Math.log10(0.015)} max={Math.log10(4)} step={0.01} value={fovLog} onChange={(e) => setFovLog(Number(e.target.value))} />
+            <div className="row sky-pan"><button className="btn small" aria-label="Move telescope image left" onClick={() => nudgeImage(1, 0)}>◀</button><button className="btn small" aria-label="Move telescope image up" onClick={() => nudgeImage(0, -1)}>▲</button><button className="btn small" aria-label="Move telescope image down" onClick={() => nudgeImage(0, 1)}>▼</button><button className="btn small" aria-label="Move telescope image right" onClick={() => nudgeImage(-1, 0)}>▶</button></div>
             <div className="faint hide-phone" style={{ fontSize: 12 }}>Drag to fine-tune the pointing. The drive keeps tracking your target.</div>
           </div>
         )}
@@ -448,21 +515,18 @@ export function Observatory() {
         </div>
 
         {tab === 'sky' && (
-          <div className="panel panel-pad stack">
+          <>
+          <SkyExplorer lights={skyLights} selected={sel} known={s.identified} wide={mode === 'sky'} az={cam.current.az} alt={cam.current.alt} field={cam.current.fov} labels={labels} onLabels={() => setLabels(!labels)} pan={panSky} zoom={zoomSky} select={selectLight} focus={focusWide} coaching={rules.coaching} />
+          <div className="panel panel-pad stack" aria-label="Selected light observations">
             <b>{selLabel(sel)}</b>
-            {sel && <div className="muted" style={{ fontSize: 13 }}>Altitude {fmt(altOf(sel) / DEG, 1)}°</div>}
+            {sel && available && <div className="muted" style={{ fontSize: 13 }}>Altitude {fmt(altOf(sel) / DEG, 1)}°</div>}
+            {sel && <div className="callout tip" role="status">{selectionCue()}</div>}
             <div className="muted" style={{ fontSize: 13 }}>
               Drag to look around, pinch or scroll to zoom, tap a light to select it. Then open the telescope.
             </div>
-            {!s.identified && (
-              <div className="hint">
-                Find the blue planet: at night, watch the bright lights. Stars twinkle — planets shine steadily. In the telescope at high zoom a planet
-                shows a disk.
-              </div>
-            )}
-            {sel?.kind === 'relay' && <RelayInfo />}
+            {sel?.kind === 'relay' && available && <RelayInfo />}
             {mode === 'scope' && sel && sel.kind !== 'star' && sel.kind !== 'relay' && !s.identified && (
-              <button className="btn primary" onClick={identify} data-tut="obs-identify">
+              <button className="btn primary" disabled={!available} onClick={identify} data-tut="obs-identify">
                 This is the blue planet
               </button>
             )}
@@ -481,15 +545,18 @@ export function Observatory() {
               <input type="checkbox" checked={showEcl} onChange={(e) => setShowEcl(e.target.checked)} /> Show the ecliptic (the path of the star)
             </label>
           </div>
+          <SkyNotebook selectedKey={sel ? skyKey(sel) : undefined} code={sel ? skyCode(sys.seed, sel) : ''} canLog={notebookAllowed} reason={!sel ? 'Select a comparison light to begin.' : sel.kind === 'star' ? 'Use the Year tab for solar-filter star-position observations.' : !available ? 'Bring the selected light into an unobscured field.' : 'A background star field is needed for these comparison notes.'} onLog={logSighting} />
+          </>
         )}
 
         {tab === 'year' && sys.features.locked && (
           <YearPanel
             locked
             onPoint={() => {}}
-            canLog={!flareAt(sys, clock.t)}
-            reason="A flare is washing out the sky. Wait for it to fade."
+            canLog={!obscured(t)}
+            reason="Clouds or flare glare obscure the reference stars. Wait for clear observing conditions."
             onLog={() => {
+              if (obscured(clock.t)) return;
               // The reference star's hour angle: how far the sky has turned (with a small reading error).
               const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
               const lastObs = useGame.getState().starObs.at(-1);
@@ -503,11 +570,11 @@ export function Observatory() {
         {tab === 'year' && !sys.features.locked && (
           <YearPanel
             onPoint={() => (pointAt('star', 2), flag('scope-star'))}
-            canLog={mode === 'scope' && sel?.kind === 'star' && twilight}
-            reason={sel?.kind !== 'star' ? 'Select the star and open the telescope (the solar filter fits automatically).' : mode !== 'scope' ? 'Open the telescope.' : !twilight ? 'Wait for sunrise or sunset: the tracker needs the star low in a twilight sky to see reference stars.' : ''}
+            canLog={mode === 'scope' && sel?.kind === 'star' && twilight && !obscured(t)}
+            reason={obscured(t) ? 'Clouds or flare glare obscure the field. Wait for clear observing conditions.' : sel?.kind !== 'star' ? 'Select the star and open the telescope (the solar filter fits automatically).' : mode !== 'scope' ? 'Open the telescope.' : !twilight ? 'Wait for sunrise or sunset: the tracker needs the star low in a twilight sky to see reference stars.' : ''}
             onLog={() => {
               const c = pointing(clock.t);
-              if (!c) return;
+              if (!c || obscured(clock.t)) return;
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               const v = eclLon(c);
@@ -534,9 +601,10 @@ export function Observatory() {
             <button
               data-tut="micro-log"
               className="btn primary"
-              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified)}
+              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified && !obscured(t))}
               onClick={() => {
                 const a = Math.abs(calip.current.x2 - calip.current.x1);
+                if (obscured(clock.t)) return toast('The field is obscured. Wait for clear observing conditions.');
                 const { system: sysNow } = currentWorld();
                 const altNow = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site)).alt;
                 if (altNow < 0) return toast('The blue planet is below the horizon — wait for it to rise.');

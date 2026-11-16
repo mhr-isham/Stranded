@@ -202,6 +202,18 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .measurement-notes summary, .measurement-help summary { cursor: pointer; color: var(--blue); }
 .measurement-notes > div { margin-top: 5px; }
 .measurement-help p { font-size: 12px; margin: 8px 0 0; }
+.sky-explorer, .sky-notebook { font-size: 13px; }
+.sky-explorer .faint, .sky-notebook .faint { font-size: 11px; }
+.sky-pan .btn { flex: 1; min-width: 36px; }
+.sky-light-list { max-height: 260px; overflow: auto; display: grid; gap: 5px; margin-top: 8px; }
+.sky-light-list .btn { display: grid; gap: 3px; text-align: left; white-space: normal; }
+.sky-light-list .btn[aria-pressed="true"] { border-color: var(--amber); }
+.sky-light-list span { color: var(--muted); font-size: 11px; }
+.sky-notebook .field { min-width: 0; }
+.sky-notebook .input { width: 100%; }
+.sighting-plot { width: 100%; border-radius: 10px; background: #0b1424; }
+.sighting-plot [role="button"] { cursor: pointer; }
+[data-tut="obs-stage"] canvas:focus-visible { outline: 2px solid var(--blue); outline-offset: -4px; }
 .paid-checks .panel-inset { padding: 10px; font-size: 12px; overflow-wrap: anywhere; }
 .paid-checks ul { margin: 0; padding-left: 18px; }
 .paid-checks li + li { margin-top: 6px; }

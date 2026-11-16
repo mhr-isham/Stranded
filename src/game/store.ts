@@ -17,6 +17,7 @@ import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
 import type { VerificationRecord } from './verification';
+import type { SkySighting } from './skyObservation';
 
 export type Screen =
   | 'map'
@@ -70,6 +71,7 @@ export interface Settings {
   rulesetVersion?: number;
   flightSensitivity?: number;
   flightReducedMotion?: boolean;
+  skyReducedFlicker?: boolean;
   flightPractice?: FlightLeg;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
@@ -133,6 +135,7 @@ export interface GameState {
   readings: Reading[];
   sheet: Partial<Record<PrimaryKey, Estimate>>;
   starObs: TimedValue[]; // star longitude against background stars (rad)
+  skySightings: SkySighting[];
   trackOn: boolean;
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
@@ -265,6 +268,7 @@ const initial = {
   readings: [] as Reading[],
   sheet: {},
   starObs: [],
+  skySightings: [] as SkySighting[],
   trackOn: false,
   track: [],
   moonTrackOn: false,

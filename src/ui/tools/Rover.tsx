@@ -131,6 +131,7 @@ export function Rover() {
                   starColor: [255, 255, 255],
                   targetDir: showB ? cap.dirB : cap.dirA,
                   targetRadius: cap.radius,
+                  targetStyle: sys.giant ? 'giant' : 'blue',
                   moonDir: null,
                   moonRadius: 0,
                   skyBrightness: 0,
