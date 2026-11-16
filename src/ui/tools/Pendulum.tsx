@@ -24,8 +24,10 @@ import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice
 import { toast } from '../common/widgets';
 
 import { pendulumReading } from '../../game/pendulumFeedback';
-import { GravityMeaning, TimingComparison } from './PendulumFeedback';
+import { observeSwingMotion, swingMotion, type PendulumTechnique } from '../../game/pendulumTechnique';
+import { GravityMeaning, TimingComparison, TechniqueReview } from './PendulumFeedback';
 
+let releaseSerial = 0;
 const BOB_R = 0.025; // m
 
 /** The wind gauge by the rig: a careful player checks it before timing. */
@@ -69,13 +71,15 @@ export function Pendulum() {
   const [taps, setTaps] = useState(0);
   const [running, setRunning] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [ask, setAsk] = useState<null | { time: number; environment: MeasurementEnvironment }>(null);
+  const [ask, setAsk] = useState<null | { time: number; environment: MeasurementEnvironment; technique: PendulumTechnique }>(null);
   const [nInput, setNInput] = useState('');
-  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number; amp: number; environment: MeasurementEnvironment }>(null);
+  const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number; amp: number; environment: MeasurementEnvironment; technique: PendulumTechnique }>(null);
 
-  const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, releaseAngle: 0, trail: [] as { x: number; y: number }[] });
-  const watch = useRef({ start: 0, running: false });
+  const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, releaseAngle: 0, releaseId: '', trail: [] as { x: number; y: number }[] });
+  const watch = useRef({ start: 0, running: false, motion: swingMotion() });
+  const timingTechnique = useRef<PendulumTechnique>({ source: 'manual', releaseId: '', angle: 0, turns: 0 });
   const timingConditions = useRef<MeasurementEnvironment | null>(null);
   const screen = !!useGame((s) => s.instrumentSetup?.pendulumScreen);
 
@@ -90,6 +94,11 @@ export function Pendulum() {
   }, []);
 
   useEffect(() => setLRead(null), [nominal]);
+  useEffect(() => {
+    if (!celebrate) return;
+    const timer = setTimeout(() => setCelebrate(false), 3200);
+    return () => clearTimeout(timer);
+  }, [celebrate]);
 
   // Stopwatch display.
   useEffect(() => {
@@ -123,7 +132,8 @@ export function Pendulum() {
     if (!watch.current.running) {
       const s = useGame.getState();
       timingConditions.current = { instrument: 'pendulum', at: clock.t, rawValue: 0, wind: { speed: windAt(s, clock.t), protection: s.instrumentSetup?.pendulumScreen ? 'windscreen' : ANOMALIES[s.settings.difficulty].announce === 'corrected' ? 'echo' : 'none' } };
-      watch.current = { start: performance.now() + lag, running: true };
+      watch.current = { start: performance.now() + lag, running: true, motion: swingMotion(phys.current.om) };
+      timingTechnique.current = { source: 'manual', releaseId: phys.current.releaseId, angle: phys.current.releaseAngle, turns: 0 };
       setTaps(0);
       setElapsed(0);
       setRunning(true);
@@ -138,7 +148,7 @@ export function Pendulum() {
       setNInput(taps ? String(taps) : '');
       const environment = timingConditions.current!;
       const endSpeed = windAt(useGame.getState(), clock.t);
-      setAsk({ time, environment: { ...environment, wind: { ...environment.wind!, endSpeed, changed: Math.abs(endSpeed - environment.wind!.speed) > .1 } } });
+      setAsk({ time, technique: { ...timingTechnique.current, turns: watch.current.motion.turns }, environment: { ...environment, wind: { ...environment.wind!, endSpeed, changed: Math.abs(endSpeed - environment.wind!.speed) > .1 } } });
       flag('pend-timed');
       sfx('click');
     }
@@ -166,6 +176,7 @@ export function Pendulum() {
     phys.current.th = amp * DEG;
     phys.current.om = 0;
     phys.current.releaseAngle = amp;
+    phys.current.releaseId = `${Date.now()}:${++releaseSerial}`;
     phys.current.swinging = true;
     phys.current.trail = [];
     sfx('metal');
@@ -213,6 +224,7 @@ export function Pendulum() {
             if (Math.abs(phys.current.th) > 0.5 * DEG) {
               phys.current.om = 0;
               phys.current.releaseAngle = Math.abs(phys.current.th / DEG);
+              phys.current.releaseId = `${Date.now()}:${++releaseSerial}`;
               phys.current.swinging = true;
               phys.current.trail = [];
               sfx('metal');
@@ -252,6 +264,7 @@ export function Pendulum() {
                 const k4o = f(P.th + hstep * k3t);
                 P.th += (hstep / 6) * (k1t + 2 * k2t + 2 * k3t + k4t);
                 P.om += (hstep / 6) * (k1o + 2 * k2o + 2 * k3o + k4o);
+                if (watch.current.running) observeSwingMotion(watch.current.motion, P.om);
               }
             }
             const { px, py, ppm } = layout(w, h);
@@ -359,6 +372,7 @@ export function Pendulum() {
             void now;
           }}
         />
+        {celebrate && <div className="panel panel-pad pendulum-milestone" role="status" aria-label="Twenty-swing celebration"><b>✦ Twenty-swing observation kept</b><div>Technique milestone · cosmetic · 0 score points</div></div>}
         <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="pend-watch">
           <div className="pendulum-clock" aria-label="Pendulum clock status">
             <b>Rig &amp; watch: real time</b>
@@ -422,6 +436,7 @@ export function Pendulum() {
             release angles make the swing slower than the simple formula predicts.
           </div>
           <Formula>g = 4π² L / T²,  T = time / N</Formula>
+          <div className="faint">Manual start/stop and swing counting · mouse, touch or keyboard</div>
           <TimingComparison period={result?.T ?? latest?.pendulum?.period} swings={result?.N ?? latest?.pendulum?.swings} source={result ? 'Your current timing' : 'Your latest kept timing'} />
           <WindGauge />
         </div>
@@ -455,9 +470,12 @@ export function Pendulum() {
               <button
                 className="btn primary"
                 onClick={() => {
-                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T, swings: result.N, time: result.time }, environment: result.environment });
+                  const already = (useGame.getState().pendulumMilestones ?? []).includes('twentySwings');
+                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T, swings: result.N, time: result.time, technique: result.technique }, environment: result.environment });
                   setResult(null);
-                  sfx('good');
+                  const earned = !already && useGame.getState().pendulumMilestones.includes('twentySwings');
+                  if (earned) setCelebrate(true);
+                  sfx(earned ? 'unlock' : 'good');
                 }}
               >
                 Keep reading
@@ -475,6 +493,7 @@ export function Pendulum() {
           <SendReadings k="g" tut="pend-send" />
           {(estimate || latest) && <GravityMeaning value={(estimate ?? latest)!.value} sigma={estimate?.sigma} source={estimate ? 'Your progress-sheet estimate' : 'Your latest kept reading'} />}
         </div>
+        <TechniqueReview />
         <ReadingPredictionPractice kind="pendulum" currentLength={lRead} resultPending={!!result || running || !!ask} />
         {keptG.length > 0 && !running && !ask && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
       </div>
@@ -499,7 +518,7 @@ export function Pendulum() {
                 const N = Number(nInput);
                 const reading = lRead === null ? null : pendulumReading(lRead, ask.time, N);
                 if (!reading) return;
-                setResult({ N, T: reading.period, time: ask.time, L: lRead!, amp: phys.current.releaseAngle, g: reading.gravity, environment: { ...ask.environment, rawValue: reading.gravity } });
+                setResult({ N, T: reading.period, time: ask.time, L: lRead!, amp: ask.technique.angle, technique: ask.technique, g: reading.gravity, environment: { ...ask.environment, rawValue: reading.gravity } });
                 setAsk(null);
                 flag('pend-result');
               }}

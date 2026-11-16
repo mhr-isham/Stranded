@@ -17,6 +17,7 @@ import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
 import type { VerificationRecord } from './verification';
+import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
 import type { SkySighting } from './skyObservation';
 
 export type Screen =
@@ -43,7 +44,7 @@ export interface Reading {
   kept: boolean;
   note: string;
   /** Observed quantities retained for optional prediction training. */
-  pendulum?: { length: number; period: number; swings?: number; time?: number };
+  pendulum?: { length: number; period: number; swings?: number; time?: number; technique?: PendulumTechnique };
   environment?: MeasurementEnvironment;
 }
 
@@ -136,6 +137,7 @@ export interface GameState {
   sheet: Partial<Record<PrimaryKey, Estimate>>;
   starObs: TimedValue[]; // star longitude against background stars (rad)
   skySightings: SkySighting[];
+  pendulumMilestones: string[];
   trackOn: boolean;
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
@@ -269,6 +271,7 @@ const initial = {
   sheet: {},
   starObs: [],
   skySightings: [] as SkySighting[],
+  pendulumMilestones: [] as string[],
   trackOn: false,
   track: [],
   moonTrackOn: false,
@@ -365,7 +368,11 @@ export const useGame = create<GameState>()(
         });
       },
       addReading: (r) =>
-        set((s) => ({ readings: [...s.readings, { ...r, id: String(nextId++), kept: true, note: r.note ?? '' }] })),
+        set((s) => {
+          const reading: Reading = { ...r, id: String(nextId++), kept: true, note: r.note ?? '' };
+          const milestones = s.pendulumMilestones ?? [];
+          return { readings: [...s.readings, reading], pendulumMilestones: earnsTwentySwings(reading) && !milestones.includes('twentySwings') ? [...milestones, 'twentySwings'] : milestones };
+        }),
       toggleReading: (id) => set((s) => ({ readings: s.readings.map((r) => (r.id === id ? { ...r, kept: !r.kept } : r)) })),
       removeReading: (id) => set((s) => ({ readings: s.readings.filter((r) => r.id !== id) })),
       setSheet: (k, e) =>

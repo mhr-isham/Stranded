@@ -34,6 +34,7 @@ export function leaveFlightPractice() {
   useGame.setState({
     ...back.state, practiceReturn: null,
     skySightings: back.state.skySightings ?? [],
+    pendulumMilestones: back.state.pendulumMilestones ?? [],
     verificationHistory: back.state.verificationHistory ?? [],
     readingPredictions: back.state.readingPredictions ?? {},
     instrumentSetup: back.state.instrumentSetup ?? { pendulumScreen: false },

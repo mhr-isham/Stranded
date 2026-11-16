@@ -521,3 +521,8 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .timing-comparison { table-layout: fixed; width: 100%; font-size: 11px; }
 .timing-comparison th, .timing-comparison td { padding: 6px 3px; overflow-wrap: anywhere; }
 .timing-comparison [aria-label="Your swing count"] { background: rgba(108,196,255,.1); }
+
+.pendulum-milestone { position: absolute; z-index: 8; top: calc(var(--hud-h) + var(--safe-top) + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(100% - 20px)); text-align: center; border-color: var(--amber); box-shadow: 0 0 22px rgba(255,196,107,.2); pointer-events: none; font-size: 13px; }
+.pendulum-milestone div { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.technique-badge { border: 1px solid var(--amber); border-radius: 8px; padding: 8px; color: var(--amber); font-size: 12px; }
+.technique-badge span { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }

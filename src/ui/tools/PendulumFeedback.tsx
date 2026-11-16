@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { comparableTimings, controlledTiming } from '../../game/pendulumTechnique';
+import { useGame } from '../../game/store';
 import { EARTH_GRAVITY, earthGravityComparison, swingTimingBudget } from '../../game/pendulumFeedback';
 import { sig } from '../../game/format';
 import { Formula } from '../common/sheetBits';
@@ -41,4 +43,27 @@ export function GravityMeaning({ value, sigma, source }: { value: number; sigma?
       <Formula>W = mg,  W_here / W_Earth = g_here / g_Earth</Formula>
     </div>
   </details>;
+}
+
+/** Requested review of recorded technique; no true gravity or correctness grade. */
+export function TechniqueReview() {
+  const s = useGame(), timings = comparableTimings(s.readings), latest = s.readings.filter((r) => r.kept && r.key === 'g' && r.pendulum).at(-1);
+  const stated = s.sheet.g && Number.isFinite(s.sheet.g.sigma) && s.sheet.g.sigma > 0;
+  const earned = (s.pendulumMilestones ?? []).includes('twentySwings');
+  const periods = timings.map((r) => r.pendulum!.period);
+  return <section className="panel panel-pad stack" aria-label="Pendulum technique">
+    <b>Technique &amp; milestones</b>
+    {earned && <div className="technique-badge">✦ Twenty-swing observation kept <span>cosmetic · 0 points</span></div>}
+    <details className="measurement-help"><summary>Review my technique</summary>
+      <div className="stack">
+        <div>{latest && controlledTiming(latest) ? '✓ Controlled release recorded: a small angle and a kept manual timing of at least five swings with matching bob motion.' : 'Controlled-release evidence: no qualifying kept timing selected yet. Technique recording is optional; other readings remain usable.'}</div>
+        <div>{timings.length >= 3 ? '✓' : '○'} {timings.length} comparable kept timing{timings.length === 1 ? '' : 's'} from separate releases. Three fresh releases form a repeat set.</div>
+        {periods.length >= 2 && <div>Your recorded period range: {sig(Math.min(...periods), 4)}–{sig(Math.max(...periods), 4)} s. Comparable timings use lengths within 1% and the same recorded wind protection.</div>}
+        <div>{stated ? '✓ Your progress sheet includes a stated gravity uncertainty.' : '○ Gravity uncertainty has not been stated on the progress sheet.'} Stating an error bar is a recorded choice, not proof that it is adequate.</div>
+        <p>Small releases and repeat timings help you investigate technique. Repeats still share ruler, setup and other systematic errors. Similar results do not prove the gravity is correct.</p>
+        <p>The optional twenty-swing milestone recognizes a kept manual timing at a 1–10° release, with at least twenty full swings and matching recorded bob motion. It is awarded once per expedition or isolated practice run. The motion record checks only this milestone; it never corrects your count or result.</p>
+      </div>
+    </details>
+    <details className="measurement-help"><summary>Timing assistance &amp; scoring</summary><p>Mouse, touch and keyboard operate the same manual watch and counter. There is no automatic swing counter or stop here. These controls do not change scoring or count as ECHO timing assistance.</p><p>ECHO-supplied practice observations are labeled and do not qualify for manual technique milestones. Wind stabilization and your windscreen remain labeled in observation conditions.</p><p>Technique feedback and the milestone add no score, fuel, hint uses or verification charges. Your normal measurement and expedition scoring still applies; this cosmetic milestone cannot be farmed for points.</p></details>
+  </section>;
 }

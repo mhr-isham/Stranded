@@ -9,13 +9,14 @@ import { useGameTime } from './widgets';
 
 export function MeasurementNotes({ reading }: { reading: Reading }) {
   const e = reading.environment;
-  if (!e) return <div className="faint" style={{ fontSize: 10 }}>Conditions not recorded</div>;
+  if (!e) return <div className="faint" style={{ fontSize: 10 }}>{reading.pendulum?.technique?.source === 'echo' ? 'ECHO-supplied timing; manual technique not recorded. Conditions not recorded.' : 'Conditions not recorded'}</div>;
   const info = QUANTITY_INFO[reading.key];
   const value = (v: number) => `${sig(toDisplay(reading.key, v), 5)} ${info.unit}`;
   return <details className="measurement-notes">
     <summary>Conditions &amp; calculation</summary>
     <div>{conditionSummary(e)}</div>
     {reading.pendulum?.swings !== undefined && reading.pendulum.time !== undefined && <div>Manual timing: {reading.pendulum.swings} full swings in {fmt(reading.pendulum.time, 3)} s; period {fmt(reading.pendulum.period, 4)} s; measured length {fmt(reading.pendulum.length, 4)} m.</div>}
+    {reading.pendulum?.technique && <div>{reading.pendulum.technique.source === 'echo' ? 'ECHO-supplied timing; manual technique not recorded.' : `Manually started, counted and stopped. Release angle ${fmt(reading.pendulum.technique.angle, 1)}°; motion recorded for technique milestones.`}</div>}
     <div>Captured on expedition day {fmt(e.at / DAY + 1, 3)}.</div>
     <div>Instrument result: {value(e.rawValue)}.</div>
     {e.wind && <div>{e.wind.protection === 'none' ? 'Exposed measurement.' : e.wind.protection === 'echo' ? 'ECHO physically stabilized the rig.' : 'You fitted the windscreen before timing.'} No numerical wind correction was applied.</div>}
