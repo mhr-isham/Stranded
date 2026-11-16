@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEG } from '../../engine/constants';
 import { surfaceGravity } from '../../engine/measure';
 import { hash32 } from '../../engine/rng';
-import { clock } from '../../game/clock';
+import { WARPS, clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
@@ -10,7 +10,7 @@ import { paintSky } from '../../render/paint';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
-import { Modal, useGameTime } from '../common/widgets';
+import { Modal, useClockState, useGameTime } from '../common/widgets';
 import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { explain, makePrediction, resolveNow } from '../../game/predictions';
@@ -22,6 +22,9 @@ import type { MeasurementEnvironment } from '../../game/measurementEnvironment';
 import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { toast } from '../common/widgets';
+
+import { pendulumReading } from '../../game/pendulumFeedback';
+import { GravityMeaning, TimingComparison } from './PendulumFeedback';
 
 const BOB_R = 0.025; // m
 
@@ -52,7 +55,11 @@ export function Pendulum() {
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const g = surfaceGravity(sys);
   const addReading = useGame((s) => s.addReading);
-  const keptG = useGame((s) => s.readings).filter((r) => r.key === 'g' && r.kept).map((r) => r.value);
+  const gravityReadings = useGame((s) => s.readings).filter((r) => r.key === 'g' && r.kept);
+  const keptG = gravityReadings.map((r) => r.value);
+  const latest = gravityReadings.at(-1);
+  const estimate = useGame((s) => s.sheet.g);
+  useClockState();
 
   const [nominal, setNominal] = useState(1.5); // m, the coarse knob setting
   // The true length differs from the knob by a hidden knot/attachment offset.
@@ -61,12 +68,13 @@ export function Pendulum() {
   const [amp, setAmp] = useState(6);
   const [taps, setTaps] = useState(0);
   const [running, setRunning] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [ask, setAsk] = useState<null | { time: number; environment: MeasurementEnvironment }>(null);
   const [nInput, setNInput] = useState('');
   const [result, setResult] = useState<null | { g: number; T: number; N: number; time: number; L: number; amp: number; environment: MeasurementEnvironment }>(null);
 
-  const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, trail: [] as { x: number; y: number }[] });
+  const phys = useRef({ th: 0, om: 0, swinging: false, dragging: false, releaseAngle: 0, trail: [] as { x: number; y: number }[] });
   const watch = useRef({ start: 0, running: false });
   const timingConditions = useRef<MeasurementEnvironment | null>(null);
   const screen = !!useGame((s) => s.instrumentSetup?.pendulumScreen);
@@ -86,11 +94,28 @@ export function Pendulum() {
   // Stopwatch display.
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setElapsed((performance.now() - watch.current.start) / 1000), 31);
+    const id = setInterval(() => setElapsed(Math.max(0, (performance.now() - watch.current.start) / 1000)), 31);
     return () => clearInterval(id);
   }, [running]);
 
   const lastFrame = useRef<number | null>(null);
+
+  useEffect(() => {
+    const visibility = () => {
+      lastFrame.current = null;
+      if (!document.hidden || !watch.current.running) return;
+      watch.current.running = false;
+      phys.current.swinging = false;
+      setRunning(false);
+      setInterrupted(true);
+      setElapsed(0);
+      setTaps(0);
+      stopInstrument();
+      toast('Timing interrupted while the game was hidden. Release the bob and time again.');
+    };
+    document.addEventListener('visibilitychange', visibility);
+    return () => document.removeEventListener('visibilitychange', visibility);
+  }, []);
 
   const toggleWatch = () => {
     // Worn stopwatch challenge: the button registers up to 0.2 s late.
@@ -102,10 +127,11 @@ export function Pendulum() {
       setTaps(0);
       setElapsed(0);
       setRunning(true);
+      setInterrupted(false);
       setResult(null);
       sfx('click');
     } else {
-      const time = (performance.now() + lag - watch.current.start) / 1000;
+      const time = Math.max(0, (performance.now() + lag - watch.current.start) / 1000);
       watch.current.running = false;
       setRunning(false);
       setElapsed(time);
@@ -126,7 +152,7 @@ export function Pendulum() {
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || ask) return;
+      if (e.repeat || ask || (e.target instanceof HTMLElement && (e.target.closest('input, textarea, select, button, summary, a, [role="button"], [role="link"]') || e.target.isContentEditable))) return;
       if (e.code === 'Space') {
         e.preventDefault();
         toggleWatch();
@@ -139,6 +165,7 @@ export function Pendulum() {
   const release = () => {
     phys.current.th = amp * DEG;
     phys.current.om = 0;
+    phys.current.releaseAngle = amp;
     phys.current.swinging = true;
     phys.current.trail = [];
     sfx('metal');
@@ -149,13 +176,14 @@ export function Pendulum() {
     phys.current.swinging = false;
     phys.current.th = 0;
     phys.current.om = 0;
+    phys.current.releaseAngle = 0;
   };
 
   const layout = (w: number, h: number) => {
     // Leave room for the HUD on top and the stopwatch below.
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const top = (hudHeight() + 14) * dpr;
-    const bottom = 110 * dpr;
+    const bottom = 140 * dpr;
     const ppm = (h - top - bottom) / 3.3;
     return { px: w / 2, py: top, ppm };
   };
@@ -165,7 +193,7 @@ export function Pendulum() {
       <div className="tool-stage">
         <CanvasView
           onPointerDown={(e) => {
-            if (phys.current.swinging) return;
+            if (phys.current.swinging || watch.current.running || ask) return;
             phys.current.dragging = true;
             (e.target as Element).setPointerCapture(e.pointerId);
           }}
@@ -184,12 +212,14 @@ export function Pendulum() {
             phys.current.dragging = false;
             if (Math.abs(phys.current.th) > 0.5 * DEG) {
               phys.current.om = 0;
+              phys.current.releaseAngle = Math.abs(phys.current.th / DEG);
               phys.current.swinging = true;
               phys.current.trail = [];
               sfx('metal');
               flag('pend-released');
             }
           }}
+          onPointerCancel={() => { phys.current.dragging = false; }}
           draw={({ ctx, w, h, dpr, now, dt: frameDt }) => {
             // The swing keeps real time, like the stopwatch: a slow frame must not slow it
             // down (the canvas caps each frame at 0.1 s, which made g come out low).
@@ -330,10 +360,14 @@ export function Pendulum() {
           }}
         />
         <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="pend-watch">
+          <div className="pendulum-clock" aria-label="Pendulum clock status">
+            <b>Rig &amp; watch: real time</b>
+            <span>{clock.paused ? 'Expedition paused' : 'Expedition: 1×'} · saved warp: {WARPS[clock.warpIndex].label}</span>
+          </div>
           <div className="row" style={{ justifyContent: 'center', gap: 10, flexWrap: 'nowrap' }}>
             <div style={{ textAlign: 'center' }}>
               <div className="readout" style={{ minWidth: 120, fontSize: 24 }}>{fmtWatch(elapsed)}</div>
-              <div className="muted" style={{ fontSize: 12 }}>swings tapped: {taps}</div>
+              <div className="muted" style={{ fontSize: 12 }}>full swings tapped: {taps}</div>
             </div>
             <button className={`btn big ${running ? 'danger' : 'primary'}`} onClick={toggleWatch} style={{ minWidth: 86, padding: '10px 14px' }}>
               {running ? 'Stop' : 'Start'}
@@ -342,6 +376,7 @@ export function Pendulum() {
               +1
             </button>
           </div>
+          {interrupted && <div className="amber" role="status" style={{ fontSize: 11, textAlign: 'center' }}>Timing interrupted while hidden. Release the bob and time again.</div>}
           <div className="faint hide-phone" style={{ fontSize: 11, textAlign: 'center', marginTop: 4 }}>
             Space = start/stop · C = count a swing
           </div>
@@ -349,7 +384,8 @@ export function Pendulum() {
       </div>
 
       <div className="tool-side">
-        <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. Clock runs in real time here." />
+        <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. Operate the rig and stopwatch at real time." />
+        <details className="panel panel-pad measurement-help"><summary>Time while measuring</summary><p>The bob and stopwatch use real elapsed time, even when the expedition is paused. An unpaused expedition advances one game second per real second here, consuming its usual air/time. Warp controls are disabled while using the rig.</p><p>Leaving the rig restores the saved warp setting; the expedition keeps its current pause/resume state. Leaving during timing abandons that unfinished timing.</p></details>
         <div className="panel panel-pad stack" aria-label="Pendulum conditions">
           <b>Wind protection</b>
           <button className="btn small" aria-pressed={screen} disabled={running || !!ask} onClick={() => { const s = useGame.getState(); s.set({ instrumentSetup: { ...s.instrumentSetup, pendulumScreen: !screen } }); stopSwing(); }}>{screen ? 'Remove windscreen' : 'Fit windscreen'}</button>
@@ -358,11 +394,11 @@ export function Pendulum() {
         </div>
         <div className="panel panel-pad stack">
           <b>1 · Set the string length</b>
-          <input data-tut="pend-length" type="range" min={0.6} max={3} step={0.1} value={nominal} onChange={(e) => setNominal(Number(e.target.value))} disabled={running} />
+          <input data-tut="pend-length" type="range" min={0.6} max={3} step={0.1} aria-label="String length setting" value={nominal} onChange={(e) => { stopSwing(); setNominal(Number(e.target.value)); }} disabled={running || !!ask} />
           <div className="muted" style={{ fontSize: 13 }}>Knob setting ≈ {fmt(nominal, 1)} m — the exact length depends on the knot. Measure it:</div>
           <b>2 · Measure it on the scale</b>
           <div data-tut="pend-scale">
-            <Scale trueL={trueL} nominal={nominal} value={lRead} onChange={(v) => (setLRead(v), flag('pend-measured'))} />
+            <Scale trueL={trueL} nominal={nominal} value={lRead} disabled={running || !!ask} onChange={(v) => (setLRead(v), flag('pend-measured'))} />
           </div>
           <div className="row between">
             <span className="muted">Your reading (pivot → bob centre)</span>
@@ -371,13 +407,13 @@ export function Pendulum() {
           <b>3 · Release and time it</b>
           <div className="row" data-tut="pend-release">
             <span className="muted" style={{ fontSize: 13 }}>Release angle {fmt(amp, 1)}°</span>
-            <input type="range" min={1} max={30} step={0.5} value={amp} onChange={(e) => setAmp(Number(e.target.value))} style={{ flex: 1 }} />
+            <input type="range" aria-label="Release angle" disabled={running || !!ask} min={1} max={30} step={0.5} value={amp} onChange={(e) => setAmp(Number(e.target.value))} style={{ flex: 1 }} />
           </div>
           <div className="row" data-tut="pend-release">
-            <button className="btn primary" onClick={release}>
+            <button className="btn primary" onClick={release} disabled={running || !!ask}>
               Release
             </button>
-            <button className="btn" onClick={stopSwing}>
+            <button className="btn" onClick={stopSwing} disabled={running || !!ask}>
               Stop pendulum
             </button>
           </div>
@@ -386,6 +422,7 @@ export function Pendulum() {
             release angles make the swing slower than the simple formula predicts.
           </div>
           <Formula>g = 4π² L / T²,  T = time / N</Formula>
+          <TimingComparison period={result?.T ?? latest?.pendulum?.period} swings={result?.N ?? latest?.pendulum?.swings} source={result ? 'Your current timing' : 'Your latest kept timing'} />
           <WindGauge />
         </div>
 
@@ -403,6 +440,7 @@ export function Pendulum() {
               <dd className="blue">{fmt(result.g, 4)} m/s²</dd>
             </dl>
             <div className="muted" style={{ fontSize: 12 }}>Instrument result with {result.environment.wind?.protection === 'windscreen' ? 'your windscreen' : result.environment.wind?.protection === 'echo' ? 'ECHO physical stabilization' : 'an exposed rig'}; no numerical wind correction was applied.</div>
+            <GravityMeaning value={result.g} source="This instrument result" />
             <SanityWarning
               attempt={result}
               msgs={[
@@ -417,7 +455,7 @@ export function Pendulum() {
               <button
                 className="btn primary"
                 onClick={() => {
-                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T }, environment: result.environment });
+                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T, swings: result.N, time: result.time }, environment: result.environment });
                   setResult(null);
                   sfx('good');
                 }}
@@ -435,9 +473,10 @@ export function Pendulum() {
           <b>Gravity log</b>
           <ReadingsTable k="g" />
           <SendReadings k="g" tut="pend-send" />
+          {(estimate || latest) && <GravityMeaning value={(estimate ?? latest)!.value} sigma={estimate?.sigma} source={estimate ? 'Your progress-sheet estimate' : 'Your latest kept reading'} />}
         </div>
-        <ReadingPredictionPractice kind="pendulum" currentLength={lRead} resultPending={!!result || running} />
-        {keptG.length > 0 && !running && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
+        <ReadingPredictionPractice kind="pendulum" currentLength={lRead} resultPending={!!result || running || !!ask} />
+        {keptG.length > 0 && !running && !ask && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
       </div>
 
       {ask && (
@@ -448,19 +487,19 @@ export function Pendulum() {
             You timed {fmt(ask.time, 2)} s. A full swing is there and back. {taps ? `You tapped ${taps}.` : ''}
           </p>
           <input className="input" autoFocus inputMode="numeric" value={nInput} onChange={(e) => setNInput(e.target.value.replace(/\D/g, ''))} />
-          {lRead === null && <p className="amber" style={{ fontSize: 13 }}>You haven’t measured the string length yet — measure it on the scale first.</p>}
+          {lRead === null && <p className="amber" style={{ fontSize: 13 }}>You haven’t measured the string length yet — cancel, measure it on the scale, then time the swings again.</p>}
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
             <button className="btn" onClick={() => setAsk(null)}>
               Cancel
             </button>
             <button
               className="btn primary"
-              disabled={!Number(nInput) || lRead === null}
+              disabled={lRead === null || !pendulumReading(lRead, ask.time, Number(nInput))}
               onClick={() => {
                 const N = Number(nInput);
-                const T = ask.time / N;
-                const measuredG = (4 * Math.PI ** 2 * lRead!) / (T * T);
-                setResult({ N, T, time: ask.time, L: lRead!, amp, g: measuredG, environment: { ...ask.environment, rawValue: measuredG } });
+                const reading = lRead === null ? null : pendulumReading(lRead, ask.time, N);
+                if (!reading) return;
+                setResult({ N, T: reading.period, time: ask.time, L: lRead!, amp: phys.current.releaseAngle, g: reading.gravity, environment: { ...ask.environment, rawValue: reading.gravity } });
                 setAsk(null);
                 flag('pend-result');
               }}
@@ -487,7 +526,7 @@ const fmtWatch = (s: number) => {
 };
 
 /** A magnified ruler at the bob: drag the hairline onto the bob's centre. */
-function Scale({ trueL, nominal, value, onChange }: { trueL: number; nominal: number; value: number | null; onChange: (v: number) => void }) {
+function Scale({ trueL, nominal, value, onChange, disabled }: { trueL: number; nominal: number; value: number | null; onChange: (v: number) => void; disabled: boolean }) {
   const span = 0.1; // m shown
   const x0 = nominal - span / 2;
   const toX = (L: number, w: number) => ((L - x0) / span) * w;
@@ -499,13 +538,16 @@ function Scale({ trueL, nominal, value, onChange }: { trueL: number; nominal: nu
   return (
     <div style={{ height: 96, position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--panel-border)' }}>
       <CanvasView
+        aria-label="Length scale; align the hairline with the bob centre" aria-disabled={disabled}
         onPointerDown={(e) => {
+          if (disabled) return;
           drag.current = true;
           (e.target as Element).setPointerCapture(e.pointerId);
           set(e);
         }}
-        onPointerMove={(e) => drag.current && set(e)}
+        onPointerMove={(e) => !disabled && drag.current && set(e)}
         onPointerUp={() => (drag.current = false)}
+        onPointerCancel={() => (drag.current = false)}
         draw={({ ctx, w, h, dpr }) => {
           ctx.fillStyle = '#e9dcc0';
           ctx.fillRect(0, 0, w, h);

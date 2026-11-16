@@ -69,7 +69,7 @@ export function Hud() {
             {clock.paused ? '▶' : '❚❚'}
           </button>
           <button className="rate btn ghost small" onClick={() => (togglePause(), flag('warp-changed'))} title="Tap to pause / resume">
-            {clock.realtime ? 'real time' : clock.paused ? 'paused' : WARPS[clock.warpIndex].label}
+            {clock.paused ? 'paused' : clock.realtime ? 'real time' : WARPS[clock.warpIndex].label}
           </button>
           <button
             className="btn icon small"

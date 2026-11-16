@@ -43,7 +43,7 @@ export interface Reading {
   kept: boolean;
   note: string;
   /** Observed quantities retained for optional prediction training. */
-  pendulum?: { length: number; period: number };
+  pendulum?: { length: number; period: number; swings?: number; time?: number };
   environment?: MeasurementEnvironment;
 }
 

@@ -15,6 +15,7 @@ export function MeasurementNotes({ reading }: { reading: Reading }) {
   return <details className="measurement-notes">
     <summary>Conditions &amp; calculation</summary>
     <div>{conditionSummary(e)}</div>
+    {reading.pendulum?.swings !== undefined && reading.pendulum.time !== undefined && <div>Manual timing: {reading.pendulum.swings} full swings in {fmt(reading.pendulum.time, 3)} s; period {fmt(reading.pendulum.period, 4)} s; measured length {fmt(reading.pendulum.length, 4)} m.</div>}
     <div>Captured on expedition day {fmt(e.at / DAY + 1, 3)}.</div>
     <div>Instrument result: {value(e.rawValue)}.</div>
     {e.wind && <div>{e.wind.protection === 'none' ? 'Exposed measurement.' : e.wind.protection === 'echo' ? 'ECHO physically stabilized the rig.' : 'You fitted the windscreen before timing.'} No numerical wind correction was applied.</div>}
