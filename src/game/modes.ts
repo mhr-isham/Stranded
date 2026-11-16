@@ -27,7 +27,7 @@ export interface ModeRules {
   hints: number;
   /** Hints cost score. */
   hintsCost: boolean;
-  /** "Ask ECHO to verify" uses per run. */
+  /** Shared paid evidence-review and ship-sensor verification uses per run. */
   verifies: number;
   /** Manual checkpoint saves per run (Infinity = any time). */
   checkpoints: number;

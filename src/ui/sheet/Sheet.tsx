@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { PRIMARY_KEYS, QUANTITY_INFO, derivedFor, deriveAll, edgesFor, keysFor, labelFor, truthValues, type PrimaryKey, type QuantityKey } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { probeTruth } from '../../game/probeState';
-import { scoreQuantity } from '../../engine/scoring';
 import { sfx } from '../../game/audio';
 import { fmt, fromDisplay, sig, toDisplay } from '../../game/format';
 import { checkMissions, currentVariant, currentWorld } from '../../game/sim';
@@ -11,8 +10,9 @@ import { readingStats, useGame, type Screen } from '../../game/store';
 import { hintsFor, nodeInfoFor } from './nodeInfo';
 import { flag } from '../../game/tutorial';
 import { NamesDialog } from '../Atlas';
-import { countText, useMode } from '../../game/modes';
+import { useMode } from '../../game/modes';
 import { CadetGoal } from '../CadetGoal';
+import { PaidChecks } from './PaidChecks';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -180,10 +180,8 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   const e = isPrimary ? s.sheet[k as PrimaryKey] : derivedEst[k as keyof typeof derivedEst];
   const hintLevel = s.hintsSeen?.[k] ?? 0;
   const setHintLevel = (n: number) => s.set({ hintsSeen: { ...(s.hintsSeen ?? {}), [k]: n } });
-  const [verdict, setVerdict] = useState<string | null>(null);
   const mode = useMode();
   const maxHints = Math.min(HINTS_K.length, mode.hints);
-  const verifiesLeft = mode.verifies - s.checksUsed;
   const stats = isPrimary ? readingStats(s.readings, k as PrimaryKey) : null;
 
   const edit = (field: 'value' | 'sigma', text: string) => {
@@ -194,15 +192,6 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
     if (Number.isFinite(next.value) && next.sigma > 0) s.setSheet(k as PrimaryKey, next);
     else s.setSheet(k as PrimaryKey, { ...next, sigma: next.sigma > 0 ? next.sigma : Math.abs(next.value) * 0.01 });
     checkMissions();
-  };
-
-  const check = () => {
-    if (!e || verifiesLeft <= 0) return;
-    const truth = truthValues(sys, s.sheet, probeTruth(s))[k];
-    const sc = scoreQuantity(e.value, e.sigma, truth);
-    s.set({ penaltyDv: s.penaltyDv + 40, checksUsed: s.checksUsed + 1 });
-    setVerdict(sc.inside ? 'ECHO cross-checked with the ship’s damaged sensors: the true value lies INSIDE your error bar.' : sc.z < 2 ? 'Close, but the true value lies just OUTSIDE your error bar.' : 'The true value lies well OUTSIDE your error bar.');
-    sfx(sc.inside ? 'good' : 'bad');
   };
 
   return (
@@ -282,15 +271,7 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
       ) : (
         <div className="faint" style={{ fontSize: 12 }}>No hints in {mode.name} mode. The lessons in the Codex are always open.</div>
       )}
-      {e && mode.verifies > 0 && (
-        <>
-          <hr className="sep" />
-          <button className="btn small amber" onClick={check} disabled={verifiesLeft <= 0}>
-            Ask ECHO to verify (costs 40 m/s of fuel · {countText(verifiesLeft)} left)
-          </button>
-          {verdict && <div className="hint">{verdict}</div>}
-        </>
-      )}
+      {e && <PaidChecks quantity={k} estimate={e} />}
       </div>
     </div>
   );

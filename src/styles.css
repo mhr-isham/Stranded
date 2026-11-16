@@ -202,6 +202,10 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .measurement-notes summary, .measurement-help summary { cursor: pointer; color: var(--blue); }
 .measurement-notes > div { margin-top: 5px; }
 .measurement-help p { font-size: 12px; margin: 8px 0 0; }
+.paid-checks .panel-inset { padding: 10px; font-size: 12px; overflow-wrap: anywhere; }
+.paid-checks ul { margin: 0; padding-left: 18px; }
+.paid-checks li + li { margin-top: 6px; }
+.paid-checks summary { color: var(--blue); cursor: pointer; }
 [aria-label="Horizon conditions"] .field { min-width: 0; flex: 1; }
 .log tr.off td { opacity: 0.4; text-decoration: line-through; }
 

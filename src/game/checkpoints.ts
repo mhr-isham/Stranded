@@ -6,6 +6,7 @@
 
 import { clock } from './clock';
 import { useGame, type GameState } from './store';
+import { VERIFICATION_COST } from './verification';
 
 const KEY = 'stranded-checkpoints-v1';
 export const SLOTS = 3;
@@ -53,10 +54,14 @@ function snapshot(): Snapshot {
 }
 
 function restore(snap: Snapshot) {
+  const current = useGame.getState();
+  const savedChecks = snap.state.checksUsed ?? 0;
+  const checksUsed = Math.max(current.checksUsed, savedChecks);
+  const spentSinceSave = Math.max(0, checksUsed - savedChecks) * VERIFICATION_COST;
   clock.t = snap.t;
   clock.stopAt = Infinity;
   clock.paused = true;
-  useGame.setState({ ...snap.state, phase: 'play', outcome: null, savedT: snap.t });
+  useGame.setState({ ...snap.state, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
 }
 
 export const listSlots = () => read().slots;

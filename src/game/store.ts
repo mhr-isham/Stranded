@@ -16,6 +16,7 @@ import { RULESET_VERSION } from './world';
 import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
+import type { VerificationRecord } from './verification';
 
 export type Screen =
   | 'map'
@@ -155,7 +156,8 @@ export interface GameState {
   /** Extra life support (s), e.g. when leaving Flight School late with the air already spent. */
   lifeExtra: number;
   checksUsed: number;
-  penaltyDv: number; // fuel spent on "is it right?" checks
+  verificationHistory: VerificationRecord[];
+  penaltyDv: number; // spent flight reserve, including paid checks and expedition costs
   codex: string[];
   achievements: string[];
   echo: EchoLine[];
@@ -282,6 +284,7 @@ const initial = {
   hintsSeen: {},
   lifeExtra: 0,
   checksUsed: 0,
+  verificationHistory: [] as VerificationRecord[],
   penaltyDv: 0,
   codex: [],
   achievements: [],
