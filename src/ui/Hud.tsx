@@ -239,6 +239,7 @@ function CheckpointPanel({ onDone }: { onDone: () => void }) {
           {finite ? `${left} save${left === 1 ? '' : 's'} left this run` : 'save any time'}
         </span>
       </div>
+      <div className="faint" style={{ fontSize: 12 }}>Loading keeps unlocked hints and spent hint/verification costs.</div>
       {Array.from({ length: SLOTS }, (_, i) => {
         const snap = slots[i];
         return (

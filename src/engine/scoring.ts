@@ -11,6 +11,7 @@ export interface QuantityScore {
 
 const LN_TIGHT = Math.log(1 / 0.001); // 0.1% honest error bar = 100 points
 const LN_LOOSE = Math.log(1 / 0.5); // 50% error bar = 0 points
+export const HINT_POINT_COST = 25;
 
 export function scoreQuantity(value: number, sigma: number, truth: number): QuantityScore {
   const relSigma = Math.max(1e-6, Math.abs(sigma / truth));
@@ -34,7 +35,7 @@ export function gradeRun(opts: { measurementPoints: number; fuelLeftFraction: nu
     opts.measurementPoints * 0.6 +
       0.5 * (opts.predictionPoints ?? 0) +
       (opts.success ? 200 + 400 * Math.max(0, opts.fuelLeftFraction) + 100 * Math.max(0, opts.daysLeftFraction) : 0) -
-      25 * opts.hintsUsed -
+      HINT_POINT_COST * opts.hintsUsed -
       (opts.penalty ?? 0)),
   );
   const letter = !opts.success ? 'F' : total > 1100 ? 'S' : total > 900 ? 'A' : total > 700 ? 'B' : total > 450 ? 'C' : 'D';

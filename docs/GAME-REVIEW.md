@@ -106,7 +106,7 @@ These are configured rules, not measured human success probabilities.
 | Formula sheet | on | on | on | off, can enable | locked off |
 | Missions | coached | coached | goals | hidden | hidden |
 | Coaching / suspicious-reading warnings | yes / yes | yes / yes | no / yes | no / yes | no / no |
-| Hint levels | 3 free | 3 | 1 | 0 | 0 |
+| Hint levels per quantity | 3 free | 3, 25 points per new level | 1, 25 points per new level | 0 | 0 |
 | Paid evidence/sensor checks, shared allowance; 40 m/s each | unlimited | 5 | 2 | 0 | 0 |
 | Evidence-review depth | full explanations | optional why/how sections | concise observed facts | unavailable | unavailable |
 | Manual saves into three slots | unlimited | unlimited | 3/run | none | none |
@@ -118,6 +118,8 @@ These are configured rules, not measured human success probabilities.
 | Separate descent allowance | 1300 m/s | 1100 | 900 | 750 | 650 |
 
 **Verification decision agreed and implemented — 16 November 2026:** retain both paid actions with a shared mode allowance. “Review my evidence” uses saved observations, entered calculations and recorded conditions without consulting generated truth; “Verify against ship sensors” explicitly compares the checked entry/error bar with hidden truth, returning inside/just outside/well outside without giving the exact value. Each costs 40 m/s of flight reserve. Basic arithmetic, propagation and existing consistency checks remain free. Cadet can request why/how explanations; Navigator receives concise facts; Astronomer and Legend receive neither paid audit. Evidence reviews identify repeatability, shared correction errors, exposed wind, frozen-image reuse, observational baselines and dominant uncertainty inputs where supporting records exist. They do not automatically discard readings or certify an entry. Missing evidence, invalid inputs, exhausted allowances and insufficient fuel cannot spend a fee or use. Paid results persist as entry/data snapshots and are marked stale when relevant records change. Checkpoint loading and failed-flight rewind preserve verification counts, result history and verification fuel charges, without refunding them or double-charging repeated loads; ordinary checkpoint fuel restoration otherwise remains as before. The cost is the existing explicit assistance charge against flight reserve; this decision does not invent a simulated calibration burn. Other rows and remaining cross-tool enforcement still need their appropriate validation.
+
+**Paid-hint persistence agreed and implemented — 16 November 2026:** loading a checkpoint or rewinding a failed flight retains the highest unlocked hint level for each quantity and its recorded score cost in the current expedition. Reopening an unlocked hint is free. Merge different branches in older save slots without losing access, refunding paid knowledge or charging overlapping levels twice; existing paid-use totals are retained, with at least one paid use per distinct unlocked level in a paid-hint mode. Stargazer hints remain free. Newly unlocked Cadet/Navigator hint levels retain the existing 25-point base cost, now shown explicitly; unscored practice is labeled separately. A shared unlock action rejects duplicate/stale requests, skipped levels and requests beyond the mode limit. New expeditions reset run-specific hint progress as before.
 
 **Test before calling mode rules complete:** every tool, helper, alternate fit, challenge, descent phase and truth overlay must respect the same effective rules. Current configuration tests alone do not establish that.
 

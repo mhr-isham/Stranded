@@ -7,6 +7,7 @@
 import { clock } from './clock';
 import { useGame, type GameState } from './store';
 import { VERIFICATION_COST } from './verification';
+import { modeOf } from './modes';
 
 const KEY = 'stranded-checkpoints-v1';
 export const SLOTS = 3;
@@ -58,10 +59,17 @@ function restore(snap: Snapshot) {
   const savedChecks = snap.state.checksUsed ?? 0;
   const checksUsed = Math.max(current.checksUsed, savedChecks);
   const spentSinceSave = Math.max(0, checksUsed - savedChecks) * VERIFICATION_COST;
+  const hintsSeen = { ...snap.state.hintsSeen, ...current.hintsSeen };
+  for (const key of Object.keys(hintsSeen)) hintsSeen[key] = Math.max(current.hintsSeen?.[key] ?? 0, snap.state.hintsSeen?.[key] ?? 0);
+  const paid = modeOf((snap.state.settings ?? current.settings).difficulty).hintsCost;
+  // Legacy slots can contain different branches of unlocked hints. Preserve
+  // their union and at least one paid use per unlocked level, without refunds.
+  const paidLevels = paid ? Object.values(hintsSeen).reduce<number>((total, level) => total + (level ?? 0), 0) : 0;
+  const hintsUsed = Math.max(current.hintsUsed, snap.state.hintsUsed ?? 0, paidLevels);
   clock.t = snap.t;
   clock.stopAt = Infinity;
   clock.paused = true;
-  useGame.setState({ ...snap.state, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
+  useGame.setState({ ...snap.state, hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
 }
 
 export const listSlots = () => read().slots;

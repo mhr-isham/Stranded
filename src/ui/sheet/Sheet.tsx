@@ -13,6 +13,8 @@ import { NamesDialog } from '../Atlas';
 import { useMode } from '../../game/modes';
 import { CadetGoal } from '../CadetGoal';
 import { PaidChecks } from './PaidChecks';
+import { unlockHint } from '../../game/hints';
+import { HINT_POINT_COST } from '../../engine/scoring';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -179,8 +181,8 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
   const isPrimary = (PRIMARY_KEYS as readonly string[]).includes(k);
   const e = isPrimary ? s.sheet[k as PrimaryKey] : derivedEst[k as keyof typeof derivedEst];
   const hintLevel = s.hintsSeen?.[k] ?? 0;
-  const setHintLevel = (n: number) => s.set({ hintsSeen: { ...(s.hintsSeen ?? {}), [k]: n } });
   const mode = useMode();
+  const scoredHints = mode.hintsCost && !s.settings.freeRoam && !s.tutorial.active;
   const maxHints = Math.min(HINTS_K.length, mode.hints);
   const stats = isPrimary ? readingStats(s.readings, k as PrimaryKey) : null;
 
@@ -251,18 +253,16 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
         <>
           <div className="row between">
             <b style={{ fontSize: 13 }}>Hints</b>
-            <span className="faint" style={{ fontSize: 12 }}>{mode.hintsCost ? 'each costs score' : 'free in this mode'}</span>
+            <span className="faint" style={{ fontSize: 12 }}>{mode.hintsCost ? scoredHints ? `${HINT_POINT_COST} points per level` : 'unscored practice' : 'free in this mode'}</span>
           </div>
+          <div className="faint" style={{ fontSize: 12 }}>Unlocked hints{scoredHints ? ' and their score costs' : ''} persist through checkpoint loads and rewinds in this expedition. Reading an unlocked hint again is free.</div>
           {HINTS_K.slice(0, hintLevel).map((h, i) => (
             <div key={i} className="hint">{h}</div>
           ))}
           {hintLevel < maxHints && (
             <button
               className="btn small"
-              onClick={() => {
-                setHintLevel(hintLevel + 1);
-                if (mode.hintsCost) s.set({ hintsUsed: s.hintsUsed + 1 });
-              }}
+              onClick={() => { if (unlockHint(k, hintLevel + 1)) sfx('click'); }}
             >
               {['Nudge me', 'How is it measured?', 'Show me the first step'][hintLevel]}
             </button>
