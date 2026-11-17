@@ -652,6 +652,37 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .shadow-screen summary { cursor: pointer; padding: 6px 0; font-size: 13px; }
 .shadow-screen .kv dd { overflow-wrap: anywhere; }
 .shadow-screen progress { width: 100%; accent-color: #ffc46b; }
+.radius-cross-check { min-width: 0; }
+.radius-cross-check > summary { cursor: pointer; font-size: 13px; line-height: 1.6; }
+.radius-cross-check-body { padding-top: 16px; }
+.radius-cross-check h3, .radius-field-notes h2 { margin: 5px 0; }
+.radius-cross-check p, .radius-field-notes p { font-size: 13px; line-height: 1.65; margin: 4px 0; }
+.radius-note-chip { display: inline-block; color: #a9e1d1; border: 1px solid #6dc4b145; border-radius: 20px; padding: 4px 9px; font-size: 11px; margin-left: 8px; }
+.radius-source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.radius-source { display: grid; gap: 10px; padding: 14px; border: 1px solid #82cfff33; border-radius: 10px; background: linear-gradient(135deg, #17354866, #0c1822); min-width: 0; }
+.radius-source.shadow { border-color: #ffd08a33; background: linear-gradient(135deg, #44362355, #161b24); }
+.radius-source > strong { color: #a9dfff; font: 28px var(--mono); }
+.radius-source.shadow > strong { color: #ffdaa7; }
+.radius-source small { font-size: 14px; }
+.radius-cross-check label { font-size: 12px; display: grid; gap: 6px; min-width: 0; }
+.radius-cross-check .input { width: 100%; min-width: 0; max-width: 100%; }
+.radius-cross-check select { text-overflow: ellipsis; }
+.radius-empty { border: 1px solid #ffffff15; border-radius: 10px; padding: 12px; background: #111e2b; font-size: 13px; }
+.radius-empty button { margin-top: 8px; }
+.radius-comparison-reveal { border-top: 1px solid #ffffff18; padding-top: 16px; }
+.radius-comparison-verdict { border-left: 3px solid #9ecad8; padding-left: 12px; }
+.radius-range-figure { margin: 4px 0; padding: 10px 0; border-radius: 12px; background: #091522; }
+.radius-range-figure svg { display: block; width: 100%; max-height: 280px; }
+.radius-range-figure svg text { font-size: 16px; }
+.radius-range-figure figcaption { color: #93a8be; font-size: 11px; line-height: 1.6; padding: 0 12px 6px; }
+.radius-evidence { margin-top: 10px; padding: 12px; border-radius: 9px; background: #091522; }
+.radius-keep-note { padding: 14px; border-radius: 12px; border: 1px solid #8ccfb12d; background: linear-gradient(135deg, #25453635, transparent); }
+.radius-takeaways, .radius-note-tabs { flex-wrap: wrap; gap: 6px; }
+.radius-takeaways button { white-space: normal; text-align: left; }
+.radius-cross-check summary, .radius-field-notes summary { cursor: pointer; font-size: 13px; }
+.radius-note-status { color: #a9dfcc; font-size: 13px; line-height: 1.6; }
+.radius-field-notes { background: linear-gradient(135deg, #142d3655, #0c1222); }
+.radius-field-notes blockquote { margin: 6px 0; padding: 10px 14px; border-left: 2px solid #b7d5c1; color: #d3e5db; }
 @media (max-width: 760px) {
   .shadow-screen { padding-inline: 10px; }
   .shadow-heading { align-items: start; }

@@ -1,3 +1,4 @@
+import { RadiusFieldNotes } from './common/RadiusCrossCheck';
 import { SchoolLogbook } from './SchoolRewards';
 import { useEffect, useState } from 'react';
 import type { Difficulty } from '../engine/types';
@@ -59,6 +60,7 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
         <p className="faint" style={{ fontSize: 12 }}>“Completed” records finishing a lesson or guided exercise, with help labeled. It is not an exam or a requirement to play.</p>
         {recommendedChapter && <div className="callout tip">Recommended for chapter {recommendedChapter}. You can jump into the campaign at any time.</div>}
         <SchoolLogbook />
+        <RadiusFieldNotes />
         <div className="school-filters">
           <label className="field">Skill group<select className="input" value={group} onChange={(e) => setGroup(e.target.value as typeof group)}>
             <option value="all">All skills</option>{TRAINING_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}

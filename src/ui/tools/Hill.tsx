@@ -1,3 +1,4 @@
+import { RadiusCrossCheck } from '../common/RadiusCrossCheck';
 import { useEffect, useRef, useState } from 'react';
 import { shadowAvailable } from '../../game/shadowObservation';
 import { DEG } from '../../engine/constants';
@@ -346,6 +347,7 @@ export function Hill() {
           <ReadingsTable k="R1" />
           <SendReadings k="R1" tut="hill-send" />
         </div>
+        <RadiusCrossCheck />
       </div>
     </div>
   );

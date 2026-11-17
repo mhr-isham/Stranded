@@ -1,3 +1,4 @@
+import { RadiusFieldNotes } from './common/RadiusCrossCheck';
 import { CODEX } from '../game/codex';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ export function Codex() {
         <div className="muted">Every system you’ve measured, and how honest your error bars have been.</div>
         <CalibrationPanel />
         <AtlasGrid />
+        <RadiusFieldNotes />
         <h1 style={{ fontSize: 28, marginTop: 16 }}>Logs</h1>
         <div className="muted">Scenes, discoveries and journal pages. Tap one to read it again.</div>
         {s.logs.length === 0 ? (

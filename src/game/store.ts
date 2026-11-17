@@ -1,6 +1,7 @@
 import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
 import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
+import type { RadiusFieldNote, RadiusDiscoveries } from './radiusCrossCheck';
 import type { ShadowReading } from './shadowObservation';
 import type { MoonStudy } from './moonObservations';
 import type { RetroStudy } from './observedMotion';
@@ -184,6 +185,8 @@ export interface GameState {
   tutorial: TutorialState;
   training: TrainingHistory;
   schoolRewards: SchoolRewards;
+  radiusFieldNote: RadiusFieldNote | null;
+  radiusDiscoveries: RadiusDiscoveries | null;
   moonStudies: MoonStudy[];
   retroStudy: RetroStudy | null;
   parallaxPair: ParallaxPair | null;
@@ -319,6 +322,8 @@ const initial = {
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
   schoolRewards: freshSchoolRewards(),
+  radiusFieldNote: null as RadiusFieldNote | null,
+  radiusDiscoveries: null as RadiusDiscoveries | null,
   moonStudies: [] as MoonStudy[],
   retroStudy: null as RetroStudy | null,
   parallaxPair: null as ParallaxPair | null,
@@ -387,6 +392,7 @@ export const useGame = create<GameState>()(
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
           training: get().training ?? {},
           schoolRewards: get().schoolRewards ?? freshSchoolRewards(),
+          radiusDiscoveries: get().radiusDiscoveries ?? null,
         });
       },
       addReading: (r) =>

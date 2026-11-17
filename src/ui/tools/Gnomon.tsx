@@ -1,3 +1,4 @@
+import { RadiusCrossCheck } from '../common/RadiusCrossCheck';
 import { useEffect, useId, useRef, useState } from 'react';
 import { DAY, DEG } from '../../engine/constants';
 import { sfx } from '../../game/audio';
@@ -120,6 +121,7 @@ export function Gnomon() {
               <div className="shadow-records">{s.shadows.length ? s.shadows.slice(-8).reverse().map((r, i) => <div key={`${r.capture ?? r.at}:${r.site}:${i}`}><b>{r.site}</b> · expedition day {fmt(r.at / DAY, 4)} · {r.length !== undefined ? `${fmt(r.length, 3)} m · ${r.direction === 1 ? 'north' : 'south'}` : `legacy altitude ${fmt(r.alt / DEG, 3)}°; synchronized provenance unavailable`}</div>) : 'No saved shadow observations yet.'}</div>
             </details>
           </section>
+          <RadiusCrossCheck />
         </section>
         <aside className="stack shadow-planning" aria-label="Shadow expedition controls">
           <section className="panel panel-pad stack" data-tut="shadow-route"><span className="meter-label">1 · NORTHWARD SURVEY</span><b>Give the shadows some distance</b><label className="stack">Rover destination · {km} km north<input aria-label="Northward rover distance in kilometres" type="range" min="200" max={Math.max(200, Math.floor(northLimit(sys) / 50000) * 50)} step="50" value={km} onChange={(e) => setKm(Number(e.target.value))} /></label><label>± baseline error (km)<input className="input" aria-label="Baseline uncertainty in kilometres" type="number" min="0.001" step="0.1" value={sigmaKm} onChange={(e) => setSigmaKm(e.target.value)} /></label><div className="row" style={{ flexWrap: 'wrap', gap: 6 }}><button className="btn" disabled={driving || waiting || Number(sigmaKm) <= 0} onClick={() => drive(km * 1000)}>Drive north</button><button className="btn ghost" disabled={driving || waiting || !trip.dist} onClick={() => drive(0)}>Return rover</button></div>
