@@ -156,16 +156,17 @@ export function RefractionLesson() {
         </Demo>
       }
       formula={<Equation tex={"R=\\frac d\\Delta\\quad(\\Delta\\text{ in radians}) \\\\ d=\\text{distance between sites, north–south}"} />}
-      keyIdea="Near the horizon, light skims through the thickest air and bends, so the horizon looks higher than it is — the dip shrinks and the planet seems bigger. At noon the sun is high, its light crosses little air, and two stick shadows a known distance apart give the planet’s size directly."
-      tip="Drive the rover due north so both sticks see noon at the same moment. Measure the shortest shadow of the day at each site — that is noon."
+      keyIdea="The horizon dip is sensitive to atmospheric bending. Two vertical sticks on one meridian provide another radius measurement: their signed noon angles differ because the ground curves between them. Higher sunlight reduces refraction, but does not eliminate it."
+      tip="Deploy the rover first. Capture both views near the shared local noon, then mark each shadow at your own pace. Opposite shadow directions add their angles; matching directions subtract them."
       warn="If two methods disagree badly, one of them has a systematic error. Repeating the bad one doesn’t fix it."
     >
+      <P>The existing Two Noon Shadows practice is available from the Flight School library. Try the rover, synchronized views, marker and comparison in a separate unscored expedition; ordinary gameplay does not require this lesson.</P>
       <P>
         Around 240 BC Eratosthenes noticed that at noon on the solstice the sun shone straight down a well in Syene, while in Alexandria, 800 km
         north, a stick still cast a short shadow. The sun’s rays are parallel, so the difference in angle is the slice of the Earth between the two
         cities.
       </P>
-      <P>Raise the air thickness on the left: the horizon method goes badly wrong. The shadow method on the right doesn’t care.</P>
+      <P>Raise the air thickness on the left: the horizon method goes badly wrong. High-Sun shadows are less sensitive, but still need timing, a surveyed baseline and honest uncertainty.</P>
       <P>A refraction correction needs a justified coefficient and uncertainty. The local air probe estimates episodic humidity only. Persistent atmospheric layering can require the independent shadow experiment; bracing your hands cannot remove it.</P>
       <Equation tex={"\\theta_{\\mathrm{geometric}}\\approx\\frac{\\theta_{\\mathrm{apparent}}}{\\sqrt{1-k}} \\\\ \\frac{\\sigma_R}{R}\\approx\\frac{\\sigma_k}{1-k}\\quad\\text{(small dip; contribution from }k\\text{ only)}"} />
       <P>Repeated readings reduce random scatter, while a shared calibration error remains. With an independently measured reference radius and known eye height, compare its predicted geometric dip with your observed dip to estimate k. Do not calibrate a method against its own uncorrected result.</P>

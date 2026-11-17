@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { shadowAvailable } from '../../game/shadowObservation';
 import { DEG } from '../../engine/constants';
 import { horizonDip } from '../../engine/measure';
 import { useMode } from '../../game/modes';
@@ -238,6 +239,7 @@ export function Hill() {
       </div>
       <div className="tool-side">
         <ToolHeader title="The hill" sub="Measure how far the horizon dips below level. The dip depends on your height and the planet’s radius." />
+        {shadowAvailable(sys) && <button className="btn small" onClick={() => s.go('gnomon')}>Alternative: two-site noon shadows</button>}
         <div className="panel panel-pad stack" aria-label="Horizon conditions">
           <b>Air and refraction</b>
           <div className="muted" style={{ fontSize: 13 }}>{legacyCompensated ? 'Legacy compensated sight: this saved expedition removes episodic humidity before displaying the angle. Uncompensated angles are unavailable.' : humidity > 0 ? '🌫 Damp air episode: the distant horizon shimmers.' : 'No episodic damp-air signal. Persistent atmospheric layering may still refract the horizon.'}</div>

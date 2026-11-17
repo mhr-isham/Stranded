@@ -165,7 +165,7 @@ const CH3: Mission[] = [
     id: 'shadows',
     title: 'Measure the world, the old way',
     short: 'Measure the planet’s radius R₁.',
-    goal: 'The thick air bends light near the horizon, so the hill can’t be trusted here. Log the noon shadow at camp, drive the rover due north, and log its noon shadow on the same day.',
+    goal: 'The thick air bends light near the horizon, so the hill can’t be trusted here. Drive the rover due north first. Near local noon, capture both shadow views, then mark each stick’s shadow from the synchronized pair.',
     why: 'Eratosthenes’ method: the difference in the noon sun’s angle between two places on one meridian, and the distance between them, give the planet’s size.',
     screen: 'gnomon',
     done: (s) => !!s.sheet.R1,

@@ -21,6 +21,7 @@ export function exerciseRange(id: ExerciseId) {
 
 /** Supply only prerequisites, in an isolated unscored teaching system. */
 export function prepareExercise(id: ExerciseId) {
+  if (id === 'shadows') { useGame.getState().go('gnomon'); return; }
   if (id === 'year') { useGame.getState().go('observatory'); return; }
   if (id === 'estimate-pendulum') { useGame.getState().go('pendulum'); return; }
   if (id === 'estimate-star') { useGame.getState().go('observatory'); jumpTo(nextDusk(clock.t)); return; }

@@ -1,6 +1,7 @@
 import { ARCSEC, DAY } from '../engine/constants';
 import { QUANTITY_INFO, type PrimaryKey } from '../engine/chain';
 import { showQuantity, sig } from './format';
+import { compareShadows } from './shadowObservation';
 import { analyzeYear, yearPoints } from './yearObservations';
 import type { GameState } from './store';
 
@@ -49,6 +50,18 @@ export function discoveryCard(s: GameState, module: string, assisted: boolean, a
     if (s.retroStudy) {
       card.summary.push({ label: 'Committed motion prediction', value: `${s.retroStudy.prediction} from day ${sig(s.retroStudy.anchorAt / DAY, 5)}` });
       if (s.retroStudy.result) card.summary.push({ label: 'Next saved sighting', value: `${sig(s.retroStudy.result.delta, 4)}° · ${s.retroStudy.result.direction} · day ${sig(s.retroStudy.result.at / DAY, 5)}` });
+    }
+  } else if (id === 'shadows') {
+    const a = compareShadows(s.shadows);
+    if (a.pair) {
+      const { camp, rover } = a.pair;
+      card.plot = [{ x: 0, y: camp.length! }, { x: rover.dist / 1000, y: rover.length! }];
+      card.xLabel = 'distance north of camp (km)'; card.yLabel = 'your marked shadow length (m)';
+      card.summary = [{ label: 'Synchronized observation', value: `expedition day ${sig(rover.at / DAY, 6)} · local solar day ${rover.solarDay! + 1}` },
+        { label: 'Surveyed baseline', value: `${sig(rover.dist / 1000, 5)} ± ${sig(rover.sigmaBaseline! / 1000, 3)} km north` },
+        ...[camp, rover].map((r) => ({ label: `${r.site} marked shadow`, value: `${sig(r.length!, 5)} ± ${sig(r.sigmaLength!, 3)} m · ${r.direction === 1 ? 'north' : 'south'} · solar hour ${sig(r.solarHours!, 5)}` })),
+        { label: 'Shared refraction treatment', value: camp.refraction ? `player k=${sig(camp.refraction.k, 4)} ± ${sig(camp.refraction.sigmaK, 3)}; raw marks retained` : 'Apparent shadows used; high-Sun refraction not removed' }];
+      if (a.result) card.summary.push({ label: 'Inference from your marks', value: `${sig(a.result.radius / 1000, 6)} km · working error estimate ${sig(a.result.sigma / 1000, 4)} km` });
     }
   } else if (id === 'moon') {
     const studies = s.moonStudies ?? [], latest = studies.at(-1);

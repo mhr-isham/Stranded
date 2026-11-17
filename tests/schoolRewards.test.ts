@@ -7,6 +7,8 @@ import { practiceSnapshot, leaveFlightPractice } from '../src/ui/common/flightPr
 import { loadSlot, saveSlot } from '../src/game/checkpoints';
 import { analyzeMoon, moonStudy } from '../src/game/moonObservations';
 import { ARCSEC } from '../src/engine/constants';
+import { makeShadowCapture, markedShadow, nextShadowNoon } from '../src/game/shadowObservation';
+import { currentWorld } from '../src/game/sim';
 
 beforeEach(() => {
   const data = new Map<string,string>();
@@ -15,6 +17,21 @@ beforeEach(() => {
   useGame.setState({ phase: 'play', schoolRewards: freshSchoolRewards(), training: {}, schoolSession: { id: 'year', start: 0, end: 0, completedSteps: [], assisted: false }, starObs: [0, 1, 26].map((d) => ({ at: d * DAY, v: (20 + d) * DEG })) });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('keeps player-marked shadow provenance on a discovery card without changing their expedition', () => {
+  const sys = currentWorld().system, at = nextShadowNoon(sys, 0)!;
+  const frame = makeShadowCapture(sys, at, 800000, 1000, 'school')!;
+  expect(frame).not.toBeNull();
+  const marks = [markedShadow(frame, 'camp', frame.camp.length, .01)!, markedShadow(frame, 'rover', frame.rover.length, .02)!];
+  const back = practiceSnapshot();
+  useGame.setState({ practiceReturn: back, schoolSession: { id: 'shadows', start: 0, end: 0, completedSteps: [], assisted: false }, shadows: marks });
+  recordTraining('exercise:shadows', 'completed');
+  const card = useGame.getState().schoolRewards.cards['exercise:shadows'].latest;
+  expect(card.plot).toEqual([{ x: 0, y: marks[0].length }, { x: 800, y: marks[1].length }]);
+  expect(card.summary.some((r) => r.value.includes('0.02'))).toBe(true);
+  leaveFlightPractice(); expect(useGame.getState().shadows).toEqual(back.state.shadows);
+  expect(useGame.getState().schoolRewards.cards['exercise:shadows'].latest).toEqual(card);
+});
 
 it('archives selected moon observations and restores expedition comparison work after practice', () => {
   const obs = Array.from({ length: 81 }, (_, i) => ({ at: i * DAY / 4, v: 30 * Math.sin(2 * Math.PI * i / 4 / 3.3) * ARCSEC }));

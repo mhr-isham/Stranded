@@ -1,3 +1,4 @@
+import { compareShadows } from '../../game/shadowObservation';
 import { analyzeYear } from '../../game/yearObservations';
 // The Flight School script: every step of the hands-on tutorial, from the
 // first look at the HUD to a successful launch and the debrief.
@@ -901,5 +902,24 @@ export const STEPS: TutStep[] = [
       'You measured a planet, a star and a moon with your own hands and flew between worlds on your own numbers. That is how astronomers actually worked out the size of our solar system.',
       'Ready for the real thing? Start the **Campaign** from the title screen — or a **Single expedition** — with new systems, real life-support pressure, and an optional **survival mode**. All lessons stay available in the **Codex**.',
     ],
+  },
+  // Standalone alternative experiment: kept after the Basic Training endpoint.
+  {
+    id: 'shadow-lesson', chapter: 'Shadows', title: 'Two sticks can measure a world',
+    lesson: 'refraction', autoLesson: true,
+    body: ['Explore the diagram if you like. Then deploy the rover north before choosing a shared local noon. This is an alternative radius method, not an extra task for every expedition.'],
+  },
+  {
+    id: 'shadow-pair', chapter: 'Shadows', title: 'Capture, mark and compare',
+    target: 'shadow-stage shadow-capture shadow-route', screen: 'gnomon',
+    body: ['Drive north and use **Wait for rover**. Near local noon, **Capture both shadow views**. Mark the fuzzy tip’s centre in **Camp view**, keep it, then do the same in **Rover view**. The frozen views give you time to think.'],
+    tip: 'Use the clock control to pause at the next local noon. Pointer, arrow keys and a numeric marker field are all available.',
+    done: (s) => !!compareShadows(s.shadows).result,
+  },
+  {
+    id: 'shadow-send', chapter: 'Shadows', title: 'Keep your radius estimate',
+    target: 'shadow-comparison', screen: 'gnomon',
+    body: ['Your two marked shadows give a radius candidate. Open **Use this radius**, enter your uncertainty and send it. The optional review explains timing, refraction and shared errors. Finishing saves your work in the Flight School logbook.'],
+    done: (s) => !!s.sheet.R1 && !!compareShadows(s.shadows).result,
   },
 ];

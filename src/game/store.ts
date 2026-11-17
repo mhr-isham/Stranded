@@ -1,6 +1,7 @@
 import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
 import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
+import type { ShadowReading } from './shadowObservation';
 import type { MoonStudy } from './moonObservations';
 import type { RetroStudy } from './observedMotion';
 // Persistent game state (zustand + localStorage). Time itself lives in clock.ts.
@@ -230,10 +231,10 @@ export interface GameState {
   /** Chapter 5: the solar camera that times transits. */
   sunCamOn: boolean;
   sunLog: TimedValue[];
-  /** Chapter 3: noon-shadow (gnomon) readings at camp and at the rover. */
-  shadows: { site: 'camp' | 'rover'; at: number; alt: number; dist: number }[];
+  /** Dated shadow observations; legacy records retain their original fields. */
+  shadows: ShadowReading[];
   /** Chapter 3: the rover's trip due north (m) for the second gnomon. */
-  northTrip: { dist: number; arriveAt: number };
+  northTrip: { dist: number; arriveAt: number; from?: number; departAt?: number };
   /** Where and how the ship came down in the prologue. */
   camp: CampInfo | null;
   predictions: Prediction[];

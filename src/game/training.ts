@@ -16,6 +16,7 @@ export type TrainingGroup = typeof TRAINING_GROUPS[number]['id'];
 export const EXERCISES = [
   { id: 'basic', group: 'instruments', title: 'Basic Training', first: 'welcome', last: 'graduate', description: 'The complete guided measurement-to-flight journey.' },
   { id: 'gravity', group: 'instruments', title: 'Use the pendulum', first: 'lesson-pendulum', last: 'pend-send', description: 'Measure length, time swings, repeat and state an uncertainty.' },
+  { id: 'shadows', group: 'instruments', title: 'Measure with two noon shadows', first: 'shadow-lesson', last: 'shadow-send', description: 'Deploy the rover, mark synchronized shadow views and infer the planet’s radius.' },
   { id: 'radius', group: 'instruments', title: 'Read the horizon dip', first: 'lesson-horizon', last: 'hill-send', description: 'Climb, aim, read the dip and measure the planet.' },
   { id: 'sky', group: 'instruments', title: 'Find and track a planet', first: 'lesson-twinkle', last: 'sky-moon', description: 'Identify a steady light and start the trackers.' },
   { id: 'year', group: 'instruments', title: 'Log and fit the year', first: 'lesson-year', last: 'year-send', description: 'Take observations over a baseline and fit the drift.' },

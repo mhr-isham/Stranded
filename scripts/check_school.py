@@ -22,7 +22,7 @@ with sync_playwright() as p:
         page.evaluate('''()=>{__game.getState().newGame(91,{difficulty:'navigator',sound:false,survival:false,formulas:true});__clock.t=123;__clock.paused=true;__game.setState({phase:'title',savedT:123,sheet:{g:{value:9.81,sigma:.2}}})}''')
         page.get_by_role('button', name='Flight School', exact=False).click()
         lib = library(page)
-        assert lib.locator('[data-training]').count() == 48
+        assert lib.locator('[data-training]').count() == 49
         assert lib.get_by_role('combobox', name='Skill group', exact=True).locator('option').count() == 7
         assert lib.get_by_role('button', name='Open · The distances of the stars', exact=True).is_enabled()
         stellar = lib.locator('[data-training="lesson:stellar"]')
@@ -144,4 +144,4 @@ with sync_playwright() as p:
         assert not errors, errors
         page.close()
     browser.close()
-print('PASS 48-module library, filters/search, skip/view/complete/repeat, guided exercise and assisted completion, chapter recommendations, optional campaign start, safe return to title/live expedition at phone/desktop widths')
+print('PASS 49-module library, filters/search, skip/view/complete/repeat, guided exercise and assisted completion, chapter recommendations, optional campaign start, safe return to title/live expedition at phone/desktop widths')

@@ -98,7 +98,7 @@ export function Tutorial() {
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const session = s.schoolSession;
   const originalStep = STEPS[idx];
-  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance', 'size', 'moon'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance', 'Size', 'Moon'].includes(originalStep.chapter)));
+  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance', 'size', 'moon', 'shadows'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance', 'Size', 'Moon'].includes(originalStep.chapter)));
   const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
   const step: TutStep = predictionKind ? {
     ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
@@ -108,7 +108,7 @@ export function Tutorial() {
     doIt: undefined, action: undefined, warn: undefined, lesson: undefined,
   } : observationGuide ? { ...originalStep, dim: false, followTarget: false, compact: true } : originalStep;
   const first = session?.start ?? 0;
-  const last = session?.end ?? STEPS.length - 1;
+  const last = session?.end ?? STEPS.findIndex((item) => item.id === 'graduate');
   const [box, setBox] = useState<Box | null>(null);
   const [lesson, setLesson] = useState<LessonId | null>(null);
   const [mini, setMini] = useState(false);
@@ -219,6 +219,7 @@ export function Tutorial() {
 
   if (mini && observationGuide && phone) { cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))'; cardStyle.bottom = 'auto'; }
   if (mini && originalStep.chapter === 'Size') { cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))'; cardStyle.bottom = 'auto'; cardStyle.left = phone ? 8 : 16; cardStyle.right = 'auto'; cardStyle.transform = 'none'; if (!phone) cardStyle.width = 380; if (phone && vh < 500) cardStyle.width = 180; }
+  if (mini && originalStep.chapter === 'Shadows' && phone && vh < 500) { cardStyle.width = 240; cardStyle.right = 8; cardStyle.left = 'auto'; cardStyle.transform = 'none'; }
   // Keep the complete swing-count dialog clear, including its Calculate button.
   if (step.id === 'pend-count' && box) {
     cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))';

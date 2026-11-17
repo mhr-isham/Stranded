@@ -39,6 +39,8 @@ export const EQUATIONS: Record<string, string> = {
     'a_{\\mathrm m}=d\\tan\\theta_{\\mathrm m} \\\\ M_2=\\frac{4\\pi^2 a_{\\mathrm m}^3}{GP_{\\mathrm m}^2}',
   'sun altitude = atan(stick / shadow)': '\\text{sun altitude}=\\arctan\\left(\\frac{\\text{stick}}{\\text{shadow}}\\right)',
   'R₁ = d / Δ (Δ in radians)': 'R_1=\\frac{d}{\\Delta}\\quad(\\Delta\\text{ in radians})',
+  'z = atan(shadow / stick), R₁ = d / |zᵣ − z꜀| (signed angles in radians)': 'z=\\arctan\\left(\\frac{\\text{shadow}}{\\text{stick}}\\right)\\quad\\text{(signed)} \\\\ R_1=\\frac{d}{|z_{\\mathrm r}-z_{\\mathrm c}|}\\quad\\text{(radians)}',
+  'h_apparent = h_geometric + (2k / 60)° cot h_geometric': 'h_{\\mathrm{apparent}}=h_{\\mathrm{geometric}}+\\left(\\frac{2k}{60}\\right)^\\circ\\cot h_{\\mathrm{geometric}}',
   '1/S_G = 1/P₁ − 1/P_G': '\\frac{1}{S_G}=\\frac{1}{P_1}-\\frac{1}{P_G}',
   'M_G = 4π² (d_G tan θ_G)³ / (G P²)': 'M_G=\\frac{4\\pi^2(d_G\\tan\\theta_G)^3}{GP^2}',
   't = π√((a₁+a₂)³ / 8GM★), φ = 180° − 360°·t/P₂':

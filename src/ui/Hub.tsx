@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { shadowAvailable } from '../game/shadowObservation';
 import { DEG } from '../engine/constants';
 import { clock } from '../game/clock';
 import { activeMission } from '../game/missions';
@@ -39,9 +40,9 @@ export function Hub() {
     ];
     if (survival) list.push({ kind: 'workshop' as StationKind, az: 207 * DEG, alt: -3 * DEG, size: 5 * DEG, label: 'Workshop', icon: '🔧', screen: 'workshop' });
     if (chapter === 2 || freeRoam) list.push({ kind: 'probe', az: 130 * DEG, alt: -3.4 * DEG, size: 5 * DEG, label: 'Probe bay', icon: '🛰', screen: 'probe' });
-    if (chapter === 3 || freeRoam) list.push({ kind: 'gnomon', az: 154 * DEG, alt: -3.6 * DEG, size: 3.5 * DEG, label: 'Shadow stick', icon: '📐', screen: 'gnomon' });
+    if (shadowAvailable(sys)) list.push({ kind: 'gnomon', az: 154 * DEG, alt: -3.6 * DEG, size: 3.5 * DEG, label: 'Shadow stick', icon: '📐', screen: 'gnomon' });
     return list;
-  }, [land, survival, chapter, freeRoam]);
+  }, [land, survival, chapter, freeRoam, sys]);
   const tagRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const cam = useRef({ az: 165 * DEG, drag: null as null | { x: number; az: number }, scale: 1 });
 

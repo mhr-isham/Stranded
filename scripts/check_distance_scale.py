@@ -83,7 +83,7 @@ with sync_playwright() as p:
         # observations/time. Closing without Got it must not earn its patch.
         page.evaluate("__game.getState().newGame(91,{difficulty:'navigator',sound:false,survival:false,formulas:true});__clock.t=123;__clock.paused=true;__game.setState({phase:'title',savedT:123,sheet:{g:{value:9.81,sigma:.2}},training:{},schoolRewards:{patches:{},cards:{},milestones:{}}})")
         page.get_by_role('button',name='Flight School',exact=False).click()
-        assert library(page).locator('[data-training]').count()==48
+        assert library(page).locator('[data-training]').count()==49
         module=library(page).locator('[data-training="lesson:distance-scale"]')
         module.get_by_role('button',name=re.compile('^Open')).click()
         lab=page.get_by_role('region',name='Changing distance mini expedition',exact=True)
