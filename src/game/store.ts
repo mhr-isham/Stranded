@@ -1,4 +1,5 @@
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
+import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
 import type { RetroStudy } from './observedMotion';
 // Persistent game state (zustand + localStorage). Time itself lives in clock.ts.
 
@@ -47,6 +48,7 @@ export interface Reading {
   note: string;
   /** Observed quantities retained for optional prediction training. */
   pendulum?: { length: number; period: number; swings?: number; time?: number; technique?: PendulumTechnique };
+  parallax?: ParallaxReading;
   environment?: MeasurementEnvironment;
 }
 
@@ -179,6 +181,8 @@ export interface GameState {
   training: TrainingHistory;
   schoolRewards: SchoolRewards;
   retroStudy: RetroStudy | null;
+  parallaxPair: ParallaxPair | null;
+  parallaxInvestigations: ParallaxInvestigationRecord[];
   readingPredictions: ReadingPredictions;
   instrumentSetup: { pendulumScreen: boolean };
   schoolOpen: { chapter?: number } | null;
@@ -311,6 +315,8 @@ const initial = {
   training: {} as TrainingHistory,
   schoolRewards: freshSchoolRewards(),
   retroStudy: null as RetroStudy | null,
+  parallaxPair: null as ParallaxPair | null,
+  parallaxInvestigations: [] as ParallaxInvestigationRecord[],
   readingPredictions: {} as ReadingPredictions,
   instrumentSetup: { pendulumScreen: false },
   schoolOpen: null as GameState['schoolOpen'],

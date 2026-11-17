@@ -69,7 +69,7 @@ function restore(snap: Snapshot) {
   clock.t = snap.t;
   clock.stopAt = Infinity;
   clock.paused = true;
-  useGame.setState({ ...snap.state, hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
+  useGame.setState({ ...snap.state, parallaxPair: snap.state.parallaxPair ?? null, parallaxInvestigations: snap.state.parallaxInvestigations ?? [], hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
 }
 
 export const listSlots = () => read().slots;

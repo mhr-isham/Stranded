@@ -94,3 +94,13 @@ it('archives a tested motion prediction with its recorded comparison rather than
   expect(card.summary.find(r=>r.label==='Next saved sighting')?.value).toContain('east');
   expect(card.plot).toHaveLength(2);
 });
+
+it('keeps the completed parallax investigation on its card after the camera pair is closed', () => {
+  const s=useGame.getState();
+  useGame.setState({schoolSession:{...s.schoolSession!,id:'distance'},parallaxPair:null,parallaxInvestigations:[{captureId:'test:1',at:123,projectedBaseline:2e6,prediction:'up',comparison:{dx:0,dy:1e-5,shift:1e-5,direction:'down'}}]});
+  recordTraining('exercise:distance','completed');
+  const card=useGame.getState().schoolRewards.cards['exercise:distance'].first;
+  expect(card.summary).toContainEqual({label:'Committed parallax prediction',value:'up'});
+  expect(card.summary.find(r=>r.label==='Compared camera marks')?.value).toContain('down');
+  expect(card.summary).toContainEqual({label:'Compared sideways baseline',value:'2000.0 km'});
+});

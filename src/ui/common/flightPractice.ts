@@ -41,6 +41,8 @@ export function leaveFlightPractice() {
     training: s.training,
     schoolRewards: s.schoolRewards,
     retroStudy: back.state.retroStudy ?? null,
+    parallaxPair: back.state.parallaxPair ?? null,
+    parallaxInvestigations: back.state.parallaxInvestigations ?? [],
     tutorial: { ...(back.state.tutorial ?? { active: false, step: 0, flags: [], lessons: [] }), lessons: [...new Set([...(back.state.tutorial?.lessons ?? []), ...s.tutorial.lessons])] },
     settings: { ...settings, flightSensitivity: s.settings.flightSensitivity, flightReducedMotion: s.settings.flightReducedMotion, skyReducedFlicker: s.settings.skyReducedFlicker, skyTrackTrail: s.settings.skyTrackTrail },
   });

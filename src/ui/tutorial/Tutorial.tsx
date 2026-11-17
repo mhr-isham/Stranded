@@ -93,7 +93,7 @@ export function Tutorial() {
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const session = s.schoolSession;
   const originalStep = STEPS[idx];
-  const observationGuide = !!session && (['year', 'opposition', 'synodic'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic'].includes(originalStep.chapter)));
+  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance'].includes(originalStep.chapter)));
   const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
   const step: TutStep = predictionKind ? {
     ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
@@ -298,7 +298,8 @@ export function Tutorial() {
           </div>
         )}
         <div className="row tut-actions" style={{ marginTop: 8, gap: 6 }}>
-          {observationGuide && originalStep.chapter !== 'Year' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School motion investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Motion investigation panel</button>}
+          {observationGuide && originalStep.chapter === 'Distance' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School parallax investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Parallax investigation panel</button>}
+          {observationGuide && ['Opposition', 'Synodic'].includes(originalStep.chapter) && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School motion investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Motion investigation panel</button>}
           {(session?.id === 'year' || (session?.id === 'basic' && step.id.startsWith('year-'))) && <button className="btn small" onClick={() => { document.querySelector('[data-tut="year-investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Year investigation panel</button>}
           {(predictionKind || (session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send'))) && <button className="btn small" onClick={() => {
             const kind = predictionKind ?? (step.id === 'pend-send' ? 'pendulum' : 'star');

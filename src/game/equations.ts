@@ -1,5 +1,6 @@
 // Explicit typesetting of authored equations; no inference or evaluation of player input.
 export const EQUATIONS: Record<string, string> = {
+  "d ≈ B⊥ / p (p in radians)": "d\\approx\\frac{B_\\perp}{p}\\quad(p\\text{ in radians})",
   "T = t / N, ΔT = Δt / N": "T=\\frac{t}{N} \\\\ \\Delta T=\\frac{\\Delta t}{N}",
   "W = mg, W_here / W_Earth = g_here / g_Earth": "W=mg \\\\ \\frac{W_{\\mathrm{here}}}{W_{\\mathrm{Earth}}}=\\frac{g_{\\mathrm{here}}}{g_{\\mathrm{Earth}}}",
 

@@ -20,7 +20,7 @@ export interface SchoolRewards {
 export const freshSchoolRewards = (): SchoolRewards => ({ patches: {}, cards: {}, milestones: {} });
 export const SCHOOL_MILESTONES: Record<string, string> = {
   'first-observation': 'First field note', 'wider-baseline': 'Observation planner',
-  'predict-star': 'Star prediction tested', 'predict-pendulum': 'Swing prediction tested', 'predict-motion': 'Motion prediction tested',
+  'predict-star': 'Star prediction tested', 'predict-pendulum': 'Swing prediction tested', 'predict-motion': 'Motion prediction tested', 'predict-parallax': 'Parallax prediction tested',
 };
 
 const snapshotPlot = (points: { x: number; y: number }[]) => {
@@ -60,6 +60,15 @@ export function discoveryCard(s: GameState, module: string, assisted: boolean, a
       card.plot = snapshotPlot(readings.map((r, i) => ({ x: i + 1, y: r.value / QUANTITY_INFO[r.key].scale })));
       card.xLabel = 'kept reading'; card.yLabel = `${QUANTITY_INFO[key[id]!].symbol} (${QUANTITY_INFO[key[id]!].unit})`;
     }
+  }
+  if (id === 'distance' || id === 'basic') {
+    const record = s.parallaxInvestigations?.at(-1);
+    if (record) card.summary.unshift(
+      { label: 'Parallax investigations', value: String(s.parallaxInvestigations.length) },
+      { label: 'Committed parallax prediction', value: record.prediction },
+      { label: 'Compared camera marks', value: `${record.comparison.direction} · ${(record.comparison.shift * 648000 / Math.PI).toFixed(3)} arcsec` },
+      { label: 'Compared sideways baseline', value: `${(record.projectedBaseline / 1000).toFixed(1)} km` },
+    );
   }
   for (const [key, estimate] of Object.entries(s.sheet).slice(0, 10)) if (estimate && Number.isFinite(estimate.value) && Number.isFinite(estimate.sigma)) card.summary.push({ label: `Practice worksheet ${QUANTITY_INFO[key as PrimaryKey].symbol}`, value: showQuantity(key as PrimaryKey, estimate.value, estimate.sigma) });
   const prediction = id === 'estimate-star' ? s.readingPredictions.star : id === 'estimate-pendulum' ? s.readingPredictions.pendulum : undefined;

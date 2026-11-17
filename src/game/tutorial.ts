@@ -1,3 +1,4 @@
+import { projectedBaseline } from './parallaxObservation';
 import { analyzeYear, yearFitMessage } from './yearObservations';
 // Flight School: the hands-on tutorial. This module holds the tutorial's
 // runtime helpers: signals the UI raises when the player does something,
@@ -6,10 +7,9 @@ import { analyzeYear, yearFitMessage } from './yearObservations';
 
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { oppositions } from '../engine/ephemeris';
-import { horizonDip, moonOffset, parallaxShift, siteEastOf, starLongitude, surfaceGravity, targetAngularDiameter } from '../engine/measure';
+import { horizonDip, moonOffset, parallaxShift, parallaxSite, starLongitude, surfaceGravity, targetAngularDiameter } from '../engine/measure';
 import { makeRng } from '../engine/rng';
 import { localFrame, observerPos, starAltitude, toHorizontal, topocentric } from '../engine/sky';
-import { norm, sub } from '../engine/vec';
 import { QUANTITY_INFO, keysFor, truthValues, type PrimaryKey } from '../engine/chain';
 import { variantOf } from '../engine/chapters';
 import { clock } from './clock';
@@ -148,11 +148,13 @@ export function doParallax() {
   const s = useGame.getState();
   const sys = sysNow();
   const dist = s.rover.dist || 3000e3;
-  const rover = siteEastOf(sys, sys.site, dist);
+  const rover = parallaxSite(sys, sys.site, dist);
   const t = clock.t;
-  const B = norm(sub(observerPos(sys, t, sys.site), observerPos(sys, t, rover)));
-  const p = parallaxShift(sys, t, sys.site, rover) + rng.normal(0, 0.15 * ARCSEC);
-  s.addReading({ key: 'dPar', value: B / p, at: t, note: 'ECHO · blink comparator' });
+  const body = sys.giant ? 'giant' : 'target';
+  const B = projectedBaseline(observerPos(sys, t, sys.site), observerPos(sys, t, rover), topocentric(sys, body, t, sys.site));
+  const p = parallaxShift(sys, t, sys.site, rover, body) + rng.normal(0, 0.15 * ARCSEC);
+  if (!(p > 0 && B > 0)) return;
+  s.addReading({ key: 'dPar', value: B / p, at: t, note: 'ECHO · projected-baseline blink comparator' });
 }
 
 export function doMicrometer() {
