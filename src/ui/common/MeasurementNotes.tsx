@@ -31,6 +31,7 @@ export function MeasurementNotes({ reading }: { reading: Reading }) {
         {e.horizon.correction.source === 'echo-humidity' && <div>Episodic humidity calibration only; persistent layering can remain.</div>}
       </>}
     </>}
+    {reading.micrometer && <div>Manual micrometer · live sighting with {reading.micrometer.revisions} revision{reading.micrometer.revisions === 1 ? '' : 's'}. Wire A {fmt(Math.atan(reading.micrometer.wireA) * 648000 / Math.PI, 3)}″, B {fmt(Math.atan(reading.micrometer.wireB) * 648000 / Math.PI, 3)}″; field {fmt(reading.micrometer.field * 648000 / Math.PI, 1)}″. Re-marking this observing instant updates one sighting. Different timestamps alone do not establish independent errors.</div>}
     {e.seeing?.frozen && <div>Repeated marks on this frozen image pair are not independent exposures.</div>}
   </details>;
 }

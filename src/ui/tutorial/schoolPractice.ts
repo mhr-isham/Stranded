@@ -31,7 +31,7 @@ export function prepareExercise(id: ExerciseId) {
   const provided = botMeasure(sys, PERFECT, makeRng(812)).primaries;
   if (id === 'sheet') useGame.setState({ sheet: { g: provided.g, R1: provided.R1 } });
   else if (id === 'planning') useGame.setState({ sheet: provided });
-  else if (id === 'distance' || id === 'size') useGame.setState({ sheet: { g: provided.g, R1: provided.R1, P1: provided.P1, ...(id === 'size' ? { dPar: provided.dPar } : {}) } });
+  else if (id === 'distance' || id === 'size') useGame.setState({ sheet: { g: provided.g, R1: provided.R1, P1: provided.P1, ...(id === 'size' ? { dPar: provided.dPar, S2: provided.S2, tOpp: provided.tOpp } : {}) } });
   else if (id === 'opposition' || id === 'synodic') useGame.setState({ sheet: { P1: provided.P1 } });
   else if (id === 'moon') useGame.setState({ sheet: { P1: provided.P1, dPar: provided.dPar, alpha2: provided.alpha2 } });
   if (id === 'size' || id === 'moon') jumpTo(darkNightNear(tutorialOppositions()[0] + (id === 'moon' ? 20 : 0) * DAY));

@@ -1,3 +1,4 @@
+import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
 import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
 import type { RetroStudy } from './observedMotion';
@@ -49,6 +50,7 @@ export interface Reading {
   /** Observed quantities retained for optional prediction training. */
   pendulum?: { length: number; period: number; swings?: number; time?: number; technique?: PendulumTechnique };
   parallax?: ParallaxReading;
+  micrometer?: MicrometerObservation;
   environment?: MeasurementEnvironment;
 }
 

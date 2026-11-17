@@ -61,6 +61,16 @@ export function discoveryCard(s: GameState, module: string, assisted: boolean, a
       card.xLabel = 'kept reading'; card.yLabel = `${QUANTITY_INFO[key[id]!].symbol} (${QUANTITY_INFO[key[id]!].unit})`;
     }
   }
+  if (id === 'size' || id === 'basic') {
+    const reading = s.readings.filter((r) => r.kept && r.key === 'alpha2' && r.micrometer?.interpretation).at(-1);
+    const review = reading?.micrometer?.interpretation;
+    if (review) card.summary.unshift(
+      { label: 'Your size interpretation', value: `${(review.radius / 1000).toFixed(1)} ± ${(review.sigma / 1000).toFixed(1)} km · day ${(review.at / DAY).toFixed(4)}` },
+      { label: 'Your angular range', value: `${(review.alpha * 648000 / Math.PI).toFixed(3)} ± ${(review.sigmaAlpha * 648000 / Math.PI).toFixed(3)} arcsec` },
+      { label: 'Model separation at diameter date', value: `${(review.distance / 1e9).toFixed(3)} million km` },
+      { label: 'Uncertainty contributions', value: `model ${(review.sigmaModel / 1000).toFixed(1)} km; angular ${(review.sigmaAngle / 1000).toFixed(1)} km` },
+    );
+  }
   if (id === 'distance' || id === 'basic') {
     const record = s.parallaxInvestigations?.at(-1);
     if (record) card.summary.unshift(

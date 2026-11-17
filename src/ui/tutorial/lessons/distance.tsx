@@ -1,3 +1,4 @@
+import { AngularSizeLab } from '../AngularSizeLab';
 import { DistanceScaleLab } from '../DistanceScaleLab';
 import { ParallaxGeometryLab } from '../ParallaxGeometryLab';
 import { Equation } from '../../common/Equation';
@@ -5,7 +6,6 @@ import { useState } from 'react';
 import { DAY, G, M_EARTH } from '../../../engine/constants';
 import { ArrowDefs, Demo, LessonShell, Note, P, Slider, fmtN, useAnimTime } from './common';
 
-const AS = Math.PI / 648000; // one arcsecond in radians
 
 export function ParallaxLesson() {
   return <LessonShell kicker="Lesson 11 · Parallax" title="Two viewpoints reveal the distance"
@@ -29,57 +29,13 @@ export function DistanceScaleLesson() {
 }
 
 export function AngularLesson() {
-  const [Rkm, setR] = useState(6000);
-  const [dM, setD] = useState(80);
-  const alpha = 2 * Math.atan((Rkm * 1e3) / (dM * 1e9));
-  const aAs = alpha / AS;
-  const dpx = 80 + dM * 2.2;
-  const rpx = 12 + Rkm / 400;
-  return (
-    <LessonShell
-      kicker="Lesson 12 · Angular size"
-      title="Angle × distance = size"
-      demo={
-        <Demo h={240}>
-          <svg viewBox="0 0 600 220">
-            <ArrowDefs />
-            <circle cx={40} cy={110} r={5} fill="#ffc46b" />
-            <text x={40} y={135} fill="#ffc46b" fontSize={12} textAnchor="middle">
-              telescope
-            </text>
-            <circle cx={40 + dpx} cy={110} r={rpx} fill="#2f7fd0" />
-            <line x1={40} y1={110} x2={40 + dpx} y2={110 - rpx} stroke="#6cc4ff" />
-            <line x1={40} y1={110} x2={40 + dpx} y2={110 + rpx} stroke="#6cc4ff" />
-            <text x={70} y={106} fill="#6cc4ff" fontSize={14} fontWeight={700}>
-              α
-            </text>
-            <line x1={52 + dpx} y1={110 - rpx} x2={52 + dpx} y2={110} stroke="#5be3a4" markerStart="url(#arrow-green)" markerEnd="url(#arrow-green)" />
-            <text x={58 + dpx} y={110 - rpx / 2} fill="#5be3a4" fontSize={12}>
-              R₂
-            </text>
-            <text x={40 + dpx / 2} y={200} fill="#e8eefc" fontSize={12} textAnchor="middle">
-              distance d
-            </text>
-          </svg>
-          <Slider label="Planet radius R₂" value={Rkm} min={2000} max={12000} step={100} onChange={setR} fmt={(v) => `${v} km`} />
-          <Slider label="Distance d" value={dM} min={30} max={200} step={1} onChange={setD} fmt={(v) => `${v} million km`} />
-          <dl className="kv">
-            <dt>Angular diameter α</dt>
-            <dd className="blue">{fmtN(aAs, 1)}″</dd>
-          </dl>
-        </Demo>
-      }
-      formula={<Equation tex={"R_2=d\\tan\\left(\\frac{\\alpha}{2}\\right)\\approx\\frac{d\\alpha}{2}"} />}
-      keyIdea="A coin held at arm’s length can cover the Moon: something small and near can look as big as something huge and far. If you know the distance, the angle tells you the true size."
-      warn="The disk is only tens of arcseconds across and its edge is blurred by the air (“seeing”). Measure it several times and average."
-      tip="Measure the disk on the same night as your parallax images — then the distance you use is right for that moment."
-    >
-      <P>
-        Your telescope’s <b>micrometer</b> has two fine wires you can move. Put one on each edge of the planet’s disk and it reads the angle
-        between them, α.
-      </P>
-    </LessonShell>
-  );
+  return <LessonShell kicker="Lesson 12 · Angular size" title="Angle and distance reveal a planet’s size" demo={<Demo><AngularSizeLab /></Demo>}
+    keyIdea="The same apparent disk at twice the distance implies twice the physical radius. Both the angle and distance uncertainty matter."
+    warn="Blur, edge judgement and shared alignment errors remain. Repeated adjustments at one observing instant are revisions, not more independent data."
+    tip="Select wire A or B, move it onto one edge, then repeat for the other. The focused size course offers a separate optional interpretation of your own dated readings.">
+    <P>The filar micrometer measures angular diameter. Use the model separation at that sighting’s date to convert it to a physical radius.</P>
+    <P>Try keeping two teaching cases with the same angle and different distances, then change each uncertainty separately. These examples do not supply true values for your expedition.</P>
+  </LessonShell>;
 }
 
 export function MoonLesson() {

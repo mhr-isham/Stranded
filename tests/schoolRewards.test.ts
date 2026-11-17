@@ -104,3 +104,13 @@ it('keeps the completed parallax investigation on its card after the camera pair
   expect(card.summary.find(r=>r.label==='Compared camera marks')?.value).toContain('down');
   expect(card.summary).toContainEqual({label:'Compared sideways baseline',value:'2000.0 km'});
 });
+
+it('archives a saved micrometer interpretation as the player’s dated work without an accuracy verdict',()=>{
+  const s=useGame.getState();
+  useGame.setState({schoolSession:{...s.schoolSession!,id:'size'},readings:[{id:'size-review',key:'alpha2',kept:true,value:1e-4,at:123,note:'manual',micrometer:{sightingId:'s:123',wireA:-.00005,wireB:.00005,field:.001,stepArcsec:.1,realSampleMs:100,revisions:1,interpretation:{radius:6000e3,sigma:200e3,distance:120e9,sigmaModel:150e3,sigmaAngle:132e3,alpha:1e-4,sigmaAlpha:1e-6,at:123,anchorAt:0,assumedAnchor:false}}}]});
+  recordTraining('exercise:size','completed');
+  const card=useGame.getState().schoolRewards.cards['exercise:size'].first;
+  expect(card.summary.find(r=>r.label==='Your size interpretation')?.value).toContain('6000.0');
+  expect(card.summary.find(r=>r.label==='Model separation at diameter date')?.value).toContain('120.000');
+  expect(card.summary.find(r=>r.label==='Uncertainty contributions')?.value).toContain('model 150.0');
+});

@@ -98,7 +98,7 @@ export function Tutorial() {
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const session = s.schoolSession;
   const originalStep = STEPS[idx];
-  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance'].includes(originalStep.chapter)));
+  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance', 'size'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance', 'Size'].includes(originalStep.chapter)));
   const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
   const step: TutStep = predictionKind ? {
     ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
@@ -218,6 +218,7 @@ export function Tutorial() {
   }
 
   if (mini && observationGuide && phone) { cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))'; cardStyle.bottom = 'auto'; }
+  if (mini && originalStep.chapter === 'Size') { cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))'; cardStyle.bottom = 'auto'; cardStyle.left = phone ? 8 : 16; cardStyle.right = 'auto'; cardStyle.transform = 'none'; if (!phone) cardStyle.width = 380; if (phone && vh < 500) cardStyle.width = 180; }
   // Keep the complete swing-count dialog clear, including its Calculate button.
   if (step.id === 'pend-count' && box) {
     cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))';
@@ -303,6 +304,7 @@ export function Tutorial() {
           </div>
         )}
         <div className="row tut-actions" style={{ marginTop: 8, gap: 6 }}>
+          {observationGuide && originalStep.chapter === 'Size' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School angular-size investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Size interpretation panel</button>}
           {observationGuide && originalStep.chapter === 'Distance' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School parallax investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Parallax investigation panel</button>}
           {observationGuide && ['Opposition', 'Synodic'].includes(originalStep.chapter) && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School motion investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Motion investigation panel</button>}
           {(session?.id === 'year' || (session?.id === 'basic' && step.id.startsWith('year-'))) && <button className="btn small" onClick={() => { document.querySelector('[data-tut="year-investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Year investigation panel</button>}

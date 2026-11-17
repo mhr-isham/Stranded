@@ -587,3 +587,16 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .distance-scale-lab { font-size: 13px; }
 .distance-scale-lab input[type="range"] { width: 100%; }
 .distance-teaching-row { padding: 6px; border-left: 2px solid var(--amber); overflow-wrap: anywhere; }
+.micrometer-controls { position: absolute; left: 10px; right: 10px; bottom: 9px; padding: 8px; background: rgba(9, 16, 30, .96); display: grid; gap: 5px; }
+.micrometer-controls .row { gap: 5px; }
+.micrometer-controls .btn[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+.micrometer-controls .input { width: 75px; padding: 6px; font-size: 12px; }
+.micrometer-controls .faint { font-size: 11px; }
+.angular-size-lab { font-size: 13px; }
+.angular-size-lab > svg { width: 100%; border-radius: 9px; background: #080e19; }
+.angular-size-lab input[type="range"] { width: 100%; }
+@media (max-width: 860px) and (max-height: 500px) {
+  .micrometer-controls { left: auto; right: 8px; top: calc(var(--hud-h) + 8px + var(--safe-top)); bottom: auto; width: 178px; padding: 5px; }
+  .micrometer-controls .btn { font-size: 10px; padding: 5px; }
+  .micrometer-controls .input { width: 58px; font-size: 10px; }
+}

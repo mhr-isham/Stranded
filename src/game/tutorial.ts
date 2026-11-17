@@ -159,6 +159,8 @@ export function doParallax() {
 }
 
 export function doMicrometer() {
+  const state = useGame.getState();
+  if (state.schoolSession && state.readings.some((r) => r.key === 'alpha2' && r.kept && Math.abs(r.at - clock.t) < 1)) jumpTo(clock.t + 60);
   const sys = sysNow();
   const a = targetAngularDiameter(sys, clock.t, sys.site) + rng.normal(0, 0.25 * ARCSEC);
   useGame.getState().addReading({ key: 'alpha2', value: a, at: clock.t, note: 'ECHO · micrometer' });
