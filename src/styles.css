@@ -526,3 +526,14 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .pendulum-milestone div { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .technique-badge { border: 1px solid var(--amber); border-radius: 8px; padding: 8px; color: var(--amber); font-size: 12px; }
 .technique-badge span { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.hill-trip-preview { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; font-weight: 400; }
+.hill-controls { width: min(440px, calc(100% - 16px)); }
+.hill-controls .row { gap: 6px; flex-wrap: wrap; }
+.hill-controls .readout { display: block; font-size: 26px; }
+.hill-stability { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.hill-stability meter { width: 54px; height: 12px; }
+.hill-key-help { font-size: 10px; margin-top: 5px; }
+.hill-journey { position: absolute; z-index: 7; top: calc(var(--hud-h) + var(--safe-top) + 10px); left: 50%; transform: translateX(-50%); width: min(360px, calc(100% - 20px)); text-align: center; font-size: 13px; }
+.hill-journey div { font-size: 11px; color: var(--muted); margin: 4px 0; }
+.hill-journey progress { width: 100%; }

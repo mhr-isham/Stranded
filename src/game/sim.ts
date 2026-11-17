@@ -242,19 +242,39 @@ export function checkMissions() {
  * Spend game time on an action (climbing, salvaging): fast-forward to the end,
  * then call onDone. Everything that happens meanwhile is simulated normally.
  */
-export function spendTime(duration: number, onDone: () => void) {
+export function spendTime(duration: number, onDone: () => void, options: { pauseOnArrival?: boolean } = {}) {
   const target = clock.t + duration;
-  const prev = clock.warpIndex;
+  const runId = useGame.getState().runId;
+  const prev = clock.warpIndex, wasPaused = clock.paused;
   clock.stopAt = target;
+  clock.pauseAtStop = !!options.pauseOnArrival;
   clock.warpIndex = duration > 2 * DAY ? WARPS.length - 2 : duration > 6 * 3600 ? 5 : 3;
   clock.paused = false;
   clock.emit();
+  let done = false;
   const id = setInterval(() => {
-    if (clock.t >= target - 1 || useGame.getState().phase !== 'play') {
+    if (useGame.getState().runId !== runId) { clearInterval(id); done = true; return; }
+    const arrived = options.pauseOnArrival ? clock.t >= target : clock.t >= target - 1;
+    if (arrived || useGame.getState().phase !== 'play') {
       clearInterval(id);
+      done = true;
       clock.warpIndex = prev;
       clock.emit();
       onDone();
     }
   }, 50);
+  // Callers can abandon a local action without leaving a timer or time warp
+  // attached to a tool that is no longer open. Other callers may ignore this.
+  return () => {
+    clearInterval(id);
+    const arrived = !!options.pauseOnArrival && clock.stopAt === Infinity && clock.paused && Math.abs(clock.t - target) < 1;
+    if (!done && useGame.getState().runId === runId && (clock.stopAt === target || arrived)) {
+      clock.stopAt = Infinity;
+      clock.pauseAtStop = false;
+      clock.warpIndex = prev;
+      if (useGame.getState().phase === 'play') clock.paused = arrived || wasPaused || clock.paused;
+      clock.emit();
+    }
+    done = true;
+  };
 }

@@ -294,7 +294,7 @@ export const STEPS: TutStep[] = [
     title: 'Climb to the summit',
     target: 'hill-stations',
     screen: 'hill',
-    body: ['Tap **Summit**. Climbing takes a few hours of game time (watch the clock).'],
+    body: ['Check the height and expedition-time preview, then tap **Summit**. Travel uses the expedition clock; it pauses when you arrive.'],
     warn: 'At camp you are only 1.7 m up: the dip is about 0.04°, so even a 0.005° reading error would make R wrong by 25%. Height is everything here.',
     done: (s) => has(s, 'hill-summit'),
   },
@@ -317,7 +317,7 @@ export const STEPS: TutStep[] = [
     title: 'Brace and read',
     target: 'hill-controls',
     screen: 'hill',
-    body: ['Hold **Brace** to steady your hands for a few seconds, wait for a still moment with the horizon on the line, then press **Read angle**.'],
+    body: ['Activate **Brace (4 s)** to reduce hand sway. Watch its countdown, wait for a still moment with the horizon on the line, then press **Read angle**. Keyboard users can brace with Space while the instrument is focused.'],
     done: (s) => has(s, 'hill-read'),
   },
   {

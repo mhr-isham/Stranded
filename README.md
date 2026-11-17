@@ -121,3 +121,5 @@ Sky-discovery browser checks: with the development server running, run `python s
 Pendulum observation checks: run `python scripts/check_pendulum.py` against the development server. It covers manual timing, optional timing comparisons, Earth-relative gravity with player uncertainty, keyboard counting, clock states, reloads and formula preferences at phone/desktop sizes. See [pendulum QA](reports/pendulum-observation-qa.md).
 
 Pendulum technique checks: run `python scripts/check_technique.py` against the development server. It times real twenty-swing and repeat-release observations, checks cosmetic milestone persistence and false-count rejection, and verifies ECHO labels at phone/desktop sizes. See [technique QA](reports/pendulum-technique-qa.md).
+
+Hill observation checks: run `python scripts/check_hill.py` against the development server. It verifies previewed/charged travel times, arrival and cancellation, keyboard/touch/high-DPI aiming, bracing, equipment provenance and expert-mode behavior. See [hill QA](reports/hill-observation-qa.md).

@@ -22,6 +22,7 @@ export function MeasurementNotes({ reading }: { reading: Reading }) {
     {e.wind && <div>{e.wind.protection === 'none' ? 'Exposed measurement.' : e.wind.protection === 'echo' ? 'ECHO physically stabilized the rig.' : 'You fitted the windscreen before timing.'} No numerical wind correction was applied.</div>}
     {e.horizon && <>
       <div>{e.horizon.station}, eye height {fmt(e.horizon.height, 1)} m. {e.horizon.legacyCompensated ? 'Legacy displayed dip' : 'Apparent dip'} {fmt(e.horizon.rawAngle / DEG, 4)}°; dip used {fmt(e.horizon.usedAngle / DEG, 4)}°.</div>
+      {e.horizon.aim && <div>At capture: {e.horizon.aim.tripod ? 'tripod fitted' : 'hand-held'}, {e.horizon.aim.braced ? 'braced' : 'unbraced'}; scale step {fmt(e.horizon.aim.stepDeg, 3)}°; magnification {fmt(e.horizon.aim.zoom, 1)}×. Stabilization does not remove refraction.</div>}
       {e.horizon.legacyCompensated && <div>The original uncompensated angle was not captured by this legacy sight.</div>}
       {e.horizon.correction && <>
         <div>k = {fmt(e.horizon.correction.k, 3)} ± {fmt(e.horizon.correction.sigmaK, 3)}. Used result: {value(reading.value)}.</div>

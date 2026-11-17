@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEG, HOUR } from '../../engine/constants';
+import { DEG } from '../../engine/constants';
 import { horizonDip } from '../../engine/measure';
 import { useMode } from '../../game/modes';
 import { starAltitude } from '../../engine/sky';
@@ -14,12 +14,16 @@ import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { CanvasView } from '../common/CanvasView';
 import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlierNote } from '../common/sheetBits';
+import { braceSeconds, hillPitch, hillTravel, travelTime } from '../../game/hillObservation';
 import { toast, useGameTime } from '../common/widgets';
 
 const EYE = 1.7;
+interface HillView { pitch: number; drag: null | { y: number; p: number }; braceUntil: number; sway: number; adjusted: boolean }
 
 export function Hill() {
-  useEffect(() => stopInstrument, []);
+  const cancelTravel = useRef<null | (() => void)>(null);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; cancelTravel.current?.(); stopInstrument(); }; }, []);
   const hillMode = useMode();
   const { system: sys } = currentWorld();
   const s = useGame();
@@ -36,7 +40,7 @@ export function Hill() {
     { name: 'Summit', h: H },
   ];
   const [at, setAt] = useState(0);
-  const [moving, setMoving] = useState(false);
+  const [moving, setMoving] = useState<null | { to: number; due: number; duration: number }>(null);
   const [zoom, setZoom] = useState(4);
   const autoAvailable = ANOMALIES[s.settings.difficulty].announce === 'corrected' && (s.settings.rulesetVersion ?? 1) >= 3;
   const legacyCompensated = ANOMALIES[s.settings.difficulty].announce === 'corrected' && !autoAvailable;
@@ -47,7 +51,7 @@ export function Hill() {
   const manualValid = estimateK.trim() !== '' && sigmaK.trim() !== '' && Number(sigmaK) > 0 && !!correctHorizon(1, .001, Number(estimateK), Number(sigmaK));
   const [result, setResult] = useState<null | { theta: number; R: number; h: number; untouched: boolean; environment: MeasurementEnvironment }>(null);
   const keptR = s.readings.filter((r) => r.key === 'R1' && r.kept).map((r) => r.value);
-  const view = useRef({ pitch: -0.3, drag: null as null | { y: number; p: number }, brace: 0, sway: 0 });
+  const view = useRef<HillView>({ pitch: -0.3, drag: null, braceUntil: 0, sway: 0, adjusted: false });
   const h = stations[at].h + EYE;
   // Thick air (chapter 3) bends the light from the horizon down to the eye, so
   // the horizon looks higher than it is: apparent dip ≈ true dip · √(1 − k).
@@ -56,25 +60,35 @@ export function Hill() {
   const k = Math.min(0.9, sys.features.refraction + humidity);
   const dip = (horizonDip(sys.home.radius, h) * Math.sqrt(1 - k)) / DEG;
 
+  const tripTo = (i: number) => hillTravel(stations, at, i, s.camp?.hillKm ?? 4)!;
   const climb = (i: number) => {
     if (i === at || moving) return;
-    const dh = Math.abs(stations[i].h - stations[at].h);
-    // Walking out from camp to the foot of the hill (and back) takes time too.
-    const walk = at === 0 || i === 0 ? ((s.camp?.hillKm ?? 4) / 4) * HOUR : 0;
-    const dur = (dh / 350 + 0.25) * HOUR + walk;
-    setMoving(true);
-    spendTime(dur, () => {
+    const duration = tripTo(i).total, due = clock.t + duration, runId = s.runId;
+    view.current.drag = null;
+    view.current.braceUntil = 0;
+    setMoving({ to: i, due, duration });
+    cancelTravel.current = spendTime(duration, () => {
+      const current = useGame.getState();
+      if (!mounted.current || current.runId !== runId || current.phase !== 'play' || clock.t < due) return;
+      cancelTravel.current = null;
       setAt(i);
-      setMoving(false);
+      setMoving(null);
       if (i === stations.length - 1) flag('hill-summit');
       view.current.pitch = -0.3;
-      toast(`${stations[i].name}: ${stations[i].h} m above camp`);
-    });
+      view.current.adjusted = false;
+      toast(`${stations[i].name}: ${stations[i].h} m above camp · expedition paused`);
+    }, { pauseOnArrival: true });
   };
+  const nudge = (delta: number) => {
+    if (moving) return;
+    const next = hillPitch(view.current.pitch + delta);
+    if (next !== view.current.pitch) { view.current.pitch = next; view.current.adjusted = true; sfx('detent'); }
+  };
+  const brace = () => { if (!moving) { view.current.braceUntil = performance.now() + 4000; sfx('detent'); } };
 
   const ppdFor = (hpx: number) => hpx / (4 / zoom);
   const read = () => {
-    if (treatment === 'manual' && !manualValid) return;
+    if (moving || (treatment === 'manual' && !manualValid)) return;
     const atTime = clock.t;
     const reading = Math.round(view.current.pitch / res) * res;
     const apparent = -reading * DEG;
@@ -88,10 +102,10 @@ export function Hill() {
     const used = apply ? correctHorizon(h, apparent, calibration.k, calibration.sigmaK) : raw;
     if (!raw || !used) return toast('The angle or refraction estimate is outside this model. Check the inputs.');
     const environment: MeasurementEnvironment = { instrument: 'horizon', at: atTime, rawValue: raw.radius, horizon: {
-      height: h, station: stations[at].name, rawAngle: apparent, usedAngle: used.angle, damp: instrumentHumidK(s, atTime) > 0, legacyCompensated,
+      height: h, station: stations[at].name, aim: { braced: performance.now() < view.current.braceUntil, tripod, stepDeg: res, zoom }, rawAngle: apparent, usedAngle: used.angle, damp: instrumentHumidK(s, atTime) > 0, legacyCompensated,
       ...(apply ? { correction: { source: treatment === 'manual' ? 'player' : 'echo-humidity', ...calibration, sigmaValue: used.sigmaValue, ...(treatment === 'auto' ? { sampledAt: atTime } : sampleAt !== null ? { sampledAt: sampleAt } : {}) } } : {}),
     } };
-    setResult({ theta: used.angle, R: used.radius, h, untouched: Math.abs(view.current.pitch + 0.3) < 1e-9, environment });
+    setResult({ theta: used.angle, R: used.radius, h, untouched: !view.current.adjusted, environment });
     flag('hill-read');
     sfx('measure');
   };
@@ -100,30 +114,45 @@ export function Hill() {
     <div className="tool">
       <div className="tool-stage" data-tut="hill-stage">
         <CanvasView
+          tabIndex={0} role="img" aria-label="Horizon instrument; arrows adjust pitch, plus or minus zoom, Space braces, Enter reads"
+          onKeyDown={(e) => {
+            if (!['ArrowUp', 'ArrowDown', '+', '=', '-', '_', ' ', 'b', 'B', 'Enter'].includes(e.key)) return;
+            e.preventDefault(); e.stopPropagation();
+            if (moving) return;
+            if (e.key === 'ArrowUp') nudge(res * (e.shiftKey ? 10 : 1));
+            else if (e.key === 'ArrowDown') nudge(-res * (e.shiftKey ? 10 : 1));
+            else if (e.key === '+' || e.key === '=') setZoom((z) => Math.min(60, z + 1));
+            else if (e.key === '-' || e.key === '_') setZoom((z) => Math.max(1, z - 1));
+            else if (!e.repeat && e.key === 'Enter') read();
+            else if (!e.repeat) brace();
+          }}
           onPointerDown={(e) => {
+            if (moving) return;
             sfx('detent');
             (e.target as Element).setPointerCapture(e.pointerId);
             view.current.drag = { y: e.clientY, p: view.current.pitch };
           }}
           onPointerMove={(e) => {
             const d = view.current.drag;
-            if (!d) return;
+            if (!d || moving) return;
             const c = e.currentTarget;
-            const ppd = ppdFor(c.height) / (window.devicePixelRatio || 1);
+            const ppd = ppdFor(c.clientHeight);
             // Fine control: drag moves the instrument a quarter of the apparent motion.
-            view.current.pitch = d.p + ((e.clientY - d.y) / ppd) * 0.25;
+            const next = hillPitch(d.p + ((e.clientY - d.y) / ppd) * 0.25);
+            if (next !== view.current.pitch) view.current.adjusted = true;
+            view.current.pitch = next;
             sfx('detent');
           }}
           onPointerUp={() => (view.current.drag = null)}
-          onWheel={(e) => setZoom((z) => Math.max(1, Math.min(60, z * (e.deltaY < 0 ? 1.15 : 0.87))))}
-          draw={({ ctx, w, h: hp, dpr, now, dt }) => {
+          onPointerCancel={() => (view.current.drag = null)}
+          onWheel={(e) => { if (!moving) setZoom((z) => Math.max(1, Math.min(60, z * (e.deltaY < 0 ? 1.15 : 0.87)))); }}
+          draw={({ ctx, w, h: hp, dpr, now }) => {
             const wind = windAt(useGame.getState(), clock.t);
             setInstrument('wind', 0.22 + Math.min(0.4, wind / 30) + (at / 3) * 0.15, Math.min(1, wind / 12));
             const V = view.current;
             const tt = now / 1000;
             // Hand sway: smooth, quasi-periodic. Bracing and a tripod steady it.
-            V.brace = Math.max(0, V.brace - dt);
-            const amp = 0.012 * (tripod ? 0.2 : 1) * (V.brace > 0 ? 0.3 : 1);
+            const amp = 0.012 * (tripod ? 0.2 : 1) * (now < V.braceUntil ? 0.3 : 1);
             V.sway = amp * (Math.sin(tt * 1.3) + 0.6 * Math.sin(tt * 2.9 + 1) + 0.3 * Math.sin(tt * 7.1 + 2)) / 1.9;
             const ppd = ppdFor(hp);
             const eff = V.pitch + V.sway;
@@ -154,8 +183,8 @@ export function Hill() {
               ctx.stroke();
             }
             // Instrument reticle (fixed to the instrument, so it does not sway).
-            ctx.strokeStyle = 'rgba(255,90,90,0.9)';
-            ctx.lineWidth = 1.2 * dpr;
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 3.5 * dpr;
             ctx.beginPath();
             ctx.moveTo(w * 0.15, hp / 2);
             ctx.lineTo(w * 0.45, hp / 2);
@@ -166,6 +195,8 @@ export function Hill() {
             ctx.moveTo(w / 2, hp / 2 + 8 * dpr);
             ctx.lineTo(w / 2, hp / 2 + 30 * dpr);
             ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,110,110,.95)';
+            ctx.lineWidth = 1.2 * dpr; ctx.stroke();
             // Elevation scale relative to the instrument's own level.
             const step = pickStep(4 / zoom);
             ctx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -184,24 +215,26 @@ export function Hill() {
             ctx.fillRect(0, 0, w, hp);
           }}
         />
-        <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="hill-controls">
+        {moving && <div className="panel panel-pad hill-journey" role="status" aria-label="Hill journey"><b>Traveling to {stations[moving.to].name}</b><div>About {travelTime(Math.max(0, moving.due - t))} of expedition time remaining</div><progress aria-label="Hill travel progress" max={moving.duration} value={Math.max(0, Math.min(moving.duration, moving.duration - (moving.due - t)))} /></div>}
+        <section className="panel panel-pad stage-bottom hill-controls" style={{ padding: '8px 12px' }} data-tut="hill-controls" aria-label="Horizon aiming controls">
           <div className="meter-label">Instrument pitch</div>
-          <PitchReadout view={view} res={res} />
+          <PitchReadout view={view} res={res} tripod={tripod} />
           <div className="row" style={{ marginTop: 6 }}>
-            <button className="btn small" onClick={() => (view.current.pitch += res)}>
+            <button className="btn small" aria-label="Raise instrument" disabled={!!moving} onClick={() => nudge(res)}>
               ▲
             </button>
-            <button className="btn small" onClick={() => (view.current.pitch -= res)}>
+            <button className="btn small" aria-label="Lower instrument" disabled={!!moving} onClick={() => nudge(-res)}>
               ▼
             </button>
-            <button className="btn small amber" onPointerDown={() => (view.current.brace = 4)}>
-              Brace (hold breath)
+            <button className="btn small amber" disabled={!!moving} onClick={brace}>
+              Brace (4 s)
             </button>
-            <button className="btn small primary" disabled={treatment === 'manual' && !manualValid} onClick={read}>
+            <button className="btn small primary" disabled={!!moving || (treatment === 'manual' && !manualValid)} onClick={read}>
               Read angle
             </button>
           </div>
-        </div>
+          <div className="faint hill-key-help">Arrows: fine aim · Shift: coarse · + / −: zoom · Space: brace · Enter: read</div>
+        </section>
       </div>
       <div className="tool-side">
         <ToolHeader title="The hill" sub="Measure how far the horizon dips below level. The dip depends on your height and the planet’s radius." />
@@ -239,24 +272,25 @@ export function Hill() {
           <b>Where are you?</b>
           <div className="stack" data-tut="hill-stations">
             {stations.map((st, i) => (
-              <button key={st.name} className={`btn ${i === at ? 'primary' : ''}`} style={{ justifyContent: 'space-between' }} disabled={moving} onClick={() => climb(i)}>
-                <span>{st.name}</span>
+              <button key={st.name} className={`btn ${i === at ? 'primary' : ''}`} style={{ justifyContent: 'space-between', textAlign: 'left' }} disabled={!!moving || i === at} aria-current={i === at ? 'location' : undefined} data-hill-station={i} onClick={() => climb(i)}>
+                <span>{st.name}<small className="hill-trip-preview">{i === at ? 'Here' : `≈ ${travelTime(tripTo(i).total)} expedition time`}</small></span>
                 <span className="mono">{st.h} m</span>
               </button>
             ))}
           </div>
-          {moving && <div className="amber">Climbing…</div>}
+          <div className="faint" aria-label="Current survey height">At {stations[at].name}: ground {stations[at].h} m · eye height {fmt(h, 1)} m above camp.</div>
           <div className="muted" style={{ fontSize: 13 }}>
-            Heights come from the survey markers on the path. Your eye is {EYE} m above the ground. Climbing takes time.
+            Heights come from survey markers. Your eye adds {EYE} m. The previews include walking between camp and the hill, vertical travel and a 15-minute allowance per trip. Travel uses ordinary expedition time and supplies; arrival pauses the expedition clock.
           </div>
+          <div className="faint">Leaving this tool cancels unfinished travel; time already spent is not refunded.</div>
           <b>Aim</b>
           <div className="muted" style={{ fontSize: 13 }}>
             Drag the view up/down until the horizon sits exactly on the red crosshair. Zoom in for precision. Your hands shake — brace, wait for a
-            still moment, then read.
+            still moment, then read. Negative pitch is below level. Fine steps are {fmt(res, 3)}°; the mechanical range is −15° to +15°. Bracing and a tripod reduce sway; they do not remove atmospheric refraction.
           </div>
           <div className="row">
             <span className="muted" style={{ fontSize: 13 }}>Zoom {fmt(zoom, 0)}×</span>
-            <input type="range" min={1} max={60} step={1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={{ flex: 1 }} />
+            <input type="range" aria-label="Horizon magnification" disabled={!!moving} min={1} max={60} step={1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={{ flex: 1 }} />
           </div>
           <Formula>R = h·cos θ / (1 − cos θ)  ≈ 2h / θ²</Formula>
         </div>
@@ -320,12 +354,13 @@ function pickStep(spanDeg: number) {
   return 1;
 }
 
-function PitchReadout({ view, res }: { view: React.MutableRefObject<{ pitch: number }>; res: number }) {
+function PitchReadout({ view, res, tripod }: { view: React.MutableRefObject<HillView>; res: number; tripod: boolean }) {
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((x) => x + 1), 80);
     return () => clearInterval(id);
   }, []);
   const v = Math.round(view.current.pitch / res) * res;
-  return <div className="readout">{v.toFixed(3)}°</div>;
+  const remaining = braceSeconds(view.current.braceUntil, performance.now());
+  return <><output className="readout" aria-label="Instrument pitch">{v.toFixed(3)}°</output><div className="hill-stability" aria-live="off"><span>{tripod ? 'Tripod fitted' : 'Hand-held'}</span><span aria-label="Brace status">{remaining > 0 ? `Braced · ${remaining.toFixed(1)} s` : 'Unbraced'}</span><meter aria-label="Brace time remaining" min={0} max={4} value={remaining} /></div></>;
 }

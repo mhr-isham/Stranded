@@ -153,8 +153,8 @@ export function HorizonLesson() {
       }
       formula={<Equation tex={"\\cos\\theta=\\frac{R}{R+h} \\\\ R=\\frac{h\\cos\\theta}{1-\\cos\\theta}\\approx\\frac{2h}{\\theta^2}\\quad(\\theta\\text{ in radians})"} />}
       keyIdea="On a curved world the horizon sits a little below level, and the higher you stand the more it dips. The triangle formed by the planet’s centre, your eye and the horizon point turns that dip into the radius."
-      warn="Near the ground the dip is tiny, so a small reading error becomes a huge error in R (try h = 2 m). Always climb to the summit. Your hands shake, too — brace and wait for a steady moment before reading."
-      tip="Because R ≈ 2h/θ², the relative error in R is twice the relative error in θ. Zoom the instrument in and repeat readings to shrink it."
+      warn="Near the ground the dip is tiny, so a small reading error becomes a huge error in R (try h = 2 m). Higher stations give a larger dip: compare their height and travel time before choosing. Your hands shake, too — brace and wait for a steady moment before reading. Bracing does not remove refraction."
+      tip="Because R ≈ 2h/θ², the relative error in R is twice the relative error in θ. Zoom in and compare independent readings to investigate aiming scatter. Shared offsets and refraction still need separate care."
     >
       <P>
         Stand on a hill and look at the far horizon. If the ground were flat it would sit exactly at eye level. On a ball it drops away — by an
