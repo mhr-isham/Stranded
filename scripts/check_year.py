@@ -26,6 +26,7 @@ def guide(page):
     return page.get_by_role('dialog',name='Flight School',exact=True)
 
 def expand(page):
+    page.wait_for_timeout(200)  # Let the new step apply its initial compact layout.
     button=guide(page).get_by_role('button',name='Expand',exact=True)
     if button.count(): button.click()
 
@@ -34,7 +35,8 @@ def minimise(page):
     if button.count(): button.click()
 
 def step(page,id):
-    page.wait_for_function('async(id)=>{const {STEPS}=await __tut.steps();return STEPS[__game.getState().tutorial.step].id===id}',arg=id,timeout=30000)
+    index=page.evaluate('async(id)=>(await __tut.steps()).STEPS.findIndex(s=>s.id===id)',id)
+    page.wait_for_function('(index)=>__game.getState().tutorial.step===index',arg=index,timeout=30000)
 
 def library(page):
     return page.get_by_role('region',name='Flight School library',exact=True)

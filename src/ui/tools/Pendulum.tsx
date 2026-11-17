@@ -500,7 +500,7 @@ export function Pendulum() {
 
       {ask && (
         <Modal>
-          <div data-tut="pend-count" />
+          <div data-tut="pend-count">
           <h2>How many full swings?</h2>
           <p className="muted">
             You timed {fmt(ask.time, 2)} s. A full swing is there and back. {taps ? `You tapped ${taps}.` : ''}
@@ -526,6 +526,7 @@ export function Pendulum() {
               Calculate g
             </button>
           </div>
+        </div>
         </Modal>
       )}
     </div>

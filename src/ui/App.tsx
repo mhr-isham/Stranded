@@ -1,3 +1,4 @@
+import { SchoolRewardFeedback } from './SchoolRewards';
 import { useEffect } from 'react';
 import { clock } from '../game/clock';
 import { advance, currentWorld, fastForward } from '../game/sim';
@@ -86,6 +87,7 @@ export default function App() {
       {school && <FlightSchool recommendedChapter={school.chapter} onClose={() => useGame.setState({ schoolOpen: null })} />}
       {phase !== 'title' && phase !== 'prologue' && <StoryHost />}
       <ToastHost />
+      <SchoolRewardFeedback />
     </>
   );
 }

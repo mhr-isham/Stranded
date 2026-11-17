@@ -1,3 +1,4 @@
+import { discoveryCard, earnSchoolPatch, earnSchoolMilestone, freshSchoolRewards, type DiscoveryArtifact } from './schoolRewards';
 import type { LessonId } from '../ui/tutorial/lessons';
 import { useGame } from './store';
 import { chapterOf } from './campaign';
@@ -33,14 +34,20 @@ export interface TrainingProgress { status: 'started' | 'completed' | 'skipped';
 export type TrainingHistory = Partial<Record<string, TrainingProgress>>;
 
 /** Completion records acknowledge practice, not a test or a campaign gate. */
-export function recordTraining(id: string, status: TrainingProgress['status'], assisted = false) {
+export function recordTraining(id: string, status: TrainingProgress['status'], assisted = false, artifact?: DiscoveryArtifact) {
   const s = useGame.getState();
   if (s.training?.[id]?.status === 'completed' && status !== 'completed') return;
-  useGame.setState({ training: { ...s.training, [id]: { status, updated: Date.now(), ...(assisted ? { assisted: true } : {}) } } });
+  useGame.setState({ training: { ...s.training, [id]: { status, updated: Date.now(), ...(assisted ? { assisted: true } : {}) } }, ...(status === 'completed' ? { schoolRewards: earnSchoolPatch(s.schoolRewards ?? freshSchoolRewards(), discoveryCard(s, id, assisted, artifact)) } : {}) });
 }
 
 /** Recommendations are optional; all lessons and exercises remain open. */
 export function recommendedTraining(chapter: number) {
   const basics = chapter === 1 ? ['lesson:measure', 'exercise:gravity', 'exercise:radius', 'lesson:estimate', 'exercise:planning'] : [];
   return [...basics, ...chapterOf(chapter).lessons.map((id) => `lesson:${id}`)];
+}
+
+export function recordSchoolMilestone(id: string, assisted = false) {
+  const s = useGame.getState(), before = s.schoolRewards ?? freshSchoolRewards();
+  const schoolRewards = earnSchoolMilestone(before, id, assisted);
+  if (schoolRewards !== before) useGame.setState({ schoolRewards });
 }

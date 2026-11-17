@@ -5,6 +5,7 @@ import { Modal } from '../common/widgets';
 import { Equation } from '../common/Equation';
 
 export function EstimationWorkshop({ id, onClose }: { id: EstimationId; onClose: () => void }) {
+  const [attempt] = useState(() => Date.now());
   const [variant, setVariant] = useState(0);
   const [value, setValue] = useState('');
   const [range, setRange] = useState('');
@@ -38,8 +39,8 @@ export function EstimationWorkshop({ id, onClose }: { id: EstimationId; onClose:
           <RangeComparison value={committed.value} range={committed.range} reference={scenario.reference} referenceRange={scenario.range} />
           <Equation tex={scenario.tex} /><p>{scenario.explanation}</p>
           <p className="faint" style={{ fontSize: 12 }}>A worked model is one way to reason from the stated data. A different justified uncertainty can be reasonable; this exercise awards no points.</p>
-          <div className="row"><button className="btn primary" onClick={() => { recordTraining(`estimate:${id}`, 'completed', usedHint); onClose(); }}>Finish exercise</button>
-            <button className="btn" onClick={() => { recordTraining(`estimate:${id}`, 'completed', usedHint); setVariant(variant + 1); setValue(''); setRange(''); setCommitted(null); setRevealed(false); setHint(false); setUsedHint(false); }}>Try another example</button></div>
+          <div className="row"><button className="btn primary" onClick={() => { recordTraining(`estimate:${id}`, 'completed', usedHint, { attempt: `${attempt}:${variant}`, summary: [{ label: 'Teaching example', value: String(variant % 6 + 1) }, { label: 'Your committed estimate', value: `${committed.value} ± ${committed.range} ${scenario.unit}` }, { label: 'Worked model comparison', value: `${scenario.reference} ± ${scenario.range} ${scenario.unit}` }, ...scenario.data] }); onClose(); }}>Finish exercise</button>
+            <button className="btn" onClick={() => { recordTraining(`estimate:${id}`, 'completed', usedHint, { attempt: `${attempt}:${variant}`, summary: [{ label: 'Teaching example', value: String(variant % 6 + 1) }, { label: 'Your committed estimate', value: `${committed.value} ± ${committed.range} ${scenario.unit}` }, { label: 'Worked model comparison', value: `${scenario.reference} ± ${scenario.range} ${scenario.unit}` }, ...scenario.data] }); setVariant(variant + 1); setValue(''); setRange(''); setCommitted(null); setRevealed(false); setHint(false); setUsedHint(false); }}>Try another example</button></div>
         </>}
       </>}
     </section>

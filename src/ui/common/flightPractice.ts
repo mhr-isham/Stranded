@@ -39,8 +39,10 @@ export function leaveFlightPractice() {
     readingPredictions: back.state.readingPredictions ?? {},
     instrumentSetup: back.state.instrumentSetup ?? { pendulumScreen: false },
     training: s.training,
+    schoolRewards: s.schoolRewards,
+    retroStudy: back.state.retroStudy ?? null,
     tutorial: { ...(back.state.tutorial ?? { active: false, step: 0, flags: [], lessons: [] }), lessons: [...new Set([...(back.state.tutorial?.lessons ?? []), ...s.tutorial.lessons])] },
-    settings: { ...settings, flightSensitivity: s.settings.flightSensitivity, flightReducedMotion: s.settings.flightReducedMotion, skyReducedFlicker: s.settings.skyReducedFlicker },
+    settings: { ...settings, flightSensitivity: s.settings.flightSensitivity, flightReducedMotion: s.settings.flightReducedMotion, skyReducedFlicker: s.settings.skyReducedFlicker, skyTrackTrail: s.settings.skyTrackTrail },
   });
   clock.emit();
 }

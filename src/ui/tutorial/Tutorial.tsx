@@ -1,3 +1,4 @@
+import { SchoolProgress } from '../SchoolRewards';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { sfx } from '../../game/audio';
@@ -92,6 +93,7 @@ export function Tutorial() {
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const session = s.schoolSession;
   const originalStep = STEPS[idx];
+  const observationGuide = !!session && (['year', 'opposition', 'synodic'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic'].includes(originalStep.chapter)));
   const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
   const step: TutStep = predictionKind ? {
     ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
@@ -99,7 +101,7 @@ export function Tutorial() {
     body: [predictionKind === 'pendulum' ? 'Keep a baseline period using the rig. Measure a different string length, commit your prediction and range, then time and keep a new reading to compare.' : 'Open the Year tab and log the star at two different dusks. Commit a position and range about two weeks ahead, then advance to the target time and log again.'],
     done: (state) => state.readingPredictions[predictionKind]?.comparison !== undefined,
     doIt: undefined, action: undefined, warn: undefined, lesson: undefined,
-  } : session?.id === 'year' ? { ...originalStep, dim: false, followTarget: false, compact: true } : originalStep;
+  } : observationGuide ? { ...originalStep, dim: false, followTarget: false, compact: true } : originalStep;
   const first = session?.start ?? 0;
   const last = session?.end ?? STEPS.length - 1;
   const [box, setBox] = useState<Box | null>(null);
@@ -108,6 +110,9 @@ export function Tutorial() {
   const [confirmExit, setConfirmExit] = useState(false);
   const [extra, setExtra] = useState<'warn' | 'tip' | null>(null);
   const done = step.done ? step.done(s) : false;
+  const goalSteps = STEPS.slice(first, last + 1).filter((item) => item.done);
+  const goalIds = new Set(goalSteps.map((item) => item.id));
+  const goalsComplete = predictionKind ? Number(done) : new Set([...(session?.completedSteps ?? []).filter((id) => goalIds.has(id)), ...(done && step.done ? [step.id] : [])]).size;
   const advancing = useRef<number | null>(null);
 
   const goStep = (i: number) => {
@@ -207,6 +212,14 @@ export function Tutorial() {
     if (!phone) cardStyle[targetRight ? 'left' : 'right'] = 16;
   }
 
+  if (mini && observationGuide && phone) { cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))'; cardStyle.bottom = 'auto'; }
+  // Keep the complete swing-count dialog clear, including its Calculate button.
+  if (step.id === 'pend-count' && box) {
+    cardStyle.top = 'calc(var(--hud-h) + 8px + var(--safe-top))';
+    cardStyle.bottom = 'auto';
+    cardStyle.maxHeight = `max(72px, calc(${box.y - 16}px - var(--hud-h) - var(--safe-top)))`;
+  }
+
   const missingTarget = step.target && !box && step.screen && s.screen !== step.screen && s.phase === 'play';
   const progress = (idx - first + 1) / (last - first + 1);
   const chapters = [...new Set(STEPS.map((x) => x.chapter))];
@@ -220,7 +233,7 @@ export function Tutorial() {
           {arrow.ch}
         </div>
       )}
-      <div className={`tut-card panel ${mini ? 'mini' : ''} ${box ? '' : 'free'}`} style={cardStyle} role="dialog" aria-label="Flight School">
+      <div className={`tut-card panel ${mini ? 'mini' : ''} ${box ? '' : 'free'} ${observationGuide ? 'observation-guide' : ''}`} style={cardStyle} role="dialog" aria-label="Flight School">
         <div className="row between">
           <span className="meter-label" style={{ color: 'var(--amber)' }}>
             🎓 Flight School · {session ? `${idx - first + 1}/${last - first + 1}` : `${chapterNo}/${chapters.length}`} {step.chapter}
@@ -241,6 +254,7 @@ export function Tutorial() {
           {step.title} {done && step.done && <span className="tut-done">✓</span>}
         </h3>
         <div className="body">
+          {session && <SchoolProgress completed={goalsComplete} total={predictionKind ? 1 : goalSteps.length} />}
           {session && <p className="school-context">Unscored practice. Prerequisite observations may be supplied for this exercise; your expedition is preserved. Completing this guide records practice, not a skill certification.</p>}
           {session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send') && <p className="school-context">Optional: try the prediction practice in this instrument’s panel before continuing. It is skippable and has no points.</p>}
           {(session && step.id === 'debrief-grade' ? ['This practice run is unscored. Inspect the fuel and measurement feedback, then finish the exercise to restore your expedition.'] : step.body).map((p, i) => (
@@ -283,7 +297,8 @@ export function Tutorial() {
             {rich(step.tip)}
           </div>
         )}
-        <div className="row" style={{ marginTop: 8, gap: 6 }}>
+        <div className="row tut-actions" style={{ marginTop: 8, gap: 6 }}>
+          {observationGuide && originalStep.chapter !== 'Year' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School motion investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Motion investigation panel</button>}
           {(session?.id === 'year' || (session?.id === 'basic' && step.id.startsWith('year-'))) && <button className="btn small" onClick={() => { document.querySelector('[data-tut="year-investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Year investigation panel</button>}
           {(predictionKind || (session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send'))) && <button className="btn small" onClick={() => {
             const kind = predictionKind ?? (step.id === 'pend-send' ? 'pendulum' : 'star');

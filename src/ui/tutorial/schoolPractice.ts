@@ -44,12 +44,12 @@ export function prepareExercise(id: ExerciseId) {
   s.set({ savedT: clock.t });
 }
 
-export function startSchoolExercise(id: ExerciseId) {
+export function startSchoolExercise(id: ExerciseId, seed = 316) {
   const s = useGame.getState();
   const back = practiceSnapshot();
   const range = exerciseRange(id);
   recordTraining(`exercise:${id}`, 'started');
-  startRun(316, {
+  startRun(seed, {
     ...s.settings, difficulty: 'cadet', survival: false, formulas: true, challenges: [],
     freeRoam: true, freeRoamGuidance: false, showTruth: false, campaignRun: false, flightPractice: undefined,
   }, 1, () => {
@@ -60,6 +60,8 @@ export function startSchoolExercise(id: ExerciseId) {
       phase: 'play', screen: 'hub', identified: false, storyQueue: [], echo: [],
     });
     prepareExercise(id);
+    const prepared = useGame.getState();
+    prepared.set({ schoolSession: { ...prepared.schoolSession!, initialObservations: prepared.readings.length + prepared.starObs.length + prepared.track.length } });
   });
 }
 

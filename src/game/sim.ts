@@ -120,7 +120,8 @@ function stepTo(t1Wanted: number, dtReal: number) {
       // A locked planet has no nights: the tracker logs at every sample.
       if (s.trackOn && (night > lastNight || sys.features.locked)) {
         lastNight = night;
-        track.push({ at: t, v: Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES });
+        const ray = topocentric(sys, 'target', t, sys.site);
+        track.push({ at: t, v: Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES, skyLatitude: Math.round(Math.asin(ray[2] / norm(ray)) / TRACK_RES) * TRACK_RES, source: 'tracker' });
       }
       if (s.moonTrackOn && sys.features.moon) moon.push({ at: t, v: Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
     }

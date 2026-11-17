@@ -1,3 +1,4 @@
+import { SchoolLogbook } from './SchoolRewards';
 import { useEffect, useState } from 'react';
 import type { Difficulty } from '../engine/types';
 import { MODES, MODE_ORDER } from '../game/modes';
@@ -45,6 +46,7 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
       <span className={progress?.status === 'completed' ? 'green' : 'faint'} style={{ fontSize: 12 }}>{status}</span>
       <div className="row">
         <button className="btn small primary" onClick={action} aria-label={id.startsWith('flight:') ? title : undefined}>{progress?.status === 'completed' ? 'Repeat' : 'Open'} · {title}</button>
+        {id.startsWith('exercise:') && <button className="btn small" onClick={() => startSchoolExercise(id.slice(9) as typeof EXERCISES[number]['id'], Math.floor(Math.random() * 2147483647))}>New system</button>}
         {progress?.status !== 'completed' && <button className="btn small ghost" onClick={() => recordTraining(id, 'skipped')}>Skip for now</button>}
       </div>
     </article>;
@@ -56,6 +58,7 @@ export function FlightSchool({ onClose, recommendedChapter }: { onClose: () => v
         <p className="muted">Optional, unscored practice. Every module is available now. Lessons and exercises preserve your expedition; completed and skipped modules are remembered.</p>
         <p className="faint" style={{ fontSize: 12 }}>“Completed” records finishing a lesson or guided exercise, with help labeled. It is not an exam or a requirement to play.</p>
         {recommendedChapter && <div className="callout tip">Recommended for chapter {recommendedChapter}. You can jump into the campaign at any time.</div>}
+        <SchoolLogbook />
         <div className="school-filters">
           <label className="field">Skill group<select className="input" value={group} onChange={(e) => setGroup(e.target.value as typeof group)}>
             <option value="all">All skills</option>{TRAINING_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}

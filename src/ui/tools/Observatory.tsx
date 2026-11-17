@@ -1,3 +1,6 @@
+import { observedMotion, savedSkyDirection } from '../../game/observedMotion';
+import { ObservationReplay } from './ObservationReplay';
+import { RetroInvestigation } from '../tutorial/RetroInvestigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
@@ -15,7 +18,7 @@ import { paintSky, starRGB } from '../../render/paint';
 import { drawScope, scopeProjector, SEEING } from '../../render/telescope';
 import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
-import { Chart, unwrapDeg } from '../common/Chart';
+import { Chart } from '../common/Chart';
 import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierNote } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
@@ -297,6 +300,17 @@ export function Observatory() {
                 setAnchor('planet', r.left + tp.x / dpr, r.top + tp.y / dpr);
               }
               cam.current.scale = P.scale;
+              // Historical two-coordinate measurements, fixed against the star chart.
+              if (s.settings.skyTrackTrail && tab === 'track') {
+                ctx.strokeStyle = '#ffc46b'; ctx.lineWidth = 1.2 * dpr;
+                for (const measurement of s.track.filter((o) => o.at <= clock.t)) {
+                  const ray = savedSkyDirection(measurement);
+                  if (!ray) continue;
+                  const local = toLocalDir(ray, scene.frame), horizontal = toHorizontal(ray, scene.frame), point = P.project(local);
+                  if (!point || horizontal.alt <= skyline(land, horizontal.az) || point.x < 0 || point.x > w || point.y < 0 || point.y > h) continue;
+                  ctx.beginPath(); ctx.arc(point.x, point.y, 3 * dpr, 0, Math.PI * 2); ctx.stroke();
+                }
+              }
               // Selection ring and labels.
               const label = (d: [number, number, number], text: string, color: string) => {
                 const p = P.project(d);
@@ -590,7 +604,7 @@ export function Observatory() {
           />
         )}
 
-        {tab === 'track' && <TrackerPanel />}
+        {tab === 'track' && <TrackerPanel onWide={() => setMode('sky')} />}
         {tab === 'transit' && <TransitPanel onPoint={() => pointAt('star', 1.2)} />}
 
         {tab === 'micro' && (
@@ -745,25 +759,18 @@ function StarPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
   );
 }
 
-function TrackerPanel() {
+function TrackerPanel({ onWide }: { onWide: () => void }) {
   const s = useGame();
   const t = useGameTime(4);
   const [cursor, setCursor] = useState<number | null>(null);
   const obs = targetObservable(t);
   const { system: sysT } = currentWorld();
   const inner = sysT.features.inner;
-  const days = s.track.map((o) => o.at / DAY);
-  // An inner planet is shown by its elongation (angle from the star), which swings back and forth.
-  const lon = inner
-    ? s.track.map((o) => {
-        let e = (o.v - starLongitude(sysT, o.at, sysT.site)) / DEG;
-        e = ((e + 540) % 360) - 180;
-        return e;
-      })
-    : unwrapDeg(s.track.map((o) => o.v / DEG));
-  const pts = days.map((x, i) => ({ x, y: lon[i] }));
-  const picks = inner ? [] : [...s.oppPicks].sort((a, b) => a - b);
-  const S = picks.length >= 2 ? (picks[picks.length - 1] - picks[0]) / (picks.length - 1) : null;
+  const transformed = inner ? s.track.map((o) => ({ ...o, v: (((o.v - starLongitude(sysT, o.at, sysT.site)) / DEG + 540) % 360 - 180) * DEG })) : s.track;
+  const cadence = sysT.features.locked ? DAY / 8 : currentWorld().solarDay;
+  const replay = observedMotion(transformed, cadence), pts = replay.map(({ x, y }) => ({ x, y }));
+  const picks = inner ? [] : [...new Set(s.oppPicks.filter(Number.isFinite))].sort((a, b) => a - b);
+  const S = picks.length >= 2 && picks.at(-1)! > picks[0] ? (picks.at(-1)! - picks[0]) / (picks.length - 1) : null;
   return (
     <div className="panel panel-pad stack">
       <b>Blue planet tracker</b>
@@ -786,6 +793,8 @@ function TrackerPanel() {
           </div>
         </>
       )}
+      <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={!!s.settings.skyTrackTrail} onChange={(e) => { s.set({ settings: { ...s.settings, skyTrackTrail: e.target.checked } }); if (e.target.checked) onWide(); }} />Show saved sightings on the wide sky</label>
+      {s.settings.skyTrackTrail && <div className="faint">Gold rings are past recorded pointings in the current clear field. Only logs with a saved latitude can be placed here; older longitude-only records stay available in the chart replay. Pan the wide view to inspect them.</div>}
       <div data-tut="track-chart" className="stack">
       {pts.length > 1 && (
         <Chart
@@ -801,8 +810,7 @@ function TrackerPanel() {
       )}
       {pts.length > 1 && (
         <div className="faint" style={{ fontSize: 12 }}>
-          Drag across a region to zoom in, tap to place the cursor. Opposition is the middle of the backward (retrograde) loop, where the planet
-          moves backwards fastest.
+          Drag across a region to zoom in, tap to place a date cursor. For an outer planet, opposition lies within the backward interval, distinct from its two turning points. Near-circular examples can place it near the middle; an exact symmetry is not guaranteed.
         </div>
       )}
       {inner && pts.length > 1 && (
@@ -811,12 +819,14 @@ function TrackerPanel() {
           star (a rougher alternative to timing a transit).
         </div>
       )}
+      {pts.length > 0 && <><ObservationReplay points={replay} inner={inner} onCursor={setCursor} /><label className="field">Chart cursor day<input className="input" type="number" step="any" value={cursor ?? ''} min={pts[0].x} max={pts.at(-1)!.x} onChange={(e) => { const v = Number(e.target.value); setCursor(e.target.value !== '' && Number.isFinite(v) && v >= pts[0].x && v <= pts.at(-1)!.x ? v : null); }} /></label></>}
       {cursor !== null && (
         <div className="row between">
           <span className="mono">day {fmt(cursor, 2)}</span>
           <button
             className="btn primary small"
             onClick={() => {
+              if (s.oppPicks.some((at) => Math.abs(at - cursor * DAY) < 1)) return;
               s.set({ oppPicks: [...s.oppPicks, cursor * DAY] });
               setCursor(null);
               sfx('good');
@@ -851,7 +861,7 @@ function TrackerPanel() {
           )}
         </div>
       )}
-      {!inner && <RetroPrediction pts={pts} />}
+      {!inner && <><RetroInvestigation /><RetroPrediction pts={pts} /></>}
     </div>
   );
 }
@@ -882,13 +892,13 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
           The blue planet is moving <b>backwards</b> (retrograde). On which day will it stop and move forwards again?
         </>
       }
-      helper={`Bracket it: it can't be before opposition. The loop is a mirror image around opposition — it turned back around day ${start.toFixed(0)}; ${opp !== undefined ? `you marked opposition on day ${opp.toFixed(0)}, so mirror the gap.` : 'find the middle of the loop (opposition) and mirror the gap.'}`}
+      helper={`Bracket it: it can't be before opposition. A near-circular symmetry model gives a rough forecast, not an exact rule. It turned back around day ${start.toFixed(0)}; ${opp !== undefined ? `you marked opposition on day ${opp.toFixed(0)}, so mirror the gap.` : 'find the middle of the loop (opposition) and mirror the gap.'}`}
       pts={pts.slice(Math.max(0, iMax - 30))}
       axis="x"
       xMax={t / DAY + 120}
       xLabel="day"
       yLabel="longitude (°)"
-      ownFit={own}
+      ownFit={hasChallenge(s, 'handFit') ? null : own}
       sigma0={5}
       sigmaMax={40}
       pending={pending}

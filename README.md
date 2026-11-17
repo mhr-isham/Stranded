@@ -125,3 +125,5 @@ Pendulum technique checks: run `python scripts/check_technique.py` against the d
 Hill observation checks: run `python scripts/check_hill.py` against the development server. It verifies previewed/charged travel times, arrival and cancellation, keyboard/touch/high-DPI aiming, bracing, equipment provenance and expert-mode behavior. See [hill QA](reports/hill-observation-qa.md).
 
 Year investigation checks: run `python scripts/check_year.py` against the development server. It covers fit/baseline guards, date selection, manual-fit and formula restrictions, locked-world observations, interactive Flight School lessons and a complete native three-date practice exercise with expedition restoration. See [year QA](reports/year-observation-qa.md).
+
+Observation replay and Flight School reward checks: run `python scripts/check_replay_rewards.py` against the development server. It covers recorded-only playback, observation gaps, native sky-coordinate capture, a real motion-prediction investigation, completion recognition, saved discovery cards, reloads and expedition restoration at phone/desktop sizes. See [motion and rewards QA](reports/retrograde-school-rewards-qa.md).

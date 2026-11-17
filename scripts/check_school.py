@@ -84,6 +84,8 @@ with sync_playwright() as p:
         assert page.evaluate('__clock.t') == 123
         assert page.evaluate('__game.getState().training["exercise:gravity"].status') == 'completed'
         assert page.evaluate('__game.getState().training["exercise:gravity"].assisted')
+        assert page.evaluate('__game.getState().schoolRewards.patches["exercise:gravity"].assisted')
+        assert page.evaluate('__game.getState().schoolRewards.cards["exercise:gravity"].first.assisted')
         assert page.evaluate('__game.getState().atlas.length') == 0
         # A different exercise opens directly, without replaying Basic Training.
         library(page).get_by_role('button', name='Open · Read the horizon dip', exact=True).click()

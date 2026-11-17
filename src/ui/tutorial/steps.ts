@@ -706,9 +706,9 @@ export const STEPS: TutStep[] = [
     screen: 'observatory',
     body: [
       'Open the **Tracker** tab. The dots climb, dip back (retrograde) and climb again.',
-      '**Drag across the loop** to zoom in, **tap** its middle to place the cursor, then press **Mark opposition here**.',
+      'Replay your recorded sightings to see the reversals. **Drag across the loop** to zoom in, then place a cursor and press **Mark opposition here**. The optional motion investigation lets you predict and test another sighting.',
     ],
-    tip: 'The middle is halfway between the two turning points, where the planet moves backwards fastest.',
+    tip: 'Opposition lies inside the backward interval, distinct from the turning points. The middle is a useful approximation in the circular teaching system; allow uncertainty and check for asymmetry.',
     done: (s) => s.oppPicks.length >= 1,
     doIt: { run: () => doOpposition(0) },
   },

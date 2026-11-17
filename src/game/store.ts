@@ -1,3 +1,5 @@
+import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
+import type { RetroStudy } from './observedMotion';
 // Persistent game state (zustand + localStorage). Time itself lives in clock.ts.
 
 import { create } from 'zustand';
@@ -49,7 +51,8 @@ export interface Reading {
 }
 
 export interface TimedValue {
-  source?: 'manual' | 'echo';
+  source?: 'manual' | 'echo' | 'tracker';
+  skyLatitude?: number;
   at: number;
   v: number;
   environment?: MeasurementEnvironment;
@@ -74,6 +77,7 @@ export interface Settings {
   flightSensitivity?: number;
   flightReducedMotion?: boolean;
   skyReducedFlicker?: boolean;
+  skyTrackTrail?: boolean;
   flightPractice?: FlightLeg;
   /** Free Roam sandbox overlay: show the true values on the sheet. */
   showTruth?: boolean;
@@ -173,10 +177,12 @@ export interface GameState {
   lastNightLog: number;
   tutorial: TutorialState;
   training: TrainingHistory;
+  schoolRewards: SchoolRewards;
+  retroStudy: RetroStudy | null;
   readingPredictions: ReadingPredictions;
   instrumentSetup: { pendulumScreen: boolean };
   schoolOpen: { chapter?: number } | null;
-  schoolSession: { id: ExerciseId; start: number; end: number; completedSteps: string[]; assisted: boolean } | null;
+  schoolSession: { id: ExerciseId; start: number; end: number; completedSteps: string[]; assisted: boolean; initialObservations?: number } | null;
   /** Identifies this run, so checkpoints from an older run are ignored. */
   runId: number;
   /** Campaign chapter of this run (1 = the first system, also used for plain expeditions). */
@@ -303,6 +309,8 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
+  schoolRewards: freshSchoolRewards(),
+  retroStudy: null as RetroStudy | null,
   readingPredictions: {} as ReadingPredictions,
   instrumentSetup: { pendulumScreen: false },
   schoolOpen: null as GameState['schoolOpen'],
@@ -366,6 +374,7 @@ export const useGame = create<GameState>()(
           logs: get().logs ?? [],
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
           training: get().training ?? {},
+          schoolRewards: get().schoolRewards ?? freshSchoolRewards(),
         });
       },
       addReading: (r) =>
