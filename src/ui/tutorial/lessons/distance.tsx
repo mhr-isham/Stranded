@@ -1,3 +1,4 @@
+import { DistanceScaleLab } from '../DistanceScaleLab';
 import { ParallaxGeometryLab } from '../ParallaxGeometryLab';
 import { Equation } from '../../common/Equation';
 import { useState } from 'react';
@@ -15,6 +16,15 @@ export function ParallaxLesson() {
     <P>Your measured parallax anchors the distance scale used in later calculations. The laser link gives the straight line between the cameras; its sideways component is used with your measured angular shift.</P>
     <P>Background stars provide a shared reference. Both exposures retain their time and pointing, so switching frames changes viewpoint rather than observation date.</P>
     <P>Cassini and Richer used observations of Mars from Paris and French Guiana in 1672 to help establish the solar system’s scale.</P>
+  </LessonShell>;
+}
+
+export function DistanceScaleLesson() {
+  return <LessonShell kicker="Flight School · Dated distance" title="Changing distance, same orbit" demo={<Demo><DistanceScaleLab /></Demo>}
+    keyIdea="The telescope measures the separation between two planets at one time. Orbital radius describes a path around the star."
+    tip="Keep an aligned observation and a later one, then compare their inferred orbit sizes. Try a deliberately rough reading afterward.">
+    <P>In the outer teaching system, home orbits 100 million km from the star and the target 160 million km away. At opposition the gap is 60 million km; later it changes while those circular orbit sizes stay fixed.</P>
+    <P>The observation day tells the calculation which geometry to use. A later launch date does not replace that date. This experiment is optional and separate from your expedition.</P>
   </LessonShell>;
 }
 

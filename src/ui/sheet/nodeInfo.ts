@@ -8,7 +8,7 @@ export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; to
   P1: { what: 'How long our planet takes to go once around the star (our year).', formula: 'P₁ = 360° / daily drift of the star', tool: 'observatory', toolName: 'the observatory' },
   S2: { what: 'Time between two oppositions of the blue planet — how often we overtake it.', formula: 'S = t(opp 2) − t(opp 1)', tool: 'observatory', toolName: 'the tracker' },
   tOpp: { what: 'The date of an opposition: the blue planet directly opposite the star, closest to us. It fixes where the planets are.', tool: 'observatory', toolName: 'the tracker' },
-  dPar: { what: 'Distance to the blue planet when you imaged it from two sites.', formula: 'd = B / p', tool: 'rover', toolName: 'the rover' },
+  dPar: { what: 'Separation from home to the observed planet at the image date. This is not its orbital radius around the star.', formula: 'd ≈ B⊥ / p (p in radians)', tool: 'rover', toolName: 'the rover' },
   alpha2: { what: 'The angle the blue planet’s disk spans in the telescope.', tool: 'observatory', toolName: 'the micrometer' },
   thetaM: { what: 'How far the moon swings from the blue planet at its widest.', tool: 'observatory', toolName: 'the moon tracker' },
   Pm: { what: 'How long the moon takes to orbit the blue planet once.', tool: 'observatory', toolName: 'the moon tracker' },
@@ -16,7 +16,7 @@ export const NODE_INFO: Record<QuantityKey, { what: string; formula?: string; to
   P2: { what: 'The blue planet’s year.', formula: '1/P₂ = 1/P₁ − 1/S' },
   ratio: { what: 'How much bigger the blue planet’s orbit is than ours. Kepler’s third law — no masses needed.', formula: 'a₂/a₁ = (P₂/P₁)^(2/3)' },
   a1: { what: 'Radius of our orbit around the star — the absolute distance scale of the whole system.', formula: 'a₁ = d / √(1 + r² − 2r cos ψ),  ψ = 360°(t − t₀)/S' },
-  a2: { what: 'Radius of the blue planet’s orbit.', formula: 'a₂ = (a₂/a₁) · a₁' },
+  a2: { what: 'Size of the blue planet’s orbit around the star, derived from the dated separation and orbital periods.', formula: 'a₂ = (a₂/a₁) · a₁' },
   Mstar: { what: 'Mass of the star. It sets every orbital speed in the system.', formula: 'M★ = 4π² a₁³ / (G P₁²)' },
   R2: { what: 'Radius of the blue planet: where we will park our orbit.', formula: 'R₂ = d(t) · tan(α₂/2)' },
   aM: { what: 'Radius of the moon’s orbit around the blue planet.', formula: 'aₘ = d(t) · tan θₘ' },
@@ -44,7 +44,7 @@ export const HINTS: Record<QuantityKey, string[]> = {
   P1: ['The star seems to move against the background stars as we orbit it.', 'Log the star’s position at dusk or dawn, wait weeks, log again. Divide 360° by the drift per day.', 'Example: 18.4° in 20 days → 0.92°/day → P₁ = 360/0.92 ≈ 391 days.'],
   S2: ['How often do we lap the blue planet?', 'Time from one opposition to the next.', 'Mark the middle of two retrograde loops in the tracker; their separation is S.'],
   tOpp: ['When is the blue planet exactly opposite the star?', 'In the middle of its backward (retrograde) loop against the stars.', 'Zoom into the loop; the midpoint between where it stops and turns back on each side is opposition.'],
-  dPar: ['Hold a finger up and blink each eye. What changes?', 'Image the planet from two sites at the same instant. Its shift p against far-away stars gives d = B/p.', 'Example: B = 3000 km, p = 8.0″ = 3.88×10⁻⁵ rad → d = 3000/3.88×10⁻⁵ ≈ 77 million km.'],
+  dPar: ['Hold a finger up and blink each eye. What changes?', 'Image the planet from two sites at the same instant. Its shift p and the across-sightline baseline B⊥ give d ≈ B⊥/p.', 'Example: B = 3000 km, p = 8.0″ = 3.88×10⁻⁵ rad → d = 3000/3.88×10⁻⁵ ≈ 77 million km.'],
   alpha2: ['How big does the disk look?', 'Zoom right in and put the micrometer wires on opposite edges.', 'Measure near opposition; repeat several times and average.'],
   thetaM: ['The moon swings back and forth. How far?', 'Log its offset for a few weeks and fit a sine wave; the amplitude is θₘ.', 'Use data around opposition, when the planet is closest and the swing looks biggest.'],
   Pm: ['How long is one full swing of the moon?', 'Fit the same sine wave; its period is Pₘ.', 'Longer runs of data pin down the period much better.'],
@@ -76,6 +76,10 @@ export const HINTS: Record<QuantityKey, string[]> = {
 
 /** Node text for a chain variant: an inner planet has transits; chapter 2 weighs the planet with a probe. */
 export function nodeInfoFor(k: QuantityKey, variant: ChainVariant = 'standard') {
+  if (variant === 'ellipse' && k === 'a1') return { ...NODE_INFO.a1, what: 'Home orbit radius inferred from the dated separation and fitted ellipse. A circular opposition shortcut does not describe this target.', formula: undefined };
+  if (variant === 'slingshot' && k === 'a1') return { ...NODE_INFO.a1, what: 'Home orbit radius inferred from the dated giant separation and the giant’s own period and opposition geometry.', formula: undefined };
+  if (variant === 'ellipse' && k === 'a2') return { ...NODE_INFO.a2, what: 'Semi-major axis of the target’s ellipse, derived from its orbit fit and your dated separation. Its current distance from the star varies.' };
+  if (variant === 'slingshot' && k === 'dPar') return { ...NODE_INFO.dPar, what: 'Separation from home to the giant at the image date. This anchors the giant’s orbit, not the instantaneous distance to the blue target.' };
   if (variant === 'inner') {
     if (k === 'S2') return { ...NODE_INFO.S2, what: 'Time between two transits of the blue planet across the star — how often it laps us.', formula: 'S = t(transit 2) − t(transit 1)', toolName: 'the transit timer' };
     if (k === 'tOpp') return { ...NODE_INFO.tOpp, what: 'The moment of a transit: the blue planet passes between us and the star, exactly in line. It fixes where the planets are.', toolName: 'the transit timer' };
@@ -86,6 +90,9 @@ export function nodeInfoFor(k: QuantityKey, variant: ChainVariant = 'standard') 
 }
 
 export function hintsFor(k: QuantityKey, variant: ChainVariant = 'standard') {
+  if (variant === 'ellipse' && k === 'a1') return ['One dated separation provides the absolute scale.', 'Use the fitted eccentricity, perihelion direction and periods to reconstruct the positions at the observation date.', 'Scale that fitted separation to your measured d; a₂ is a semi-major axis, not the target’s star distance on every night.'];
+  if (variant === 'slingshot' && k === 'a1') return ['The giant is the nearer distance anchor.', 'Use the giant’s synodic period and opposition date at the time of your parallax.', 'The giant’s geometry sets a₁; the blue planet’s period sets its separate orbit ratio.'];
+  if (variant === 'inner' && k === 'a1') return ['The inner planet is closer to the star than home.', 'Use its dated separation and conjunction geometry to infer the absolute scale.', 'At inferior conjunction in a circular model: d = a₁ − a₂ = a₁(1 − r), so a₁ = d/(1 − r).'];
   if (variant === 'inner') {
     if (k === 'S2') return ['How often does the blue planet lap us?', 'Time from one transit to the next.', 'Log the middle of two transits in the transit timer; their separation is S.'];
     if (k === 'tOpp') return ['When is the blue planet exactly between us and the star?', 'During a transit you see it as a black dot crossing the star’s disk.', 'Log the time the dot is midway across.'];

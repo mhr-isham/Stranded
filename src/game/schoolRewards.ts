@@ -31,7 +31,7 @@ const snapshotPlot = (points: { x: number; y: number }[]) => {
 /** Keeps observed/entered practice work, never the hidden system's correct values. */
 export function discoveryCard(s: GameState, module: string, assisted: boolean, artifact?: DiscoveryArtifact): DiscoveryCard {
   const id = module.split(':')[1], isLesson = module.startsWith('lesson:');
-  const card: DiscoveryCard = { module, attempt: artifact?.attempt ?? (isLesson ? module : `${module}:${s.runId}`), earnedAt: Date.now(), seed: s.seed, assisted, kind: isLesson ? 'lesson' : artifact ? 'teaching' : 'practice', summary: [] };
+  const card: DiscoveryCard = { module, attempt: artifact?.attempt ?? (isLesson ? module : `${module}:${s.runId}`), earnedAt: Date.now(), seed: s.seed, assisted, kind: artifact ? 'teaching' : isLesson ? 'lesson' : 'practice', summary: [] };
   if (artifact) return { ...card, ...artifact, attempt: card.attempt, summary: artifact.summary.slice(0, 18), plot: snapshotPlot(artifact.plot ?? []) };
   if (isLesson) { card.summary = [{ label: 'Practice record', value: 'Interactive lesson completed' }]; return card; }
   if (!((module.startsWith('exercise:') && s.schoolSession?.id === id) || (module.startsWith('flight:') && s.settings.flightPractice === id))) {

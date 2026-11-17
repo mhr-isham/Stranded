@@ -1,3 +1,4 @@
+import { selectedDistanceReading } from './distanceScale';
 import { projectedBaseline } from './parallaxObservation';
 import { analyzeYear, yearFitMessage } from './yearObservations';
 // Flight School: the hands-on tutorial. This module holds the tutorial's
@@ -178,9 +179,14 @@ export function doMoonFit() {
   g.setSheet('Pm', { value: sys.moon.period * (1 + rng.normal(0, 0.001)), sigma: sys.moon.period * 0.002 });
 }
 
-/** Copy the average of the kept readings to the sheet with an honest error bar. */
+/** Supply a selected dated separation, or average genuinely repeated fixed quantities. */
 export function sendFromReadings(k: PrimaryKey, minRel = 0.004) {
   const s = useGame.getState();
+  if (k === 'dPar') {
+    const reading = selectedDistanceReading(s.readings);
+    if (reading) s.setSheet(k, { value: reading.value, sigma: Math.abs(reading.value) * minRel, at: Number.isFinite(reading.at) ? reading.at : undefined });
+    return;
+  }
   const st = readingStats(s.readings, k);
   if (!st) return;
   const se = Number.isFinite(st.se) ? st.se : 0;

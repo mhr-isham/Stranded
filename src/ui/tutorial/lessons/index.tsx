@@ -2,7 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { DeltaVLesson, HonestyLesson, MeasureLesson, PropagationLesson } from './basics';
-import { AngularLesson, MoonLesson, ParallaxLesson } from './distance';
+import { AngularLesson, DistanceScaleLesson, MoonLesson, ParallaxLesson } from './distance';
 import { HohmannLesson } from './flight';
 import { EstimateLesson } from './estimate';
 import { EllipseLesson, FlybyLesson, InnerLesson, LockedLesson, RefractionLesson, SlingshotLesson, StellarLesson } from './chapters';
@@ -21,6 +21,7 @@ export const LESSONS = {
   retrograde: { title: 'Retrograde loops and opposition', icon: '➰', C: RetrogradeLesson },
   synodic: { title: 'The synodic period', icon: '🏃', C: SynodicLesson },
   kepler: { title: 'Kepler’s third law', icon: '🪐', C: KeplerLesson },
+  'distance-scale': { title: 'Changing distance, same orbit', icon: '📐', C: DistanceScaleLesson },
   parallax: { title: 'Parallax: the distance scale', icon: '👁', C: ParallaxLesson },
   angular: { title: 'Angular size', icon: '🔭', C: AngularLesson },
   moon: { title: 'Weighing a planet with its moon', icon: '🌙', C: MoonLesson },

@@ -63,7 +63,7 @@ with sync_playwright() as p:
         # without supplying it with practice fuel or measurements.
         page.evaluate("__game.getState().newGame(91,{difficulty:'navigator',sound:false,survival:false,formulas:true});__clock.t=123;__clock.paused=true;__game.setState({phase:'title',savedT:123,sheet:{g:{value:9.81,sigma:.2}},training:{},schoolRewards:{patches:{},cards:{},milestones:{}}})")
         page.get_by_role('button',name='Flight School',exact=False).click()
-        assert library(page).locator('[data-training]').count()==47
+        assert library(page).locator('[data-training]').count()==48
         library(page).locator('[data-training="exercise:opposition"]').get_by_role('button',name=re.compile('^Open')).click()
         page.wait_for_function('__game.getState().schoolSession?.id==="opposition"',timeout=60000)
         page.locator('.lesson-modal').get_by_role('button',name='Got it',exact=True).click()

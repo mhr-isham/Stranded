@@ -318,7 +318,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .callout.warn { background: rgba(255, 107, 125, 0.08); border-color: rgba(255, 107, 125, 0.35); }
 .callout.tip { background: rgba(91, 227, 164, 0.07); border-color: rgba(91, 227, 164, 0.3); }
 .demo-box { background: radial-gradient(ellipse at 50% 30%, #0e1a36 0%, #060912 80%); border: 1px solid var(--panel-border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.demo-box svg { width: 100%; height: auto; display: block; }
+.demo-box svg:not(.katex svg) { width: 100%; height: auto; display: block; }
 .lslider { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--muted); }
 .lesson-modal { width: min(1100px, 100%); max-height: calc(100% - 16px); overflow: auto; padding: 22px; background: var(--panel-solid); }
 .lesson-back { position: fixed; inset: 0; z-index: 95; background: rgba(2, 4, 10, 0.78); display: grid; place-items: center; padding: 8px; animation: fade 0.2s; }
@@ -577,6 +577,13 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .parallax-pair-labels { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
 .parallax-pair-labels span { border: 1px solid var(--panel-border); padding: 5px 7px; border-radius: 6px; }
 .parallax-lab { font-size: 13px; }
-.parallax-lab svg { width: 100%; background: #080e19; border-radius: 10px; }
+.parallax-lab svg:not(.katex svg) { width: 100%; background: #080e19; border-radius: 10px; }
 .parallax-lab input[type="range"] { width: 100%; }
 [data-tut="rover-stage"] canvas:focus-visible { outline: 2px solid var(--amber); outline-offset: -3px; }
+.observation-date { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.distance-context { font-size: 12px; padding: 9px; border: 1px solid var(--panel-border); border-radius: 8px; }
+.distance-diagram { width: 100%; background: #080e19; border-radius: 9px; }
+.distance-context p { font-size: 12px; }
+.distance-scale-lab { font-size: 13px; }
+.distance-scale-lab input[type="range"] { width: 100%; }
+.distance-teaching-row { padding: 6px; border-left: 2px solid var(--amber); overflow-wrap: anywhere; }

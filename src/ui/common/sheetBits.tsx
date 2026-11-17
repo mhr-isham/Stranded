@@ -1,3 +1,5 @@
+import { DATED_QUANTITIES, distanceReadings, selectedDistanceReading, observationDay } from '../../game/distanceScale';
+import { ObservationDate } from './ObservationDate';
 import { Equation } from './Equation';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { QUANTITY_INFO, type PrimaryKey } from '../../engine/chain';
@@ -34,7 +36,7 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
         {readings.map((r, i) => <Fragment key={r.id}>
           <tr className={r.kept ? '' : 'off'}>
             <td>{i + 1}</td>
-            <td className="muted" style={{ fontSize: 12 }}>{r.note}</td>
+            <td className="muted" style={{ fontSize: 12 }}>{r.note}{DATED_QUANTITIES.includes(k) && <ObservationDate at={r.at} />}</td>
             <td className="num">{render ? render(r.value) : sig(toDisplay(k, r.value), 5)}</td>
             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
               <button className="btn small ghost" title={r.kept ? 'Exclude from average' : 'Include in average'} onClick={() => toggle(r.id)}>
@@ -79,6 +81,7 @@ export function SendToSheet({ k, value, at, spread, modelContribution = 0, label
           <input className="input" inputMode="decimal" placeholder={info.unit} value={err} onChange={(e) => setErr(e.target.value.replace(/[^0-9.]/g, ''))} />
         </div>
       </div>
+      {DATED_QUANTITIES.includes(k) && <ObservationDate at={at} label="Sending observation" />}
       {mode.sanity && spread !== undefined && Number.isFinite(spread) && spread > 0 && (
         <div className="muted" style={{ fontSize: 12 }}>
           Standard error from the scatter of your readings: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Systematic errors are not included — that part is up to you.
@@ -114,6 +117,7 @@ export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
     return 'optical';
   }));
   if (!st) return null;
+  if (k === 'dPar') return <DatedDistanceSender tut={tut} />;
   return (
     <div data-tut={tut}>
       <div className="row between" style={{ marginTop: 8 }}>
@@ -126,6 +130,20 @@ export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
       <SendToSheet k={k} value={st.mean} at={st.at} spread={st.n > 1 ? st.se : undefined} modelContribution={conditionUncertainty(readings.filter((r) => r.key === k))} />
     </div>
   );
+}
+
+/** Distances from different dates describe different geometry, not repeat noise. */
+function DatedDistanceSender({ tut }: { tut?: string }) {
+  const readings = useGame((s) => s.readings), [selected, setSelected] = useState<string | null>(null);
+  const kept = distanceReadings(readings);
+  const chosen = selectedDistanceReading(readings, selected);
+  if (!chosen) return null;
+  const at = Number.isFinite(chosen.at) ? chosen.at : undefined;
+  return <div className="stack" data-tut={tut}>
+    <label className="field">Distance observation<select className="input" aria-label="Distance observation" value={chosen.id} onChange={(e) => setSelected(e.target.value)}>{kept.map((r, i) => <option key={r.id} value={r.id}>#{i + 1} · {observationDay(r.at)} · {sig(toDisplay('dPar', r.value), 5)} million km</option>)}</select></label>
+    <div className="faint">Send one dated separation. Different observing dates are not averaged into a fictitious single distance; each remains in the log. State the uncertainty for your selected observation.</div>
+    <SendToSheet key={chosen.id} k="dPar" value={chosen.value} at={at} />
+  </div>;
 }
 
 export function ToolHeader({ title, sub }: { title: string; sub: string }) {

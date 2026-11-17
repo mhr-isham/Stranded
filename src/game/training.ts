@@ -4,7 +4,7 @@ import { useGame } from './store';
 import { chapterOf } from './campaign';
 
 export const TRAINING_GROUPS = [
-  { id: 'instruments', title: 'Instruments', lessons: ['measure', 'pendulum', 'horizon', 'twinkle', 'year', 'parallax', 'angular', 'moon'] },
+  { id: 'instruments', title: 'Instruments', lessons: ['measure', 'pendulum', 'horizon', 'twinkle', 'year', 'parallax', 'distance-scale', 'angular', 'moon'] },
   { id: 'predictions', title: 'Predictions and uncertainty', lessons: ['estimate', 'honesty', 'propagation'] },
   { id: 'navigation', title: 'Navigation and planning', lessons: ['mass', 'retrograde', 'synodic', 'kepler', 'deltav', 'hohmann'] },
   { id: 'ascent', title: 'Ascent', lessons: [] },

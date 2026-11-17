@@ -1,3 +1,4 @@
+import { DistanceContext } from '../common/DistanceContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUANTITY_INFO, keysFor, labelFor } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
@@ -186,12 +187,13 @@ export function Launch() {
       </div>
       <div className="tool-side">
         <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
+        <DistanceContext sheet={s.sheet} variant={variant} />
         <div className="panel panel-pad stack" data-tut="launch-departure">
           <div className="row between">
             <b>Departure</b>
             <span className="mono">day {fmt(depDay, 1)}</span>
           </div>
-          <input type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
+          <input aria-label="Departure day" type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
           <div className="row" data-tut="launch-windows">
             {windows.slice(0, 3).map((w, i) => (
               <button

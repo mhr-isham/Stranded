@@ -1,5 +1,7 @@
+import { LessonArtifactContext } from './lessonArtifact';
+import type { DiscoveryArtifact } from '../../game/schoolRewards';
 import { SchoolProgress } from '../SchoolRewards';
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { sfx } from '../../game/audio';
 import { anchors, exitTutorial } from '../../game/tutorial';
@@ -54,6 +56,9 @@ function targetBox(target: string | undefined, follow = true): Box | null {
 
 export function LessonModal({ id, onClose }: { id: LessonId; onClose: () => void }) {
   const L = LESSONS[id];
+  const artifact = useRef<DiscoveryArtifact | undefined>(undefined);
+  const attempt = useMemo(() => `${id}:${Date.now()}`, [id]);
+  const registerArtifact = useCallback((value?: DiscoveryArtifact) => { artifact.current = value ? { ...value, attempt } : undefined; }, [attempt]);
   useEffect(() => {
     const wasPaused = clock.paused;
     const runId = useGame.getState().runId;
@@ -76,9 +81,9 @@ export function LessonModal({ id, onClose }: { id: LessonId; onClose: () => void
             ✕
           </button>
         </div>
-        <L.C />
+        <LessonArtifactContext.Provider value={registerArtifact}><L.C /></LessonArtifactContext.Provider>
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-          <button className="btn primary" onClick={() => { recordTraining(`lesson:${id}`, 'completed'); onClose(); }}>
+          <button className="btn primary" onClick={() => { recordTraining(`lesson:${id}`, 'completed', false, artifact.current); onClose(); }}>
             Got it
           </button>
         </div>

@@ -1,3 +1,7 @@
+import { DistanceContext } from '../common/DistanceContext';
+import { ObservationDate } from '../common/ObservationDate';
+import { DATED_QUANTITIES, observationDay } from '../../game/distanceScale';
+import { DAY } from '../../engine/constants';
 import { Equation } from '../common/Equation';
 import { useState } from 'react';
 import { PRIMARY_KEYS, QUANTITY_INFO, derivedFor, deriveAll, edgesFor, keysFor, labelFor, truthValues, type PrimaryKey, type QuantityKey } from '../../engine/chain';
@@ -224,7 +228,17 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
               {sig(toDisplay(k, truthValues(sys, s.sheet, probeTruth(s))[k]), 6)} {info.unit}
             </div>
           )}
-          {stats && (
+          {DATED_QUANTITIES.includes(k as PrimaryKey) && <>
+            <ObservationDate at={e?.at} />
+            <label className="field">Observation day (optional)<input className="input" aria-label="Observation day" type="number" step="any" key={`at-${k}-${e?.at}`} defaultValue={e?.at !== undefined && Number.isFinite(e.at) ? String(e.at / DAY) : ''} disabled={!e} onBlur={(ev) => {
+              if (!e) return;
+              const text = ev.target.value, day = Number(text);
+              if (text !== '' && (!Number.isFinite(day) || !Number.isFinite(day * DAY))) return;
+              s.setSheet(k as PrimaryKey, { ...e, at: text === '' ? undefined : day * DAY }); checkMissions();
+            }} /></label>
+          </>}
+          {stats && k === 'dPar' && <div className="faint">{stats.n} kept dated observation{stats.n === 1 ? '' : 's'} in the rover log. The selected separation is sent with its own date.</div>}
+          {stats && k !== 'dPar' && (
             <div className="muted" style={{ fontSize: 12 }}>
               Log: {stats.n} kept reading{stats.n > 1 ? 's' : ''}, mean {sig(toDisplay(k, stats.mean), 5)}
               {stats.n > 1 ? `, standard error ±${sig(toDisplay(k, stats.se), 2)}` : ''} {info.unit}
@@ -247,6 +261,8 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
         </>
       )}
 
+      {['dPar', 'a1', 'a2', 'aG', 'Mstar', 'R2', 'aM', 'M2', 'Mg'].includes(k) && <DistanceContext sheet={s.sheet} variant={variant} />}
+      {['R2', 'aM', 'Mg'].includes(k) && <div className="observation-date">Angular observation · {observationDay(s.sheet[k === 'R2' ? 'alpha2' : k === 'Mg' ? 'thetaMg' : 'thetaM']?.at)}</div>}
       <hr className="sep" />
       <div data-tut="sheet-hints" className="stack">
       {maxHints > 0 ? (
