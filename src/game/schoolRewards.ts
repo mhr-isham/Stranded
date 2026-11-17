@@ -1,4 +1,4 @@
-import { DAY } from '../engine/constants';
+import { ARCSEC, DAY } from '../engine/constants';
 import { QUANTITY_INFO, type PrimaryKey } from '../engine/chain';
 import { showQuantity, sig } from './format';
 import { analyzeYear, yearPoints } from './yearObservations';
@@ -50,6 +50,12 @@ export function discoveryCard(s: GameState, module: string, assisted: boolean, a
       card.summary.push({ label: 'Committed motion prediction', value: `${s.retroStudy.prediction} from day ${sig(s.retroStudy.anchorAt / DAY, 5)}` });
       if (s.retroStudy.result) card.summary.push({ label: 'Next saved sighting', value: `${sig(s.retroStudy.result.delta, 4)}° · ${s.retroStudy.result.direction} · day ${sig(s.retroStudy.result.at / DAY, 5)}` });
     }
+  } else if (id === 'moon') {
+    const studies = s.moonStudies ?? [], latest = studies.at(-1);
+    card.plot = snapshotPlot(latest?.plot ?? s.moonTrack.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC })));
+    card.xLabel = 'expedition day'; card.yLabel = 'recorded moon offset (″)';
+    card.summary = [{ label: 'Observation plot', value: latest ? 'Selected sightings from the last kept comparison fit' : 'Full moon tracker log; not a selected-fit provenance record' },
+      ...studies.map((p, i) => ({ label: `Kept candidate ${i + 1} (${p.model})`, value: `days ${sig(p.from, 5)}–${sig(p.to, 5)} · ${p.count} sightings · Pₘ ${sig(p.period, 5)} ± ${sig(p.sigmaPeriod, 3)} d · θₘ ${sig(p.amplitude, 5)} ± ${sig(p.sigmaAmplitude, 3)}″ at day ${sig(p.mid, 5)}` }))];
   } else if (module.startsWith('flight:')) {
     card.summary = [{ label: 'Handling configuration', value: s.settings.difficulty }, { label: 'Flight practice', value: assisted ? 'Completed with assistance recorded' : 'Completed' }];
   } else {

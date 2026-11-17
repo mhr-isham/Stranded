@@ -91,8 +91,8 @@ export function MoonLesson() {
       }
       formula={<Equation tex={"a_{\\mathrm m}=d\\tan\\theta_{\\mathrm m} \\\\ M_2=\\frac{4\\pi^2a_{\\mathrm m}^3}{GP_{\\mathrm m}^2}"} />}
       keyIdea="We see the moon’s orbit edge-on, so the moon just swings back and forth beside the planet. The size of the swing (θₘ) times the distance gives the orbit radius; the time for one swing gives the period. Kepler’s law then weighs the planet."
-      warn="The swing looks bigger when the planet is closer, so fit only a few weeks of data around opposition. aₘ is cubed: a 1% error in the swing gives 3% in mass."
-      tip="Fit several full swings — a longer run pins down the period much better."
+      warn="The same orbit looks wider when the planet is closer. Match θₘ and planet distance to the same date; aₘ is cubed, so a 1% radius error contributes about 3% mass error."
+      tip="Start with one short interval. When ready, use the optional Flight School investigation to compare another interval; gaps can leave more than one plausible period."
     >
       <P>
         You need the blue planet’s mass to brake into orbit around it. Nobody can put a planet on a scale — but its moon is held in orbit by the

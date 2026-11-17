@@ -12,7 +12,7 @@ import { unit, type Vec3 } from '../../engine/vec';
 import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
-import { moonFit, trackedPhase } from '../../game/fits';
+import { MoonAnalysisPanel } from './MoonAnalysis';
 import { fmt } from '../../game/format';
 import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
@@ -29,7 +29,7 @@ import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { SeeingConditions } from '../common/MeasurementNotes';
-import { currentMode, useMode } from '../../game/modes';
+import { useMode } from '../../game/modes';
 import { relaySunlit, relayTopocentric } from '../../engine/relay';
 import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
@@ -69,6 +69,7 @@ export function Observatory() {
   const t = useGameTime(5);
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
+  const [moonChartFocus, setMoonChartFocus] = useState(true);
   const [sel, setSel] = useState<Sel | null>(null);
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
   const [showEcl, setShowEcl] = useState(false);
@@ -261,7 +262,7 @@ export function Observatory() {
   };
 
   return (
-    <div className="tool">
+    <div className={`tool ${tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
       <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -550,6 +551,7 @@ export function Observatory() {
 
       <div className="tool-side">
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
+        {tab === 'moon' && <button className="btn small" onClick={() => setMoonChartFocus(!moonChartFocus)}>{moonChartFocus ? 'Show sky beside the chart' : 'Focus on the moon chart'}</button>}
         {mode === 'scope' && <SeeingConditions />}
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
@@ -970,132 +972,7 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
 
 
 function MoonPanel() {
-  const s = useGame();
-  const [band, setBand] = useState<[number, number] | null>(null);
-  const [pickB, setPickB] = useState(false);
-  const t = useGameTime(2);
-  if (!currentWorld().system.features.moon)
-    return (
-      <div className="panel panel-pad stack">
-        <b>No moon</b>
-        <div className="muted" style={{ fontSize: 13 }}>
-          However long you look, nothing orbits this blue planet. Without a moon to act as a scale, its mass has to come from something else —
-          the probe bay at camp.
-        </div>
-      </div>
-    );
-  const pts = s.moonTrack.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
-  const used = pts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
-  const span = used.length ? used[used.length - 1].x - used[0].x : 0;
-  // The swing looks bigger when the planet is closer, so a fit over months is meaningless.
-  const tooLong = span > 50;
-  // The swing is seen across our line of sight, which turns as the planet moves in our
-  // sky; the fit takes that from the tracker's log, so it finds the moon's true period.
-  const fit = used.length >= 8 && !tooLong ? moonFit(used.map((p) => p.x), used.map((p) => p.y), 0.4, 60, trackedPhase(s.track), true) : null;
-  const mid = used.length ? (used[0].x + used[used.length - 1].x) / 2 : 0;
-  // Two hypotheses (period aliasing): draw both, extended a few days ahead, so a new night can decide.
-  const alt = fit?.alternative && !hasChallenge(s, 'handFit') ? fit.alternative : null;
-  const nowDay = t / DAY;
-  const x1 = alt ? Math.max(used[used.length - 1]?.x ?? 0, nowDay) + Math.max(2, 1.2 * Math.max(fit!.period, alt.period)) : used[used.length - 1]?.x ?? 0;
-  const curve = fit && used.length ? Array.from({ length: 300 }, (_, i) => {
-    const x = used[0].x + ((x1 - used[0].x) * i) / 299;
-    return { x, y: fit.model(x) };
-  }) : [];
-  const curveB = alt && used.length ? Array.from({ length: 300 }, (_, i) => {
-    const x = used[0].x + ((x1 - used[0].x) * i) / 299;
-    return { x, y: alt.model(x) };
-  }) : [];
-  // Where the two models disagree most in the coming days.
-  let decide: number | null = null;
-  if (alt && fit) {
-    let best = 0;
-    for (let x = nowDay; x < nowDay + 5; x += 0.05) {
-      const d = Math.abs(fit.model(x) - alt.model(x));
-      if (d > best) [best, decide] = [d, x];
-    }
-  }
-  const mode = currentMode();
-  const useB = !!alt && pickB;
-  const chosen = useB && alt ? { amplitude: alt.amplitude, period: alt.period } : fit;
-  return (
-    <div className="panel panel-pad stack">
-      <b>The moon of the blue planet</b>
-      {!s.identified ? (
-        <div className="amber" style={{ fontSize: 13 }}>Identify the blue planet first.</div>
-      ) : (
-        <button data-tut="moon-toggle" className={`btn ${s.moonTrackOn ? '' : 'primary'}`} onClick={() => (s.set({ moonTrackOn: !s.moonTrackOn }), s.say(ECHO.moon))}>
-          {s.moonTrackOn ? 'Moon auto-log: ON' : 'Log the moon’s offset every few hours'}
-        </button>
-      )}
-      <div className="muted" style={{ fontSize: 13 }}>
-        The tracker measures how far the moon sits east (+) or west (−) of the planet. Its swing is the moon’s orbit seen edge-on.
-      </div>
-      <div data-tut="moon-chart" className="stack">
-      {pts.length > 1 && (
-        <Chart
-          series={[
-            { pts, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
-            ...(curve.length && !hasChallenge(useGame.getState(), 'handFit') ? [{ pts: curve, color: '#6cc4ff', kind: 'line' as const }] : []),
-            ...(curveB.length ? [{ pts: curveB, color: '#b59cff', kind: 'line' as const }] : []),
-          ]}
-          markers={decide !== null && mode.missions !== 'off' ? [{ x: decide, color: '#ffc46b', label: 'decides' }] : []}
-          xLabel="day"
-          yLabel="moon offset (″)"
-          band={band}
-          onBand={setBand}
-          brushMode="band"
-          yFmt={(y) => y.toFixed(0)}
-        />
-      )}
-      {alt && fit && (
-        <div className="callout key" style={{ margin: 0 }}>
-          <b>Two models fit your data</b>
-          <div style={{ fontSize: 13 }}>
-            <span className="blue">A: Pₘ = {fmt(fit.period, 3)} d</span> · <span className="violet">B: Pₘ = {fmt(alt.period, 3)} d</span> (B fits {fmt((alt.rssRatio - 1) * 100, 0)}% worse).
-            Gaps in the data let both swing through the same points. A new observation where they differ will rule one out.
-          </div>
-          {decide !== null && mode.missions !== 'off' && (
-            <div style={{ fontSize: 13, marginTop: 4 }}>
-              They disagree most around <b>day {fmt(decide, 1)}</b> — keep logging through then.
-            </div>
-          )}
-          {mode.coaching && mode.missions === 'coach' && <div className="hint" style={{ marginTop: 4 }}>ECHO: A fits a little better, so I’d lean that way — but one more night will settle it.</div>}
-          <div className="row" style={{ gap: 6, marginTop: 6 }}>
-            <button className={`btn small ${!pickB ? 'primary' : ''}`} onClick={() => setPickB(false)}>
-              Use model A
-            </button>
-            <button className={`btn small ${pickB ? 'primary' : ''}`} onClick={() => setPickB(true)}>
-              Use model B
-            </button>
-          </div>
-        </div>
-      )}
-      {pts.length > 1 && <div className="faint" style={{ fontSize: 12 }}>Drag to choose the stretch of data to fit — near opposition is best, when the planet is closest.</div>}
-      {tooLong && <div className="amber" style={{ fontSize: 13 }}>Choose a stretch of at most ~50 days (drag across the chart): the swing looks smaller when the planet is further away.</div>}
-      {fit && hasChallenge(useGame.getState(), 'handFit') && (
-        <div className="hint">Fit by hand: read the swing’s half-height (θₘ) and the time from peak to peak (Pₘ) off your chart and type them on the progress sheet.</div>
-      )}
-      {fit && !hasChallenge(useGame.getState(), 'handFit') && (
-        <>
-          <dl className="kv">
-            <dt>Greatest elongation θₘ</dt>
-            <dd className="blue">{fmt(chosen!.amplitude, 2)}″</dd>
-            <dt>Period Pₘ</dt>
-            <dd className="blue">{fmt(chosen!.period, 3)} days</dd>
-            <dt>Centre of data</dt>
-            <dd>day {fmt(mid, 1)}</dd>
-          </dl>
-          <Formula>aₘ = d · tan θₘ,   M₂ = 4π² aₘ³ / (G Pₘ²)</Formula>
-          <b>θₘ</b>
-          <SendToSheet k="thetaM" value={chosen!.amplitude * ARCSEC} at={mid * DAY} spread={fit.sigmaAmplitude * ARCSEC} />
-          <b>Pₘ</b>
-          <SendToSheet k="Pm" value={chosen!.period * DAY} spread={fit.sigmaPeriod * DAY} />
-        </>
-      )}
-      </div>
-      <MoonPrediction pts={pts} fit={fit} />
-    </div>
-  );
+  return <MoonAnalysisPanel renderPrediction={(pts, fit) => <MoonPrediction pts={pts} fit={fit} />} />;
 }
 
 /** "Use a ratio": peak to peak is one moon period. */

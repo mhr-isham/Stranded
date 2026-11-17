@@ -40,6 +40,7 @@ export function leaveFlightPractice() {
     instrumentSetup: back.state.instrumentSetup ?? { pendulumScreen: false },
     training: s.training,
     schoolRewards: s.schoolRewards,
+    moonStudies: back.state.moonStudies ?? [],
     retroStudy: back.state.retroStudy ?? null,
     parallaxPair: back.state.parallaxPair ?? null,
     parallaxInvestigations: back.state.parallaxInvestigations ?? [],

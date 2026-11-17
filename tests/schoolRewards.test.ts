@@ -5,6 +5,8 @@ import { useGame } from '../src/game/store';
 import { recordTraining, recordSchoolMilestone } from '../src/game/training';
 import { practiceSnapshot, leaveFlightPractice } from '../src/ui/common/flightPractice';
 import { loadSlot, saveSlot } from '../src/game/checkpoints';
+import { analyzeMoon, moonStudy } from '../src/game/moonObservations';
+import { ARCSEC } from '../src/engine/constants';
 
 beforeEach(() => {
   const data = new Map<string,string>();
@@ -13,6 +15,26 @@ beforeEach(() => {
   useGame.setState({ phase: 'play', schoolRewards: freshSchoolRewards(), training: {}, schoolSession: { id: 'year', start: 0, end: 0, completedSteps: [], assisted: false }, starObs: [0, 1, 26].map((d) => ({ at: d * DAY, v: (20 + d) * DEG })) });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('archives selected moon observations and restores expedition comparison work after practice', () => {
+  const obs = Array.from({ length: 81 }, (_, i) => ({ at: i * DAY / 4, v: 30 * Math.sin(2 * Math.PI * i / 4 / 3.3) * ARCSEC }));
+  const track = Array.from({ length: 21 }, (_, i) => ({ at: i * DAY, v: 0 }));
+  const original = moonStudy(analyzeMoon(obs, track, [0, 10]), 'A')!;
+  useGame.setState({ moonStudies: [original] });
+  const back = practiceSnapshot();
+  const practice = moonStudy(analyzeMoon(obs, track, [4, 18]), 'A')!;
+  useGame.setState({ practiceReturn: back, schoolSession: { id: 'moon', start: 0, end: 0, completedSteps: [], assisted: false }, moonStudies: [practice], moonTrack: obs });
+  recordTraining('exercise:moon', 'completed');
+  const card = useGame.getState().schoolRewards.cards['exercise:moon'].latest;
+  expect(card.plot).toEqual(practice.plot);
+  expect(card.summary.some((s) => s.value.includes('57 sightings'))).toBe(true);
+  expect(card.summary.some((s) => /true|correct|certified/i.test(s.value))).toBe(false);
+  leaveFlightPractice();
+  expect(useGame.getState().moonStudies).toEqual([original]);
+  expect(useGame.getState().schoolRewards.cards['exercise:moon'].latest).toEqual(card);
+  saveSlot(0); useGame.setState({ moonStudies: [] }); loadSlot(0);
+  expect(useGame.getState().moonStudies).toEqual([original]);
+});
 
 it('awards the first completion equally with help recorded, without modifying expedition resources', () => {
   const before = useGame.getState();

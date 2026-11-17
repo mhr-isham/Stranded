@@ -98,7 +98,7 @@ export function Tutorial() {
   const idx = Math.min(s.tutorial.step, STEPS.length - 1);
   const session = s.schoolSession;
   const originalStep = STEPS[idx];
-  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance', 'size'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance', 'Size'].includes(originalStep.chapter)));
+  const observationGuide = !!session && (['year', 'opposition', 'synodic', 'distance', 'size', 'moon'].includes(session.id) || (session.id === 'basic' && ['Year', 'Opposition', 'Synodic', 'Distance', 'Size', 'Moon'].includes(originalStep.chapter)));
   const predictionKind = session?.id === 'estimate-pendulum' ? 'pendulum' : session?.id === 'estimate-star' ? 'star' : null;
   const step: TutStep = predictionKind ? {
     ...originalStep, title: predictionKind === 'pendulum' ? 'Predict a measured swing' : 'Predict from your star logs',
@@ -304,6 +304,7 @@ export function Tutorial() {
           </div>
         )}
         <div className="row tut-actions" style={{ marginTop: 8, gap: 6 }}>
+          {observationGuide && originalStep.chapter === 'Moon' && <button className="btn small" onClick={() => { const panel = document.querySelector<HTMLDetailsElement>('[aria-label="Flight School moon investigation"]'); if (panel) { panel.open = true; panel.scrollIntoView({ block: 'center' }); } setMini(true); }}>Optional moon investigation</button>}
           {observationGuide && originalStep.chapter === 'Size' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School angular-size investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Size interpretation panel</button>}
           {observationGuide && originalStep.chapter === 'Distance' && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School parallax investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Parallax investigation panel</button>}
           {observationGuide && ['Opposition', 'Synodic'].includes(originalStep.chapter) && <button className="btn small" onClick={() => { document.querySelector('[aria-label="Flight School motion investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Motion investigation panel</button>}

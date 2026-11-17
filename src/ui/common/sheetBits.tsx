@@ -58,7 +58,7 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
  * Put a value on the progress sheet. The player always states the error bar
  * themselves; the spread of their own readings is offered as a guide.
  */
-export function SendToSheet({ k, value, at, spread, modelContribution = 0, label = 'Send to progress sheet', tut }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; modelContribution?: number; label?: string; tut?: string }) {
+export function SendToSheet({ k, value, at, spread, modelContribution = 0, label = 'Send to progress sheet', spreadLabel, tut }: { k: PrimaryKey; value: number | null; at?: number; spread?: number; modelContribution?: number; label?: string; spreadLabel?: string; tut?: string }) {
   const info = QUANTITY_INFO[k];
   const current = useGame((s) => s.sheet[k]);
   const setSheet = useGame((s) => s.setSheet);
@@ -84,7 +84,7 @@ export function SendToSheet({ k, value, at, spread, modelContribution = 0, label
       {DATED_QUANTITIES.includes(k) && <ObservationDate at={at} label="Sending observation" />}
       {mode.sanity && spread !== undefined && Number.isFinite(spread) && spread > 0 && (
         <div className="muted" style={{ fontSize: 12 }}>
-          Standard error from the scatter of your readings: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Systematic errors are not included — that part is up to you.
+          {spreadLabel ?? 'Standard error from the scatter of your readings'}: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Allow separately for other systematic errors.
         </div>
       )}
       {modelContribution > 0 && <div className="stack">

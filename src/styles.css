@@ -600,3 +600,8 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .micrometer-controls .btn { font-size: 10px; padding: 5px; }
   .micrometer-controls .input { width: 58px; font-size: 10px; }
 }
+
+/* Give moon date selection and analysis room on every screen. */
+.tool.moon-analysis-focus { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
+.tool.moon-analysis-focus > .tool-stage { display: none; }
+.tool.moon-analysis-focus > .tool-side { width: min(1100px, 100%); min-height: 0; max-height: none; margin-inline: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 8px 12px calc(90px + var(--safe-bottom)); }

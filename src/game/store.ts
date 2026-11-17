@@ -1,6 +1,7 @@
 import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
 import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
+import type { MoonStudy } from './moonObservations';
 import type { RetroStudy } from './observedMotion';
 // Persistent game state (zustand + localStorage). Time itself lives in clock.ts.
 
@@ -182,6 +183,7 @@ export interface GameState {
   tutorial: TutorialState;
   training: TrainingHistory;
   schoolRewards: SchoolRewards;
+  moonStudies: MoonStudy[];
   retroStudy: RetroStudy | null;
   parallaxPair: ParallaxPair | null;
   parallaxInvestigations: ParallaxInvestigationRecord[];
@@ -316,6 +318,7 @@ const initial = {
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
   schoolRewards: freshSchoolRewards(),
+  moonStudies: [] as MoonStudy[],
   retroStudy: null as RetroStudy | null,
   parallaxPair: null as ParallaxPair | null,
   parallaxInvestigations: [] as ParallaxInvestigationRecord[],
