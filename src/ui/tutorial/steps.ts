@@ -642,7 +642,7 @@ export const STEPS: TutStep[] = [
     title: 'Send d to the sheet',
     target: 'rover-send',
     screen: 'rover',
-    body: ['Send the average distance with an honest error. This number sets the **scale of the whole system**.'],
+    body: ['Choose the dated distance observation you want to send and state its uncertainty. Keep its observation day: this separation anchors the **scale of the whole system**.'],
     warn: 'The star’s mass depends on the cube of this distance: a 2% error here becomes 6% there.',
     done: (s) => !!s.sheet.dPar,
     doIt: { run: () => sendFromReadings('dPar', 0.01) },
