@@ -36,6 +36,9 @@ import { meridianAngle } from '../../engine/sky';
 import { isCloudy } from '../../game/survival';
 import { makeSkySighting, skyCode, skyDirection, skyKey, skyline, visibleSkyLights, type SkyRef } from '../../game/skyObservation';
 import { SkyExplorer, SkyNotebook } from './SkyExplorer';
+import { analyzeYear } from '../../game/yearObservations';
+import { YearPlot, YearFitDetails } from './YearAnalysis';
+import { YearInvestigation } from '../tutorial/YearInvestigation';
 
 type Sel = SkyRef;
 type Tab = 'sky' | 'year' | 'track' | 'transit' | 'orbit' | 'giant' | 'stars' | 'micro' | 'moon';
@@ -561,7 +564,7 @@ export function Observatory() {
               const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v }] }));
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'manual' }] }));
               toast('Sky position logged');
               sfx('shutter');
             }}
@@ -574,11 +577,13 @@ export function Observatory() {
             reason={obscured(t) ? 'Clouds or flare glare obscure the field. Wait for clear observing conditions.' : sel?.kind !== 'star' ? 'Select the star and open the telescope (the solar filter fits automatically).' : mode !== 'scope' ? 'Open the telescope.' : !twilight ? 'Wait for sunrise or sunset: the tracker needs the star low in a twilight sky to see reference stars.' : ''}
             onLog={() => {
               const c = pointing(clock.t);
-              if (!c || obscured(clock.t)) return;
+              if (!c || mode !== 'scope' || sel?.kind !== 'star' || obscured(clock.t)) return;
+              const sunNow = toHorizontal(topocentric(sys, 'star', clock.t, sys.site), localFrame(sys, clock.t, sys.site)).alt / DEG;
+              if (sunNow <= -1 || sunNow >= 8) return;
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               const v = eclLon(c);
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(st, clock.t), frozen: false } } }] }));
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'manual', environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(st, clock.t), frozen: false } } }] }));
               toast('Star position logged');
               sfx('shutter');
             }}
@@ -649,13 +654,8 @@ function MicroReadout({ calip }: { calip: React.MutableRefObject<{ x1: number; x
 function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void; locked?: boolean }) {
   const obs = useGame((s) => s.starObs);
   const [band, setBand] = useState<[number, number] | null>(null);
-  const days = obs.map((o) => o.at / DAY);
-  const lon = unwrapDeg(obs.map((o) => o.v / DEG));
-  const pts = days.map((x, i) => ({ x, y: lon[i] }));
-  const used = pts.filter((p) => !band || (p.x >= band[0] && p.x <= band[1]));
-  const fit = used.length >= 2 ? linearFit(used.map((p) => p.x), used.map((p) => p.y)) : null;
-  const P1 = fit && fit.slope > 0 ? 360 / fit.slope : null;
-  const sigma = fit && P1 && used.length > 2 ? (P1 * fit.slopeSigma) / fit.slope : undefined;
+  const manual = hasChallenge(useGame.getState(), 'handFit');
+  const analysis = analyzeYear(obs, band), { fit } = analysis, pts = analysis.points;
   return (
     <div className="panel panel-pad stack">
       <b>Length of the year</b>
@@ -680,41 +680,20 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog:
       </button>
       {!canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
       <div data-tut="year-fit" className="stack">
-      {pts.length > 0 && (
-        <Chart
-          series={[
-            { pts, color: '#ffc46b', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
-            ...(fit ? [{ pts: [pts[0], pts[pts.length - 1]].map((p) => ({ x: p.x, y: fit.intercept + fit.slope * p.x })), color: 'rgba(108,196,255,0.8)', kind: 'line' as const }] : []),
-          ]}
-          xLabel="day"
-          yLabel={locked ? 'sky turned (°)' : 'star longitude (°)'}
-          band={band}
-          onBand={setBand}
-          brushMode="band"
-        />
-      )}
-      {pts.length > 0 && <div className="faint" style={{ fontSize: 12 }}>Drag across the chart to choose which logs to fit. Double-tap to use all.</div>}
-      {pts.length > 0 && <details className="measurement-help"><summary>Observation log and conditions</summary>
-        <table className="log"><thead><tr><th>Day</th><th>Position (°)</th><th>Image</th></tr></thead><tbody>{obs.map((o, i) => <tr key={`${o.at}:${i}`}><td>{fmt(o.at / DAY, 2)}</td><td>{fmt(lon[i], 3)}</td><td>{o.environment?.seeing ? o.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Not recorded'}</td></tr>)}</tbody></table>
-      </details>}
-      {fit && hasChallenge(useGame.getState(), 'handFit') && (
-        <div className="hint">Fit by hand: read the drift per day off your chart (rise over run), work out P₁ = 360° / drift, and type it on the progress sheet.</div>
-      )}
-      {fit && !hasChallenge(useGame.getState(), 'handFit') && (
-        <dl className="kv">
-          <dt>{locked ? 'Turn rate' : 'Drift'}</dt>
-          <dd>{fmt(fit.slope, 4)} °/day</dd>
-          <dt>Baseline</dt>
-          <dd>{fmt(used[used.length - 1].x - used[0].x, 1)} days</dd>
-          <dt>Year P₁ = 360° / {locked ? 'turn rate' : 'drift'}</dt>
-          <dd className="blue">{P1 ? `${fmt(P1, 2)} days` : '—'}</dd>
-        </dl>
-      )}
+      <YearPlot analysis={analysis} manual={manual} band={band} onBand={setBand} />
+      {pts.length > 0 && <>
+        <div className="faint">Drag across the chart to select dates, or use these range fields. Excluded observations remain visible.</div>
+        <div className="row year-date-range"><label className="field">From day<input className="input" type="number" step="any" value={band?.[0] ?? pts[0].x} onChange={(e) => { if (e.target.value !== '' && Number.isFinite(Number(e.target.value))) setBand([Number(e.target.value), band?.[1] ?? pts.at(-1)!.x]); }} /></label><label className="field">To day<input className="input" type="number" step="any" value={band?.[1] ?? pts.at(-1)!.x} onChange={(e) => { if (e.target.value !== '' && Number.isFinite(Number(e.target.value))) setBand([band?.[0] ?? pts[0].x, Number(e.target.value)]); }} /></label></div>
+        <button className="btn small" onClick={() => setBand(null)}>Use all observing dates</button>
+        <details className="measurement-help"><summary>Observation log and conditions</summary><table className="log"><thead><tr><th>Day</th><th>Chart position (°)</th><th>Image</th></tr></thead><tbody>{pts.map((p, i) => <tr key={`${p.x}:${i}`}><td>{fmt(p.x, 3)}</td><td>{fmt(p.y, 3)}</td><td>{p.observation.environment?.seeing ? p.observation.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Not recorded'}{p.observation.source === 'echo' ? ' · ECHO supplied' : p.observation.source === 'manual' ? ' · manual' : ''}</td></tr>)}</tbody></table></details>
+      </>}
+      <YearFitDetails analysis={analysis} manual={manual} send />
+      <details className="measurement-help"><summary>What can these dates establish?</summary><p>One date provides no time baseline. Two dates define an early line but cannot establish scatter. More separated dates can test that line; extra readings at the same instant do not provide more time coverage.</p><p>The fitted rate assumes approximately steady angular drift over the selected interval. Curvature, shared centring offsets and changing image quality can make a straight line inadequate. The shortest-turn unwrap also assumes no unobserved extra revolutions between successive dates; very long gaps can hide a turn.</p><p>Keep your observations and choose another date if the drift is small relative to your aiming uncertainty. More observations do not guarantee a narrower or more accurate result.</p></details>
       <Formula>{locked ? 'P₁ = 360° / (sky turn rate)' : 'P₁ = 360° / (daily drift)'}</Formula>
-      {P1 && !hasChallenge(useGame.getState(), 'handFit') && <SendToSheet k="P1" value={P1 * DAY} spread={sigma ? sigma * DAY : undefined} />}
       </div>
+      <YearInvestigation observations={obs} locked={locked} manual={manual} />
       {!locked && <ReadingPredictionPractice kind="star" />}
-      {pts.length >= 2 && !locked && <StarPrediction pts={pts} fit={fit} />}
+      {pts.length >= 2 && !locked && <StarPrediction pts={pts} fit={manual ? null : fit} />}
     </div>
   );
 }

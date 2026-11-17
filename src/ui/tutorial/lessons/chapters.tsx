@@ -1,3 +1,4 @@
+import { YearBaselineLab } from '../YearInvestigation';
 import { Equation } from '../../common/Equation';
 // Optional Flight School modules, one per campaign chapter.
 
@@ -409,6 +410,7 @@ export function LockedLesson() {
         Most stars in the galaxy are red dwarfs, and many of their planets are probably tidally locked. Their temperate zone is so close in that a year
         lasts weeks.
       </P>
+      {spin === 1 && <YearBaselineLab yearDays={60} locked />}
       <P>
         Flares are counted the way radioactive decays are: a steady average rate, random timing. The gaps between them follow an exponential curve.
       </P>

@@ -1,3 +1,4 @@
+import { analyzeYear } from '../../game/yearObservations';
 import { useEffect, useState } from 'react';
 import { DAY } from '../../engine/constants';
 import { clock } from '../../game/clock';
@@ -24,7 +25,7 @@ export function ReadingPredictionPractice({ kind, currentLength = null, resultPe
   const points = unwrapPositions(observations);
   const due = prediction?.due ?? (points.length ? nextDusk(Math.max(clock.t, points.at(-1)!.x * DAY) + 14 * DAY) : 0);
   const canCommit = value.trim() !== '' && range.trim() !== '' && validEstimate(Number(value), Number(range)) && (
-    kind === 'pendulum' ? !!baseline && currentLength !== null && Math.abs(currentLength / baseline.length - 1) >= .2 && !resultPending : points.length >= 2 && points.at(-1)!.x > points[0].x
+    kind === 'pendulum' ? !!baseline && currentLength !== null && Math.abs(currentLength / baseline.length - 1) >= .2 && !resultPending : !!analyzeYear(observations).fit
   );
   const completed = prediction?.comparison !== undefined;
   const plotValue = value.trim() && validEstimate(Number(value), Number(range)) ? Number(value) : null;

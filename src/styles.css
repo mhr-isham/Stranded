@@ -537,3 +537,12 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .hill-journey { position: absolute; z-index: 7; top: calc(var(--hud-h) + var(--safe-top) + 10px); left: 50%; transform: translateX(-50%); width: min(360px, calc(100% - 20px)); text-align: center; font-size: 13px; }
 .hill-journey div { font-size: 11px; color: var(--muted); margin: 4px 0; }
 .hill-journey progress { width: 100%; }
+
+.year-date-range .field { min-width: 0; flex: 1; }
+.year-date-range .input { min-width: 0; width: 100%; }
+.year-investigation { font-size: 13px; }
+.year-investigation h3 { font-size: 16px; }
+.year-choices { flex-wrap: wrap; gap: 6px; }
+.year-comparison { width: 100%; table-layout: fixed; font-size: 12px; }
+.year-comparison th, .year-comparison td { overflow-wrap: anywhere; padding: 6px 4px; }
+.year-lab { margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 12px; }

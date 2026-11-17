@@ -1,3 +1,4 @@
+import { YearBaselineLab } from '../YearInvestigation';
 import { Equation } from '../../common/Equation';
 import { useRef, useState } from 'react';
 import { ArrowDefs, Demo, LessonShell, Note, P, Slider, fmtN, useAnimTime } from './common';
@@ -126,14 +127,16 @@ export function YearLesson() {
       }
       formula={<Equation tex={"P_1=\\frac{360^\\circ\\times\\text{days between logs}}{\\text{drift in degrees}}"} />}
       keyIdea="As we circle the star, we see it against different background stars. It drifts all the way round the sky in exactly one year."
-      warn="You can only see background stars near the star at sunrise or sunset, so logs are made at twilight. Two logs a day apart give a tiny drift that your aiming error swamps."
-      tip="Spread your logs over weeks. A 60-day baseline gives a drift of ~100°, so a 0.03° aiming error hardly matters."
+      warn="The tracker needs twilight reference observations. A short baseline can make the rate sensitive to centring error; two dates define a line but cannot measure its scatter."
+      tip="Compare observations across more dates and a wider time span. Check whether the new data support a straight line; shared offsets and curved motion can remain."
     >
       <P>
         Draw a line from us, through the star, out to the distant stars. As our planet moves along its orbit, that line sweeps around — so the
         star seems to slide slowly eastward through the constellations.
       </P>
-      <P>Drag the day slider and watch the yellow marker move away from the blue day-0 marker.</P>
+      <P>Drag the day slider and watch the yellow marker move away from the blue day-0 marker. This chart uses a fixed background reference: the daily sweep of the local sky is a different motion.</P>
+      <P>On a tidally locked world the star stays nearly fixed locally. The background sky turns as the planet rotates once per orbit; its charted turn rate supplies the year instead.</P>
+      <YearBaselineLab key={P1} yearDays={P1} />
     </LessonShell>
   );
 }

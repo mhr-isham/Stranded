@@ -1,3 +1,4 @@
+import { analyzeYear, yearFitMessage } from './yearObservations';
 // Flight School: the hands-on tutorial. This module holds the tutorial's
 // runtime helpers: signals the UI raises when the player does something,
 // screen anchors for things drawn on canvases, time jumps, and the
@@ -132,7 +133,9 @@ export function doHill() {
 
 export function doStarLog() {
   const sys = sysNow();
-  useGame.setState((s) => ({ starObs: [...s.starObs, { at: clock.t, v: starLongitude(sys, clock.t, sys.site) + rng.normal(0, 0.02 * DEG) }] }));
+  const previous = useGame.getState().starObs.at(-1);
+  if (previous && clock.t - previous.at < .5 * DAY) return;
+  useGame.setState((s) => ({ starObs: [...s.starObs, { at: clock.t, v: starLongitude(sys, clock.t, sys.site) + rng.normal(0, 0.02 * DEG), source: 'echo' }] }));
 }
 
 export function doOpposition(index: number) {
@@ -184,15 +187,16 @@ export function sendFromReadings(k: PrimaryKey, minRel = 0.004) {
 
 export function sendYearFromLogs() {
   const s = useGame.getState();
-  const obs = s.starObs;
-  if (obs.length < 2) return;
-  const a = obs[0];
-  const b = obs[obs.length - 1];
-  let d = b.v - a.v;
-  while (d < 0) d += 2 * Math.PI;
-  const P1 = ((b.at - a.at) * 2 * Math.PI) / d;
-  if (!Number.isFinite(P1) || b.at - a.at < DAY) return;
-  s.setSheet('P1', { value: P1, sigma: P1 * 0.002 });
+  const a = analyzeYear(s.starObs), f = a.fit;
+  if (!f) { useGame.setState({ tutorial: { ...s.tutorial, note: [yearFitMessage(a)] } }); return; }
+  if (s.settings.challenges?.includes('handFit')) return;
+  if (f.slopeSigma !== undefined && f.slopeSigma / f.slope >= .25) {
+    useGame.setState({ tutorial: { ...s.tutorial, note: ['The fitted rate is too uncertain for this simple symmetric year-error example. Inspect the observations and model before entering a year estimate.'] } });
+    return;
+  }
+  const sigma = Math.hypot(f.yearSigma ?? 0, f.yearDays * .01);
+  s.setSheet('P1', { value: f.yearDays * DAY, sigma: sigma * DAY });
+  useGame.setState({ tutorial: { ...s.tutorial, note: ['ECHO used your logged drift and supplied an illustrative 1% uncertainty allowance combined with fitted scatter. This is a teaching example, not a validated total error budget.'] } });
 }
 
 export function sendOppositions() {

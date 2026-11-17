@@ -1,3 +1,4 @@
+import { analyzeYear } from '../../game/yearObservations';
 // The Flight School script: every step of the hands-on tutorial, from the
 // first look at the HUD to a successful launch and the debrief.
 
@@ -534,12 +535,12 @@ export const STEPS: TutStep[] = [
   {
     id: 'year-log2',
     chapter: 'Year',
-    title: 'Wait a few weeks and log again',
+    title: 'Try a short baseline',
     target: 'year-log',
     screen: 'observatory',
-    body: ['A long gap between logs gives a big drift and a small error. Skip ahead about 25 days to the next dusk, re-centre the star and log again.'],
-    action: { label: 'Fast-forward 25 days', run: () => (jumpTo(nextDusk(clock.t + 25 * DAY)), emitTut('scope-star')) },
-    done: (s) => s.starObs.length >= 2,
+    body: ['Return on the next observing day, re-centre the star and log again. Two dates give an early line, but cannot establish its scatter. The optional investigation panel keeps this first estimate for comparison.'],
+    action: { label: 'Return on the next observing day', run: () => (jumpTo(nextDusk(clock.t + DAY)), emitTut('scope-star')) },
+    done: (s) => !!analyzeYear(s.starObs).fit,
     doIt: { run: doStarLog },
   },
   {
@@ -548,9 +549,9 @@ export const STEPS: TutStep[] = [
     title: 'One more for good measure',
     target: 'year-log',
     screen: 'observatory',
-    body: ['Once more: skip ahead, centre and log. Three points also let you spot a bad one.'],
+    body: ['Now try a longer baseline: skip ahead, centre and log. Compare your first two dates with this later record. The third point can test the line; agreement is useful but does not prove correctness.'],
     action: { label: 'Fast-forward 25 days', run: () => (jumpTo(nextDusk(clock.t + 25 * DAY)), emitTut('scope-star')) },
-    done: (s) => s.starObs.length >= 3,
+    done: (s) => analyzeYear(s.starObs).used.length >= 3 && !!analyzeYear(s.starObs).fit,
     doIt: { run: doStarLog },
   },
   {

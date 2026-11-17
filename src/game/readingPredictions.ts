@@ -1,5 +1,5 @@
 import { DAY, DEG } from '../engine/constants';
-import { linearFit } from '../engine/solver';
+import { analyzeYear, yearPoints, yearLineAt } from './yearObservations';
 import { recordTraining } from './training';
 import { useGame, type GameState } from './store';
 import { validEstimate } from './estimation';
@@ -14,14 +14,7 @@ export type ReadingPredictions = Partial<Record<ReadingPredictionKind, ReadingPr
 export const readingPracticeAllowed = (s: GameState) => !!s.schoolSession && s.tutorial.active && !!s.settings.freeRoam;
 
 export function unwrapPositions(observations: GameState['starObs']) {
-  const sorted = [...observations].sort((a, b) => a.at - b.at);
-  const points: { x: number; y: number }[] = [];
-  for (const observation of sorted) {
-    const raw = observation.v / DEG;
-    const previous = points.at(-1)?.y ?? raw;
-    points.push({ x: observation.at / DAY, y: raw + 360 * Math.round((previous - raw) / 360) });
-  }
-  return points;
+  return yearPoints(observations).map(({ x, y }) => ({ x, y }));
 }
 
 export function commitReadingPrediction(kind: ReadingPredictionKind, value: number, range: number, target: number) {
@@ -35,9 +28,9 @@ export function commitReadingPrediction(kind: ReadingPredictionKind, value: numb
   } else {
     const points = unwrapPositions(s.starObs);
     if (points.length < 2 || points.at(-1)!.x <= points[0].x || target / DAY <= points.at(-1)!.x) return false;
-    const fit = linearFit(points.map((p) => p.x), points.map((p) => p.y));
-    if (!Number.isFinite(fit.intercept + fit.slope * target / DAY)) return false;
-    prediction = { value, range, due: target, reference: fit.intercept + fit.slope * target / DAY, beforeIds: s.starObs.map((o) => String(o.at)), assisted: !!s.schoolSession?.assisted };
+    const fit = analyzeYear(s.starObs).fit;
+    if (!fit || !Number.isFinite(yearLineAt(fit, target / DAY))) return false;
+    prediction = { value, range, due: target, reference: yearLineAt(fit, target / DAY), beforeIds: s.starObs.map((o) => String(o.at)), assisted: !!s.schoolSession?.assisted };
   }
   useGame.setState({ readingPredictions: { ...s.readingPredictions, [kind]: prediction } });
   return true;

@@ -99,7 +99,7 @@ export function Tutorial() {
     body: [predictionKind === 'pendulum' ? 'Keep a baseline period using the rig. Measure a different string length, commit your prediction and range, then time and keep a new reading to compare.' : 'Open the Year tab and log the star at two different dusks. Commit a position and range about two weeks ahead, then advance to the target time and log again.'],
     done: (state) => state.readingPredictions[predictionKind]?.comparison !== undefined,
     doIt: undefined, action: undefined, warn: undefined, lesson: undefined,
-  } : originalStep;
+  } : session?.id === 'year' ? { ...originalStep, dim: false, followTarget: false, compact: true } : originalStep;
   const first = session?.start ?? 0;
   const last = session?.end ?? STEPS.length - 1;
   const [box, setBox] = useState<Box | null>(null);
@@ -284,6 +284,7 @@ export function Tutorial() {
           </div>
         )}
         <div className="row" style={{ marginTop: 8, gap: 6 }}>
+          {(session?.id === 'year' || (session?.id === 'basic' && step.id.startsWith('year-'))) && <button className="btn small" onClick={() => { document.querySelector('[data-tut="year-investigation"]')?.scrollIntoView({ block: 'center' }); setMini(true); }}>Year investigation panel</button>}
           {(predictionKind || (session?.id === 'basic' && (step.id === 'pend-send' || step.id === 'year-send'))) && <button className="btn small" onClick={() => {
             const kind = predictionKind ?? (step.id === 'pend-send' ? 'pendulum' : 'star');
             document.querySelector(`[data-tut="training-prediction-${kind}"]`)?.scrollIntoView({ block: 'center' });

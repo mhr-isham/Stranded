@@ -49,6 +49,7 @@ export interface Reading {
 }
 
 export interface TimedValue {
+  source?: 'manual' | 'echo';
   at: number;
   v: number;
   environment?: MeasurementEnvironment;

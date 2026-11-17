@@ -123,3 +123,5 @@ Pendulum observation checks: run `python scripts/check_pendulum.py` against the 
 Pendulum technique checks: run `python scripts/check_technique.py` against the development server. It times real twenty-swing and repeat-release observations, checks cosmetic milestone persistence and false-count rejection, and verifies ECHO labels at phone/desktop sizes. See [technique QA](reports/pendulum-technique-qa.md).
 
 Hill observation checks: run `python scripts/check_hill.py` against the development server. It verifies previewed/charged travel times, arrival and cancellation, keyboard/touch/high-DPI aiming, bracing, equipment provenance and expert-mode behavior. See [hill QA](reports/hill-observation-qa.md).
+
+Year investigation checks: run `python scripts/check_year.py` against the development server. It covers fit/baseline guards, date selection, manual-fit and formula restrictions, locked-world observations, interactive Flight School lessons and a complete native three-date practice exercise with expedition restoration. See [year QA](reports/year-observation-qa.md).

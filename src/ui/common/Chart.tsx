@@ -21,6 +21,7 @@ export interface Marker {
 
 interface Props {
   series: Series[];
+  ariaLabel?: string;
   markers?: Marker[];
   cursor?: number | null;
   onCursor?: (x: number) => void;
@@ -39,7 +40,7 @@ interface Props {
  * Interactive scatter/line chart. Tap to place the cursor; drag to zoom into
  * a range (or select a band). Double-tap resets zoom.
  */
-export function Chart({ series, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, band, onBand, brushMode = 'zoom' }: Props) {
+export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, band, onBand, brushMode = 'zoom' }: Props) {
   const [zoom, setZoom] = useState<[number, number] | null>(null);
   const drag = useRef<null | { x0: number; x1: number; moved: boolean }>(null);
   const lastTap = useRef(0);
@@ -67,6 +68,7 @@ export function Chart({ series, markers = [], cursor = null, onCursor, xLabel, y
   return (
     <div style={{ position: 'relative', height }}>
       <CanvasView
+        role={ariaLabel ? 'img' : undefined} aria-label={ariaLabel}
         className="fill-canvas"
         style={{ borderRadius: 10, border: '1px solid var(--panel-border)' }}
         onPointerDown={(e) => {
@@ -97,6 +99,7 @@ export function Chart({ series, markers = [], cursor = null, onCursor, xLabel, y
             lastTap.current = now;
           }
         }}
+        onPointerCancel={() => { drag.current = null; }}
         draw={({ ctx, w, h, dpr }) => {
           const l = 52 * dpr;
           const r = w - 10 * dpr;
