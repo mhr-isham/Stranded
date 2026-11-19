@@ -1,3 +1,4 @@
+import { PlanningModelNotes } from '../common/PlanningModelNotes';
 import { DistanceContext } from '../common/DistanceContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUANTITY_INFO, keysFor, labelFor } from '../../engine/chain';
@@ -187,6 +188,7 @@ export function Launch() {
       </div>
       <div className="tool-side">
         <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
+        <PlanningModelNotes model={model} />
         <DistanceContext sheet={s.sheet} variant={variant} />
         <div className="panel panel-pad stack" data-tut="launch-departure">
           <div className="row between">

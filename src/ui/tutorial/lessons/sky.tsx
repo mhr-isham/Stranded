@@ -243,51 +243,54 @@ export function RetrogradeLesson() {
 
 /** Synodic period: lapping on a race track. */
 export function SynodicLesson() {
-  const [P1, setP1] = useState(220);
-  const [P2, setP2] = useState(420);
+  const [P1, setP1] = useState(220), [P2, setP2] = useState(420);
+  const [inner, setInner] = useState(false);
+  const [running, setRunning] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  const [epoch, setEpoch] = useState(0), [pausedAt, setPausedAt] = useState(0);
   const t = useAnimTime();
-  const S = 1 / (1 / P1 - 1 / P2);
-  const day = (t * 60) % (S * 2);
-  const a1 = (TAU * day) / P1;
-  const a2 = (TAU * day) / P2;
-  const laps = Math.floor(day / S);
-  return (
-    <LessonShell
-      kicker="Lesson 9 · The synodic period"
-      title="How often do we lap the blue planet?"
-      demo={
-        <Demo>
-          <svg viewBox="0 0 400 260">
-            <circle cx={200} cy={130} r={60} fill="none" stroke="rgba(255,190,120,0.4)" strokeWidth={10} />
-            <circle cx={200} cy={130} r={105} fill="none" stroke="rgba(108,196,255,0.3)" strokeWidth={10} />
-            <circle cx={200} cy={130} r={10} fill="#ffd28a" />
-            <line x1={200} y1={130} x2={200 + 120 * Math.cos(a1)} y2={130 - 120 * Math.sin(a1)} stroke="rgba(255,255,255,0.08)" />
-            <circle cx={200 + 60 * Math.cos(a1)} cy={130 - 60 * Math.sin(a1)} r={8} fill="#ffb26b" />
-            <circle cx={200 + 105 * Math.cos(a2)} cy={130 - 105 * Math.sin(a2)} r={8} fill="#6cc4ff" />
-            <text x={10} y={20} fill="#93a2c3" fontSize={12}>
-              day {Math.round(day)} · overtakes so far: {laps}
-            </text>
-          </svg>
-          <Slider label="Our year P₁ (inner track)" value={P1} min={100} max={400} step={5} onChange={(v) => setP1(Math.min(v, P2 - 20))} fmt={(v) => `${v} d`} />
-          <Slider label="Blue planet year P₂ (outer track)" value={P2} min={150} max={1200} step={5} onChange={(v) => setP2(Math.max(v, P1 + 20))} fmt={(v) => `${v} d`} />
-          <dl className="kv">
-            <dt>Time between overtakes S</dt>
-            <dd className="blue">{fmtN(S, 1)} days</dd>
-          </dl>
-          <Note>Each overtake is an opposition.</Note>
-        </Demo>
-      }
-      formula={<Equation tex={"\\frac1S=\\frac1{P_1}-\\frac1{P_2}\\ \\Rightarrow\\ \\frac1{P_2}=\\frac1{P_1}-\\frac1S"} />}
-      keyIdea="We can’t time the blue planet’s year directly — we are moving too. But we can time how often we overtake it (opposition to opposition) and combine that with our own year."
-      warn="One synodic period is long — often more than a year. You’ll need to warp time and wait for the second opposition. Waiting costs life support."
-      tip="1/P is “laps per day”. The difference between the two runners’ laps per day is how fast the faster one gains: one full lap gained every S days."
-    >
-      <P>
-        Think of two runners on a track: the inner runner is faster. Every so often the inner runner catches up and passes the outer one. The time
-        between passes is the <b>synodic period</b>, S.
-      </P>
-    </LessonShell>
-  );
+  const shownTime = running ? t : pausedAt;
+  const S = 1 / Math.abs(1 / P1 - 1 / P2);
+  const day = (Math.max(0, shownTime - epoch) * 60) % (S * 2);
+  const a1 = TAU * day / P1, a2 = TAU * day / P2;
+  const ratio = (P2 / P1) ** (2 / 3), scale = 105 / Math.max(1, ratio), r1 = scale, r2 = ratio * scale;
+  function choose(next: boolean) { setInner(next); setP2(next ? Math.min(P2, P1 * .6) : Math.max(P2, P1 * 1.7)); setEpoch(shownTime); }
+  function reference(venus: boolean) { setInner(venus); setP1(365.256); setP2(venus ? 224.701 : 686.98); setEpoch(shownTime); }
+  return <LessonShell
+    kicker="Lesson 9 · The synodic period" title="Which planet laps which?"
+    demo={<Demo>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Choose the target orbit">
+        <button className={`btn small ${!inner ? 'primary' : ''}`} aria-pressed={!inner} onClick={() => choose(false)}>Outer target</button>
+        <button className={`btn small ${inner ? 'primary' : ''}`} aria-pressed={inner} onClick={() => choose(true)}>Inner target</button>
+      </div>
+      <svg viewBox="0 0 400 270" role="img" aria-label={inner ? 'Circular teaching orbits: the inner target laps home' : 'Circular teaching orbits: home laps the outer target'}>
+        <circle cx={200} cy={140} r={r1} fill="none" stroke="rgba(255,190,120,0.45)" strokeWidth={6} />
+        <circle cx={200} cy={140} r={r2} fill="none" stroke="rgba(108,196,255,0.4)" strokeWidth={6} />
+        <circle cx={200} cy={140} r={9} fill="#ffd28a" />
+        <line x1={200} y1={140} x2={200 + 120 * Math.cos(a1)} y2={140 - 120 * Math.sin(a1)} stroke="rgba(255,255,255,0.12)" />
+        <circle cx={200 + r1 * Math.cos(a1)} cy={140 - r1 * Math.sin(a1)} r={7} fill="#ffb26b" />
+        <circle cx={200 + r2 * Math.cos(a2)} cy={140 - r2 * Math.sin(a2)} r={7} fill="#6cc4ff" />
+        <text x={14} y={24} fill="#abc0d1" fontSize={13}>Teaching day {Math.round(day)} · alignments after start: {Math.floor(day / S)}</text>
+        <text x={14} y={260} fill="#ffb26b" fontSize={13}>Orange: home</text><text x={245} y={260} fill="#6cc4ff" fontSize={13}>Blue: target</text>
+      </svg>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}><button className="btn small" onClick={() => { if (running) setPausedAt(t); else setEpoch((start) => start + t - pausedAt); setRunning(!running); }}>{running ? 'Pause animation' : 'Play animation'}</button><button className="btn small" onClick={() => setEpoch(shownTime)}>Replay from alignment</button></div>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}><button className="btn small" onClick={() => reference(false)}>Earth → Mars</button><button className="btn small" onClick={() => reference(true)}>Earth → Venus</button></div>
+      <Slider label="Home year P₁" value={P1} min={100} max={500} step={.001} onChange={(v) => { setP1(v); setP2(inner ? Math.min(P2, v - 20) : Math.max(P2, v + 20)); setEpoch(shownTime); }} fmt={(v) => `${fmtN(v, 3)} d`} />
+      <Slider label={`Target year P₂ (${inner ? 'inner' : 'outer'})`} value={P2} min={inner ? 50 : P1 + 20} max={inner ? P1 - 20 : 1200} step={.001} onChange={(v) => { setP2(v); setEpoch(shownTime); }} fmt={(v) => `${fmtN(v, 3)} d`} />
+      <dl className="kv"><dt>Repeating alignment interval S</dt><dd className="blue" data-synodic-days={S}>{fmtN(S, 2)} days</dd></dl>
+      <Note>{inner ? 'The faster inner target laps home. In this coplanar model, inferior conjunctions can be seen as transits.' : 'Home laps the slower outer target. Each return to this alignment is an opposition.'}</Note>
+      <Note>The reference buttons use rounded mean periods in circular teaching orbits, not a dated ephemeris. Orbit sizes follow Kepler’s period ratio.</Note>
+    </Demo>}
+    formula={inner ? <Equation tex={"\\frac1S=\\frac1{P_2}-\\frac1{P_1} \\\\ \\frac1{P_2}=\\frac1{P_1}+\\frac1S"} /> : <Equation tex={"\\frac1S=\\frac1{P_1}-\\frac1{P_2} \\\\ \\frac1{P_2}=\\frac1{P_1}-\\frac1S"} />}
+    keyIdea={inner ? 'An inner target has the shorter year. It gains on us, so its orbital rate is our rate plus the relative rate: use the plus sign.' : 'An outer target has the longer year. We gain on it, so its orbital rate is our rate minus the relative rate: use the minus sign.'}
+    warn="A synodic interval can be long. Waiting for another real event uses ordinary expedition time and life support; this teaching animation does not advance your expedition."
+    tip="Compare Earth → Mars and Earth → Venus. Pause the animation and inspect which planet is faster before choosing the sign."
+  >
+    <P>Two moving observers do not measure each other’s year by timing one return to alignment. The synodic interval measures their relative orbital rate.</P>
+    <details><summary>Which assumptions make these equations useful?</summary>
+      <P>This picture uses circular, coplanar orbits with uniform angular motion. An ellipse still has an orbital period, but successive opposition or transit intervals can vary, so one interval need not establish its mean year.</P>
+      <P>For the game’s fitted-ellipse route, use the period from the orbit fit and its dated positions. The Distance Scale and Ellipses lessons explore those different assumptions without adding a required task to your expedition.</P>
+    </details>
+  </LessonShell>;
 }
 
 /** Kepler's third law: periods give orbit sizes (as ratios). */

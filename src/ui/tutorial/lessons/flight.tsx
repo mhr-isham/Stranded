@@ -86,7 +86,7 @@ export function HohmannLesson() {
         </Demo>
       }
       formula={<Equation tex={"t=\\pi\\sqrt{\\frac{(a_1+a_2)^3}{8GM_\\star}} \\\\ \\phi=180^\\circ-\\frac{360^\\circ t}{P_2}"} />}
-      keyIdea="The cheapest route between two circular orbits is half an ellipse that just touches both: a Hohmann transfer. Burn once to stretch your orbit out to the blue planet’s, coast for half an orbit, then brake."
+      keyIdea="A Hohmann transfer joins two circular, coplanar orbits with a half ellipse and two burns. Burn once to stretch your orbit out to the blue planet’s, coast for half an orbit, then brake."
       warn="It only works if the blue planet arrives at the meeting point when you do — so at launch it must lead you by the angle φ. That geometry repeats only once per synodic period: that is the launch window. Leaving at another time needs a faster, more expensive orbit."
       tip="In the launch planner the cost map shows the window as a cool green patch. The planner computes φ and the window date from your own numbers — if they’re wrong, the window is wrong too."
     >
@@ -94,6 +94,11 @@ export function HohmannLesson() {
         You can’t just point at the blue planet and fire: it is moving, and so are you. You aim at where it <b>will be</b> when you arrive.
       </P>
       <P>Try launching with a random lead angle, then with the ideal one.</P>
+      <details><summary>When does this picture need a different model?</summary>
+        <P>This demonstration uses two circular orbits in one plane. The transfer itself is an ellipse. It illustrates one useful two-burn route, not every possible minimum-fuel or fastest trajectory.</P>
+        <P>An eccentric target changes distance and speed through its year. The existing Ellipses lesson lets you overlay a circular reference with the same semi-major axis and period, then compare where the two models put the target.</P>
+        <P>The planner connects the positions predicted for your chosen departure and arrival dates using a Lambert solution. Hohmann time is a reference scale there, not a replacement for the fitted orbit. Giant flybys use two such legs and a separate encounter approximation.</P>
+      </details>
     </LessonShell>
   );
 }

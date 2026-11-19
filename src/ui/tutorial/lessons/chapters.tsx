@@ -253,6 +253,7 @@ export function InnerLesson() {
 
 /** Chapter 4: Kepler's first and second laws on an ellipse. */
 export function EllipseLesson() {
+  const [showCircle, setShowCircle] = useState(false);
   const [e, setE] = useState(0.4);
   const [phase, setPhase] = useState(0.15);
   const a = 120;
@@ -283,6 +284,7 @@ export function EllipseLesson() {
         <Demo h={360}>
           <svg viewBox="0 0 600 300" style={{ width: '100%' }}>
             <ellipse cx={cx} cy={cy} rx={a} ry={b} fill="none" stroke="rgba(108,196,255,0.45)" />
+            {showCircle && <g aria-label="Circular reference at the same elapsed fraction of the year"><circle cx={fx} cy={cy} r={a} fill="none" stroke="#ffc46b" strokeDasharray="5 5" /><circle cx={fx + a * Math.cos(2 * Math.PI * phase)} cy={cy - a * Math.sin(2 * Math.PI * phase)} r={6} fill="none" stroke="#ffc46b" strokeWidth={2} /></g>}
             <path d={wedge(phase)} fill="rgba(108,196,255,0.25)" stroke="rgba(108,196,255,0.6)" />
             <path d={wedge(phase + 0.5)} fill="rgba(255,196,107,0.22)" stroke="rgba(255,196,107,0.6)" />
             <circle cx={fx} cy={cy} r={9} fill="#ffd36b" />
@@ -307,14 +309,17 @@ export function EllipseLesson() {
               distance r = {fmtN(r, 2)} a
             </text>
             <text x={430} y={150} fill={speed > 1 ? '#5be3a4' : '#ffc46b'} fontSize={12}>
-              speed = {fmtN(speed, 2)} × average
+              speed = {fmtN(speed, 2)} ×
             </text>
+            <text x={430} y={168} fill="#93a2c3" fontSize={11}>circular speed at a</text>
             <text x={430} y={190} fill="#93a2c3" fontSize={11}>
               closest {fmtN(1 - e, 2)} a · farthest {fmtN(1 + e, 2)} a
             </text>
           </svg>
           <Slider label="Eccentricity e" value={e} min={0} max={0.8} step={0.01} onChange={setE} fmt={(v) => fmtN(v, 2)} />
           <Slider label="Where the planet is (fraction of its year)" value={phase} min={0} max={1} step={0.005} onChange={setPhase} fmt={(v) => fmtN(v, 3)} />
+          <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={showCircle} onChange={(ev) => setShowCircle(ev.target.checked)} />Show a circular reference with the same semi-major axis and year</label>
+          {showCircle && <div className="callout key" role="status">Blue: the ellipse. Gold outline: a circular reference at the same fraction of the year. Try e = 0, then e = 0.4: the year can stay the same while the predicted arrival position changes. These are hypothetical teaching models, not two measurements or a truth check.</div>}
           <Note>Both wedges are swept in the same time. Near the star the wedge is short and wide; far away it is long and thin — the areas match.</Note>
         </Demo>
       }
