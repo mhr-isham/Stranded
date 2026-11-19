@@ -19,6 +19,7 @@ import { CadetGoal } from '../CadetGoal';
 import { PaidChecks } from './PaidChecks';
 import { unlockHint } from '../../game/hints';
 import { HINT_POINT_COST } from '../../engine/scoring';
+import { UncertaintyBreakdown } from './UncertaintyBreakdown';
 
 // Constellation layout: columns follow the solve chain from measurements to the launch.
 const POS: Record<QuantityKey | 'launch', [number, number]> = {
@@ -68,6 +69,7 @@ export function Sheet() {
   const { system: sys } = currentWorld();
   const [sel, setSel] = useState<QuantityKey | 'launch'>('g');
   const [naming, setNaming] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const variant = variantOf(sys.features);
   const EDGES = edgesFor(variant);
   const primaries = keysFor(variant);
@@ -78,8 +80,9 @@ export function Sheet() {
   const est = (k: QuantityKey) => (PRIMARY_KEYS as readonly string[]).includes(k) ? s.sheet[k as PrimaryKey] : derived[k as keyof typeof derived];
   const relErr = (k: QuantityKey) => {
     const e = est(k);
-    if (!e) return null;
+    if (!e || !Number.isFinite(e.value) || !Number.isFinite(e.sigma) || e.sigma < 0) return null;
     if (k === 'tOpp') return e.sigma / sys.synodic;
+    if (e.value === 0) return null;
     return Math.abs(e.sigma / e.value);
   };
   // Wide screens get the chain laid out left-to-right instead of top-to-bottom.
@@ -89,7 +92,7 @@ export function Sheet() {
   const allLaunch = LAUNCH_INPUTS.every((k) => est(k));
 
   return (
-    <div className="tool">
+    <div className={`tool${expanded ? ' sheet-inspection-focus' : ''}`}>
       <div className="tool-stage" style={{ background: 'radial-gradient(ellipse at 40% 40%, #0c1630 0%, #05070f 70%)' }}>
         <svg data-tut="sheet-map" viewBox={vb} preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 'calc(64px + var(--safe-top)) 8px 80px 8px', width: 'calc(100% - 16px)', height: 'calc(100% - 150px)' }}>
           <defs>
@@ -137,6 +140,7 @@ export function Sheet() {
       </div>
       <div className="tool-side">
         <CadetGoal inTool />
+        <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn small ghost" aria-pressed={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show constellation' : 'Expand worksheet view'}</button></div>
         <div className="panel panel-pad hide-phone">
           <div className="row between">
             <h2 style={{ fontSize: 16 }}>Progress sheet</h2>
@@ -163,7 +167,7 @@ export function Sheet() {
             </button>
           </div>
         ) : (
-          <NodePanel key={sel} k={sel} derivedEst={derived} />
+          <NodePanel key={sel} k={sel} derivedEst={derived} onSelectInput={setSel} />
         )}
         <Checks />
         <button className="btn small ghost show-phone-block" onClick={() => setNaming(true)}>
@@ -175,7 +179,7 @@ export function Sheet() {
   );
 }
 
-function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<typeof deriveAll> }) {
+function NodePanel({ k, derivedEst, onSelectInput }: { k: QuantityKey; derivedEst: ReturnType<typeof deriveAll>; onSelectInput: (key: PrimaryKey) => void }) {
   const s = useGame();
   const { system: sys } = currentWorld();
   const info = QUANTITY_INFO[k];
@@ -241,7 +245,9 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
           {stats && k !== 'dPar' && (
             <div className="muted" style={{ fontSize: 12 }}>
               Log: {stats.n} kept reading{stats.n > 1 ? 's' : ''}, mean {sig(toDisplay(k, stats.mean), 5)}
-              {stats.n > 1 ? `, standard error ±${sig(toDisplay(k, stats.se), 2)}` : ''} {info.unit}
+              {stats.n > 1 ? `, scatter-based error ±${sig(toDisplay(k, stats.se), 2)}` : ''} {info.unit}
+              {stats.revisions > 0 ? ` · ${stats.revisions} earlier mark/timing revision(s) excluded from this average.` : ''}
+              {stats.n > 1 ? ' This scatter estimate assumes independent repeats of a stable quantity; different timestamps alone do not establish independence.' : ''}
             </div>
           )}
           {node.tool && (
@@ -252,12 +258,12 @@ function NodePanel({ k, derivedEst }: { k: QuantityKey; derivedEst: ReturnType<t
         </>
       ) : (
         <>
-          <div className="readout small">{e ? `${sig(toDisplay(k, e.value), 5)} ± ${sig(toDisplay(k, e.sigma), 2)} ${info.unit}` : 'not yet computable'}</div>
+          <div className="readout small">{e ? `${sig(toDisplay(k, e.value), 5)} ${Number.isFinite(e.sigma) ? `± ${sig(toDisplay(k, e.sigma), 2)}` : '· uncertainty unavailable'} ${info.unit}` : 'not yet computable'}</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            Computed by ECHO from: {(derivedFor(variant)[k as keyof ReturnType<typeof derivedFor>]?.inputs ?? []).map((i) => QUANTITY_INFO[i].symbol).join(', ')}. Errors propagate
-            automatically.
+            Computed by ECHO from: {[...new Set(derivedFor(variant)[k as keyof ReturnType<typeof derivedFor>]?.inputs ?? [])].map((i) => QUANTITY_INFO[i].symbol).join(', ')}. Entered errors propagate using an independent-input, first-order approximation.
           </div>
-          {e && <div className="muted" style={{ fontSize: 12 }}>Relative error: {fmt((100 * e.sigma) / Math.abs(e.value), 2)}%</div>}
+          {e && Number.isFinite(e.sigma) && e.value !== 0 && <div className="muted" style={{ fontSize: 12 }}>Relative uncertainty: {fmt((100 * e.sigma) / Math.abs(e.value), 2)}%</div>}
+          <UncertaintyBreakdown sheet={s.sheet} quantity={k as keyof ReturnType<typeof derivedFor>} variant={variant} onSelectInput={onSelectInput} />
         </>
       )}
 

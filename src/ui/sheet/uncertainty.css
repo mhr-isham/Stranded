@@ -1,0 +1,18 @@
+.uncertainty-budget { border: 1px solid rgba(130, 183, 228, .26); border-radius: 12px; padding: 12px; background: linear-gradient(140deg, rgba(38, 74, 112, .19), rgba(8, 17, 31, .5)); font-size: 13px; overflow-wrap: anywhere; }
+.uncertainty-budget summary { cursor: pointer; color: #c0e4ff; line-height: 1.6; }
+.uncertainty-budget summary:focus-visible, .uncertainty-source-link:focus-visible { outline: 2px solid #ffc46b; outline-offset: 4px; border-radius: 3px; }
+.uncertainty-budget p { margin: 0; line-height: 1.6; }
+.uncertainty-total { display: grid; gap: 4px; }
+.uncertainty-total b { color: #c1e5ff; font: 600 18px 'Space Grotesk', sans-serif; }
+.uncertainty-sources { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.uncertainty-source-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.uncertainty-source-title > span { flex-shrink: 0; font-variant-numeric: tabular-nums; color: #b6d5ef; }
+.uncertainty-source-link { font: inherit; font-weight: 600; color: #d7ecff; border: 0; background: transparent; padding: 5px 0; text-align: left; cursor: pointer; min-height: 36px; text-decoration: underline; text-decoration-color: #496982; text-underline-offset: 3px; }
+.uncertainty-track { height: 9px; border-radius: 5px; overflow: hidden; background: rgba(151, 193, 227, .1); margin: 4px 0 7px; }
+.uncertainty-track > div { height: 100%; background: linear-gradient(90deg, #4c8cbf, #b1dcff); border-radius: inherit; }
+.uncertainty-sources li:first-child .uncertainty-track > div { background: linear-gradient(90deg, #ba853b, #ffce8b); }
+.uncertainty-scenario { border-top: 1px solid rgba(130, 183, 228, .2); padding-top: 10px; }
+.uncertainty-preview { line-height: 1.7; }
+.tool.sheet-inspection-focus { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.tool.sheet-inspection-focus > .tool-stage { display: none; }
+.tool.sheet-inspection-focus > .tool-side { width: min(760px, 100%); min-height: 0; max-height: none; margin-inline: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 8px 12px calc(90px + var(--safe-bottom)); }

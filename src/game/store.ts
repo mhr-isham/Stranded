@@ -433,13 +433,24 @@ export const useGame = create<GameState>()(
   ),
 );
 
-/** Mean and standard error of the kept readings of one quantity. */
+/** Scatter estimate, conditional on independent repeat observations of a stable
+ * quantity. Known revisions share a source; keep the latest kept version once.
+ * Equal timestamps/values alone never establish a shared source or independence. */
 export function readingStats(readings: Reading[], key: PrimaryKey) {
-  const rs = readings.filter((r) => r.key === key && r.kept);
+  const kept = readings.filter((r) => r.key === key && r.kept);
+  const finite = kept.filter((r) => Number.isFinite(r.value));
+  const sources = new Map<string, Reading>();
+  for (const r of finite) {
+    const source = r.micrometer?.sightingId ? `image:${r.micrometer.sightingId}`
+      : r.parallax?.captureId ? `pair:${r.parallax.captureId}`
+      : r.pendulum?.technique?.releaseId ? `release:${r.pendulum.technique.releaseId}` : `reading:${r.id}`;
+    sources.set(source, r);
+  }
+  const rs = [...sources.values()];
   const n = rs.length;
   if (!n) return null;
   const mean = rs.reduce((a, r) => a + r.value, 0) / n;
   const sd = n > 1 ? Math.sqrt(rs.reduce((a, r) => a + (r.value - mean) ** 2, 0) / (n - 1)) : NaN;
-  const at = rs.reduce((a, r) => a + r.at, 0) / n;
-  return { n, mean, sd, se: sd / Math.sqrt(n), at };
+  const at = rs.every((r) => Number.isFinite(r.at)) ? rs.reduce((a, r) => a + r.at, 0) / n : undefined;
+  return { n, mean, sd, se: sd / Math.sqrt(n), at, raw: kept.length, revisions: finite.length - n, invalid: kept.length - finite.length };
 }

@@ -84,7 +84,7 @@ export function SendToSheet({ k, value, at, spread, modelContribution = 0, label
       {DATED_QUANTITIES.includes(k) && <ObservationDate at={at} label="Sending observation" />}
       {mode.sanity && spread !== undefined && Number.isFinite(spread) && spread > 0 && (
         <div className="muted" style={{ fontSize: 12 }}>
-          {spreadLabel ?? 'Standard error from the scatter of your readings'}: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Allow separately for other systematic errors.
+          {spreadLabel ?? 'Scatter-based standard error, assuming independent repeats'}: ±{sig(toDisplay(k, spread), 2)} {info.unit}. Allow separately for shared calibration and other systematic errors.
         </div>
       )}
       {modelContribution > 0 && <div className="stack">
@@ -121,11 +121,14 @@ export function SendReadings({ k, tut }: { k: PrimaryKey; tut?: string }) {
   return (
     <div data-tut={tut}>
       <div className="row between" style={{ marginTop: 8 }}>
-        <span className="muted">Average of {st.n} kept</span>
+        <span className="muted">Average of {st.n} kept observation{st.n === 1 ? '' : 's'}</span>
         <span className="readout small">
           {sig(toDisplay(k, st.mean), 5)} {QUANTITY_INFO[k].unit}
         </span>
       </div>
+      {st.revisions > 0 && <div className="faint">{st.revisions} earlier kept mark/timing revision(s) remain in the log. Only the latest kept version of each recorded exposure, pair or release enters this average.</div>}
+      {st.invalid > 0 && <div className="amber">{st.invalid} nonfinite kept reading(s) cannot enter this average. Check the log.</div>}
+      {st.n > 1 && <div className="faint">Repeated observations must describe the same stable quantity to be averaged. Different timestamps do not establish independence, and repeating a shared calibration error does not reduce it.</div>}
       {treatments.size > 1 && <div className="muted" style={{ fontSize: 12 }}>These kept readings mix treatments or protection. Check their conditions and compatibility before averaging; use the include/exclude controls to choose the observations supporting your estimate.</div>}
       <SendToSheet k={k} value={st.mean} at={st.at} spread={st.n > 1 ? st.se : undefined} modelContribution={conditionUncertainty(readings.filter((r) => r.key === k))} />
     </div>

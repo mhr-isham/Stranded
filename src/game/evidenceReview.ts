@@ -1,5 +1,5 @@
 import { DAY } from '../engine/constants';
-import { deriveAll, derivedFor, keysFor, QUANTITY_INFO, type ChainVariant, type Estimate, type PrimaryKey, type QuantityKey } from '../engine/chain';
+import { deriveAll, derivedFor, keysFor, QUANTITY_INFO, uncertaintyBudget, type ChainVariant, type Estimate, type PrimaryKey, type QuantityKey } from '../engine/chain';
 import { readingStats, type GameState } from './store';
 import { conditionUncertainty } from './measurementEnvironment';
 import { showQuantity, sig, toDisplay } from './format';
@@ -31,23 +31,19 @@ export function reviewEvidence(s: Evidence, key: QuantityKey, variant: ChainVari
   if (stats) {
     const same = Math.abs(e.value - stats.mean) <= Math.max(1e-12, Math.abs(stats.mean) * 1e-8);
     facts.push(`${stats.n} kept reading${stats.n === 1 ? '' : 's'} average ${showQuantity(key, stats.mean)}. Your entry ${same ? 'matches this average' : `is ${showQuantity(key, e.value)}; it differs from this average`}.`);
+    if (stats.revisions) facts.push(`${stats.revisions} earlier kept mark/timing revision(s) share a recorded source; only its latest kept version enters the average.`);
+    if (stats.invalid) facts.push(`${stats.invalid} nonfinite kept reading(s) cannot enter this average.`);
     if (!same) why.push('A difference may reflect a transcription error or a deliberate adjustment. Document the adjustment rather than assuming either value is correct.');
     if (stats.n > 1) {
       facts.push(stats.se > 0 ? `Standard error from the kept readings: ±${uncertainty(key, stats.se)}.${e.sigma < stats.se ? ' Your stated uncertainty is smaller than this repeatability estimate.' : ''}` : 'These kept values are identical; zero observed scatter does not establish zero uncertainty.');
-      why.push('A standard error assumes independent repeat measurements of a stable quantity. Shared errors and repeated marks on one image do not average away.');
+      why.push('A standard error assumes independent repeat measurements of a stable quantity. Different timestamps alone do not establish independence. Shared errors and repeated marks on one image do not average away.');
     } else why.push('One kept reading cannot establish repeatability. Allow for the instrument, alignment and method as well as timing.');
     next.push('Take independent readings, compare their conditions, and justify the final uncertainty. Retain or exclude observations based on evidence.');
   }
   if (def) {
-    const contributions = def.inputs.map((input) => {
-      const a = s.sheet[input]!;
-      const up = deriveAll({ ...s.sheet, [input]: { ...a, sigma: a.sigma, value: a.value + Math.max(Math.abs(a.value) * 1e-6, a.sigma * 1e-3) } }, variant)[key as keyof ReturnType<typeof deriveAll>];
-      const dn = deriveAll({ ...s.sheet, [input]: { ...a, sigma: a.sigma, value: a.value - Math.max(Math.abs(a.value) * 1e-6, a.sigma * 1e-3) } }, variant)[key as keyof ReturnType<typeof deriveAll>];
-      const step = Math.max(Math.abs(a.value) * 1e-6, a.sigma * 1e-3);
-      return { input, amount: up && dn ? Math.abs(up.value - dn.value) / (2 * step) * a.sigma : NaN };
-    }).filter((c) => Number.isFinite(c.amount) && c.amount > 0).sort((a, b) => b.amount - a.amount);
-    facts.push(`This derived value is calculated from your entered ${def.inputs.map((p) => QUANTITY_INFO[p].symbol).join(', ')}. Recalculation is not independent confirmation of those inputs.`);
-    if (contributions[0]) facts.push(`Largest first-order uncertainty contribution in this model: ${QUANTITY_INFO[contributions[0].input].symbol}, approximately ±${uncertainty(key, contributions[0].amount)}.`);
+    const contributions = uncertaintyBudget(s.sheet, key as keyof ReturnType<typeof derivedFor>, variant)?.contributions.filter((c) => Number.isFinite(c.effect) && c.effect > 0).sort((a, b) => b.effect - a.effect) ?? [];
+    facts.push(`This derived value is calculated from your entered ${[...new Set(def.inputs)].map((p) => QUANTITY_INFO[p].symbol).join(', ')}. Recalculation is not independent confirmation of those inputs.`);
+    if (contributions[0]) facts.push(`Largest first-order uncertainty contribution in this model: ${QUANTITY_INFO[contributions[0].input].symbol}, approximately ±${uncertainty(key, contributions[0].effect)}.`);
     why.push('This ranks the uncertainties you entered under the current model. Missing systematic errors, correlations or an unsuitable model can change that ranking.');
     next.push('Inspect the observations supporting the largest contribution before spending time improving an already precise input.');
   }

@@ -340,13 +340,19 @@ export function systemFromModel(m: PlayerModel, template: StarSystem): StarSyste
   };
 }
 
-/** Draw a random model from the player's primaries (Gaussian in each primary). */
+/** Draw once per primary and reuse it throughout the chain. Invalid draws return
+ * null; callers must retain them as unassessable attempts, not resample to hide them. */
 export function sampleModel(p: Primaries, rng: Rng, variant: ChainVariant = 'standard'): PlayerModel | null {
   const s: Primaries = {};
   for (const k of keysFor(variant)) {
     const e = p[k] as Estimate | undefined;
-    if (!e) return null;
-    s[k] = { value: rng.normal(e.value, e.sigma), sigma: 0, at: e.at };
+    if (!e || !Number.isFinite(e.value) || !Number.isFinite(e.sigma) || e.sigma < 0) return null;
+    const value = rng.normal(e.value, e.sigma);
+    if (!Number.isFinite(value)) return null;
+    if (k === 'ecc' ? value < 0 || value >= 1 : !['tOpp', 'tOppG', 'wPeri'].includes(k) && value <= 0) return null;
+    if (k === 'alpha2' && value >= Math.PI || ['thetaM', 'thetaMg'].includes(k) && value >= Math.PI / 2) return null;
+    s[k] = { value, sigma: 0, at: e.at };
   }
+  if (variant === 'probe' && s.vPeak!.value <= s.vInf!.value) return null;
   return modelFromPrimaries(s, variant);
 }

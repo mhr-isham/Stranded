@@ -131,7 +131,7 @@ function buildDerived(variant: ChainVariant): Partial<Record<DerivedKey, Derived
       const psi = (2 * Math.PI * (t - v.tOppG)) / v.Sg;
       return a1of(v, at) * Math.sqrt(1 + r * r - 2 * r * Math.cos(psi));
     };
-    const GIANT: PrimaryKey[] = [...ORBIT, 'Sg', 'tOppG'];
+    const GIANT: PrimaryKey[] = [...new Set<PrimaryKey>([...ORBIT, 'Sg', 'tOppG'])];
     base.aG = { inputs: GIANT, f: aGof };
     base.Mg = {
       inputs: [...GIANT, 'thetaMg', 'Pmg'],
@@ -184,27 +184,45 @@ export function edgesFor(variant: ChainVariant = 'standard'): Partial<Record<Der
   return { ...rest, M2: ['vInf', 'vPeak', 'rPeri'] };
 }
 
-/** Value and linearly propagated 1-sigma error of every derived quantity that can be computed. */
+export interface UncertaintyContribution { input: PrimaryKey; enteredSigma: number; effect: number; variance: number; share: number }
+export interface UncertaintyBudget { value: number; sigma: number; contributions: UncertaintyContribution[]; invalid: PrimaryKey[] }
+
+/** One local derivative per distinct primary, not one per path through derived
+ * nodes. Separate primaries retain the current independent-input approximation. */
+export function uncertaintyBudget(p: Primaries, key: DerivedKey, variant: ChainVariant = 'standard'): UncertaintyBudget | null {
+  const def = derivedFor(variant)[key];
+  if (!def) return null;
+  const inputs = [...new Set(def.inputs)];
+  if (!inputs.every((k) => p[k] && Number.isFinite(p[k]!.value))) return null;
+  const base = Object.fromEntries(inputs.map((k) => [k, p[k]!.value])) as V;
+  const at = Object.fromEntries(inputs.map((k) => [k, p[k]!.at])) as At;
+  const value = def.f(base, at);
+  if (!Number.isFinite(value)) return null;
+  const invalid: PrimaryKey[] = [];
+  const contributions = inputs.map((input): UncertaintyContribution => {
+    const enteredSigma = p[input]!.sigma;
+    let effect = 0;
+    if (!Number.isFinite(enteredSigma) || enteredSigma < 0) { invalid.push(input); effect = NaN; }
+    else if (enteredSigma > 0) {
+      const h = Math.max(Math.abs(base[input]) * 1e-6, enteredSigma * 1e-3);
+      const up = def.f({ ...base, [input]: base[input] + h }, at), dn = def.f({ ...base, [input]: base[input] - h }, at);
+      effect = Math.abs((up - dn) / (2 * h) * enteredSigma);
+      if (!Number.isFinite(effect) || !Number.isFinite(effect * effect)) invalid.push(input);
+    }
+    return { input, enteredSigma, effect, variance: effect * effect, share: 0 };
+  });
+  const variance = contributions.reduce((sum, c) => sum + c.variance, 0);
+  const sigma = invalid.length || !Number.isFinite(variance) ? NaN : Math.sqrt(variance);
+  for (const c of contributions) c.share = Number.isFinite(sigma) && variance > 0 ? c.variance / variance : 0;
+  return { value, sigma, contributions, invalid };
+}
+
+/** Value and independent-input, first-order uncertainty of each derived result. */
 export function deriveAll(p: Primaries, variant: ChainVariant = 'standard'): Partial<Record<DerivedKey, Estimate>> {
   const out: Partial<Record<DerivedKey, Estimate>> = {};
-  const defs = derivedFor(variant);
   for (const key of DERIVED_KEYS) {
-    const def = defs[key];
-    if (!def) continue;
-    if (!def.inputs.every((k) => p[k] && Number.isFinite(p[k]!.value))) continue;
-    const base = Object.fromEntries(def.inputs.map((k) => [k, p[k]!.value])) as V;
-    const at = Object.fromEntries(def.inputs.map((k) => [k, p[k]!.at])) as At;
-    const value = def.f(base, at);
-    let variance = 0;
-    for (const k of def.inputs) {
-      const s = p[k]!.sigma;
-      if (!(s > 0)) continue;
-      const h = Math.max(Math.abs(base[k]) * 1e-6, s * 1e-3);
-      const up = def.f({ ...base, [k]: base[k] + h }, at);
-      const dn = def.f({ ...base, [k]: base[k] - h }, at);
-      variance += (((up - dn) / (2 * h)) * s) ** 2;
-    }
-    if (Number.isFinite(value)) out[key] = { value, sigma: Math.sqrt(variance) };
+    const budget = uncertaintyBudget(p, key, variant);
+    if (budget) out[key] = { value: budget.value, sigma: budget.sigma };
   }
   return out;
 }

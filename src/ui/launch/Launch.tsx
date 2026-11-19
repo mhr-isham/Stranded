@@ -35,11 +35,10 @@ import { Formula, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { flag, jumpTo } from '../../game/tutorial';
 import { manualFlightRequired } from '../../game/piloting';
+import { assessableModel, summarizeForecast, type ForecastSummary } from '../../game/forecast';
 
-interface McResult {
-  fuelLeft: number[];
+interface McResult extends ForecastSummary {
   paths: Vec3[][];
-  success: number;
 }
 
 export function Launch() {
@@ -105,20 +104,20 @@ export function Launch() {
     if (!plan || !model) return;
     const id = setTimeout(() => {
       const rng = makeRng(42);
-      const fuelLeft: number[] = [];
+      const trials: (ReturnType<typeof simulateLaunch> | null)[] = [];
       const paths: Vec3[][] = [];
       for (let i = 0; i < 36; i++) {
         const m = sampleModel(s.sheet, rng, variant);
-        if (!m) continue;
+        if (!assessableModel(m)) { trials.push(null); continue; }
         const u = { ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity };
         const r = simulateLaunch(u, plan.plan);
-        fuelLeft.push(r.fuelLeft);
-        if (i < 24) paths.push(r.path);
+        trials.push(r);
+        if (paths.length < 24 && r.path.length && r.path.every((p) => p.every(Number.isFinite))) paths.push(r.path);
       }
-      setMc({ fuelLeft, paths, success: fuelLeft.filter((f) => f >= 0).length / Math.max(1, fuelLeft.length) });
+      setMc({ ...summarizeForecast(trials), paths });
     }, 250);
     return () => clearTimeout(id);
-  }, [plan, model, s.sheet, sys, budget]);
+  }, [plan, model, s.sheet, sys, budget, variant]);
 
   if (!model || !hoh) {
     const missing = keysFor(variant).filter((k) => !s.sheet[k] || !Number.isFinite(s.sheet[k]!.value));
@@ -303,15 +302,19 @@ export function Launch() {
               <dd className={margin > 0 ? 'green' : 'red'}>{fmt(margin / 1000, 3)} km/s</dd>
             </dl>
             <FuelBar plan={plan} budget={budget} />
-            <div className="stack" style={{ gap: 4 }}>
+            <div className="stack" style={{ gap: 6 }} aria-label="Simulated transfer outcomes">
               <div className="row between">
-                <span className="muted" style={{ fontSize: 13 }}>Chance of success, given your error bars</span>
-                <span className={`mono ${mc && mc.success > 0.8 ? 'green' : mc && mc.success > 0.4 ? 'amber' : 'red'}`}>{mc ? `${Math.round(mc.success * 100)}%` : '…'}</span>
+                <span className="muted" style={{ fontSize: 13 }}>Simulated transfer outcomes</span>
+                <span className="mono">{mc ? `${mc.succeeded} of ${mc.attempted} succeeded` : 'Simulating…'}</span>
               </div>
               <div className="faint" style={{ fontSize: 12 }}>
-                ECHO flew this plan through {mc?.fuelLeft.length ?? '…'} versions of the system that are consistent with your measurements. Honest error
-                bars make this forecast honest too.
+                {mc ? `${mc.unsuccessful} unsuccessful · ${mc.unassessable} unassessable. ` : ''}These are conditional simulation results, not a measured chance of completing your expedition.
               </div>
+              <details style={{ fontSize: 12 }}><summary>What does this forecast include?</summary><div className="faint" style={{ marginTop: 8, lineHeight: 1.6 }}>
+                This plan is tested against 36 independently drawn models using Gaussian error bars on your primary inputs. Each sampled input is reused throughout the derived chain. Nonphysical models or numerically invalid outcomes remain unassessable attempts, rather than disappearing from the count. Success means the transfer simulator reports successful capture within the fuel budget; fuel remaining alone does not mean success.
+                <br />The draws assume different primary inputs are independent. Shared calibration errors, correlations, missing biases and an unsuitable orbit model are not captured. A small sample and smaller entered errors do not establish a calibrated probability.
+                <br />These trials cover the automatic transfer and capture model with the current fuel budget. They exclude the survival deadline, manual flight performance and later surface survival. Check the arrival deadline separately.
+              </div></details>
             </div>
             <div data-tut="launch-go">
             {ready ? (

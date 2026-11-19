@@ -91,7 +91,7 @@ export function MeasureLesson() {
         </Demo>
       }
       formula={<Equation tex={"\\text{average}=\\frac{x_1+x_2+\\cdots+x_N}{N} \\\\ \\text{error of average}=\\frac{\\sigma}{\\sqrt N}"} />}
-      keyIdea="Repeat a measurement and average it. The scatter of single readings stays the same, but the error of the average shrinks like 1/√N: 4 readings halve it, 100 readings cut it to a tenth."
+      keyIdea="For independent repeats of a stable quantity, the scatter of single readings stays the same, but the random error of the average shrinks like 1/√N: 4 readings halve it, 100 readings cut it to a tenth. New timestamps alone do not establish independence."
       warn="Averaging only beats random scatter. A systematic error (the bent ruler, a wrong height, timing the wrong swing) moves every reading the same way. Tick the bent ruler and reveal the truth: more readings make you more sure of the wrong answer."
       tip="In Stranded every tool works like this rod: your hands, eyes and reaction time cause the scatter. Keep several readings and let the game average them."
     >
@@ -244,7 +244,7 @@ export function PropagationLesson() {
       formula={<Equation tex={"y\\propto x^n\\ \\Rightarrow\\ \\frac{\\sigma_y}{|y|}\\approx |n|\\frac{\\sigma_x}{|x|} \\\\ e_{\\mathrm{total}}=\\sqrt{e_1^2+e_2^2+\\cdots}\\quad\\text{(independent errors)}"} />}
       keyIdea="A small error early in the chain can become a big one later. The star’s mass depends on the cube of the orbit size, so a 2% error in distance becomes a 6% error in mass."
       warn="Quantities that appear with a big power deserve your most careful measurements: R₁ (squared in M₁) and the parallax distance (cubed in M★)."
-      tip="You never have to do this arithmetic in Stranded — ECHO propagates every error for you on the progress sheet. But knowing where errors grow tells you where to spend your time."
+      tip="Open ‘Where does this uncertainty come from?’ on a derived star in the progress sheet to see its contributions and try hypothetical error bars. ECHO propagates the errors you enter using an independent-input, first-order approximation; missing systematic errors still need your attention."
     >
       <P>
         Most numbers you need are not measured directly: they are <b>calculated</b> from other measurements. Each step carries the error along —

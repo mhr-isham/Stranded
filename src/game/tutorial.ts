@@ -1,4 +1,5 @@
 import { selectedDistanceReading } from './distanceScale';
+import { conditionUncertainty } from './measurementEnvironment';
 import { projectedBaseline } from './parallaxObservation';
 import { analyzeYear, yearFitMessage } from './yearObservations';
 // Flight School: the hands-on tutorial. This module holds the tutorial's
@@ -192,7 +193,8 @@ export function sendFromReadings(k: PrimaryKey, minRel = 0.004) {
   const st = readingStats(s.readings, k);
   if (!st) return;
   const se = Number.isFinite(st.se) ? st.se : 0;
-  s.setSheet(k, { value: st.mean, sigma: Math.max(1.5 * se, Math.abs(st.mean) * minRel), at: st.at });
+  const shared = conditionUncertainty(s.readings.filter((r) => r.key === k));
+  s.setSheet(k, { value: st.mean, sigma: Math.max(Math.hypot(1.5 * se, shared), Math.abs(st.mean) * minRel), at: st.at });
 }
 
 export function sendYearFromLogs() {
