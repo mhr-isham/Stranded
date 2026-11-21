@@ -301,6 +301,20 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .show-phone-block { display: block !important; }
   .hud-ready { padding: 4px 6px; }
 }
+/* Keep every HUD action in reach on narrow screens, including survival mode.
+   The quick buttons open their full details; numeric life support stays visible. */
+@media (max-width: 600px) {
+  .hud { gap: 4px; }
+  .hud-block { padding: 4px 5px; gap: 4px; }
+  .hud-time .day, .hud-time .clock, .hud-life > span { white-space: nowrap; }
+  .hud-time .day { font-size: 14px; }
+  .hud-time .clock { font-size: 11px; }
+  .hud .warp .rate { min-width: 44px; font-size: 11px; padding-inline: 2px; }
+  .hud .hud-ready .mono { font-size: 0 !important; }
+  .hud .hud-ready .show-phone { font-size: 15px !important; }
+  .hud .mobile-supply-value { display: none; }
+  .hud > button { min-width: 32px; padding-inline: 5px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

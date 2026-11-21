@@ -15,6 +15,8 @@ import { ECHO } from '../../game/echo';
 import { MoonAnalysisPanel } from './MoonAnalysis';
 import { fmt } from '../../game/format';
 import { MeasurementSources } from '../common/MeasurementSources';
+import { opticalStatus, opticalWeather } from '../../game/observing';
+import { ObservingStatus } from '../common/ObservingStatus';
 import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { paintSky, starRGB } from '../../render/paint';
@@ -39,7 +41,6 @@ import { GiantPanel } from './GiantPanel';
 import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
-import { isCloudy } from '../../game/survival';
 import { makeSkySighting, skyCode, skyDirection, skyKey, skyline, visibleSkyLights, type SkyRef } from '../../game/skyObservation';
 import { SkyExplorer, SkyNotebook } from './SkyExplorer';
 import { analyzeYear } from '../../game/yearObservations';
@@ -89,7 +90,7 @@ export function Observatory() {
   const [, refreshCamera] = useState(0);
   const viewSize = useRef({ w: 1000, h: 600, dpr: 1 });
   const rules = useMode();
-  const obscured = (at: number) => !!flareAt(sys, at) || (s.settings.survival && isCloudy(s.seed, at));
+  const obscured = (at: number) => { const weather = opticalWeather(sys, useGame.getState(), at); return weather.flare || weather.cloudy; };
   const skyLights = visibleSkyLights(sys, catalog, t, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land, obscured(t));
   const panSky = (az: number, alt: number) => { cam.current.az += az * DEG; cam.current.alt = Math.max(-5 * DEG, Math.min(85 * DEG, cam.current.alt + alt * DEG)); lastMotion.current = performance.now(); refreshCamera((n) => n + 1); };
   const zoomSky = (factor: number) => { cam.current.fov = Math.max(15 * DEG, Math.min(120 * DEG, cam.current.fov * factor)); refreshCamera((n) => n + 1); };
@@ -165,13 +166,11 @@ export function Observatory() {
 
   const frameNow = localFrame(sys, t, sys.site);
   const altOf = (sl: Sel) => toHorizontal(objDir(sl, t), frameNow).alt;
-  const starAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), frameNow).alt / DEG;
-  const twilight = starAlt > -1 && starAlt < 8;
   const filter = sel?.kind === 'star';
   const inspectable = (sl: Sel | null, at: number) => {
-    if (!sl || obscured(at)) return false;
+    if (!sl) return false;
     const frame = localFrame(sys, at, sys.site), dir = objDir(sl, at), position = toHorizontal(dir, frame);
-    if (position.alt <= skyline(land, position.az)) return false;
+    if (!opticalStatus(sys, useGame.getState(), at, sl.kind === 'catalog' ? 'night-view' : 'view', { direction: dir, horizon: skyline(land, position.az) }).ok) return false;
     if (sl.kind === 'relay' && !relayVisible(at)) return false;
     if (mode === 'sky') return visibleSkyLights(sys, catalog, at, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land).some((light) => light.key === skyKey(sl));
     const sun = toHorizontal(topocentric(sys, 'star', at, sys.site), frame).alt / DEG;
@@ -182,9 +181,26 @@ export function Observatory() {
     return !!p && p.x >= 0 && p.y >= 0 && p.x <= viewSize.current.w && p.y <= viewSize.current.h;
   };
   const available = inspectable(sel, t);
-  const notebookAllowed = available && sel?.kind !== 'star' && starAlt < -1.6;
+  const yearReady = mode === 'scope' && sel?.kind === 'star';
+  const yearStatus = opticalStatus(sys, s, t, sys.features.locked ? 'locked-year' : 'solar-year', {
+    horizon: sys.features.locked ? 0 : skyline(land, toHorizontal(topocentric(sys, 'star', t, sys.site), frameNow).az),
+    inField: sys.features.locked || yearReady && available,
+  });
+  const diameterStatus = opticalStatus(sys, s, t, 'diameter', {
+    horizon: skyline(land, toHorizontal(topocentric(sys, 'target', t, sys.site), frameNow).az),
+    inField: mode === 'scope' && sel?.kind === 'target' && available,
+  });
+  const notebookStatus = opticalStatus(sys, s, t, 'night-view', {
+    direction: sel ? objDir(sel, t) : undefined,
+    horizon: sel ? skyline(land, toHorizontal(objDir(sel, t), frameNow).az) : 0,
+    inField: available,
+  });
+  const notebookAllowed = sel?.kind !== 'star' && notebookStatus.ok;
   const logSighting = (note: string) => {
-    if (!sel || sel.kind === 'star' || !inspectable(sel, clock.t) || toHorizontal(topocentric(sys, 'star', clock.t, sys.site), localFrame(sys, clock.t, sys.site)).alt >= -1.6 * DEG) return false;
+    if (!sel || sel.kind === 'star') return false;
+    const position = toHorizontal(objDir(sel, clock.t), localFrame(sys, clock.t, sys.site));
+    const live = opticalStatus(sys, useGame.getState(), clock.t, 'night-view', { direction: objDir(sel, clock.t), horizon: skyline(land, position.az), inField: inspectable(sel, clock.t) });
+    if (!live.ok) { toast(live.reason); return false; }
     const ray = pointing(clock.t);
     if (!ray) return false;
     const sighting = makeSkySighting(skyKey(sel), skyCode(sys.seed, sel), clock.t, ray, mode === 'scope' ? 'scope' : 'wide', note);
@@ -604,7 +620,7 @@ export function Observatory() {
               <input type="checkbox" checked={showEcl} onChange={(e) => setShowEcl(e.target.checked)} /> Show the ecliptic (the path of the star)
             </label>
           </div>
-          <SkyNotebook selectedKey={sel ? skyKey(sel) : undefined} code={sel ? skyCode(sys.seed, sel) : ''} canLog={notebookAllowed} reason={!sel ? 'Select a comparison light to begin.' : sel.kind === 'star' ? 'Use the Year tab for solar-filter star-position observations.' : !available ? 'Bring the selected light into an unobscured field.' : 'A background star field is needed for these comparison notes.'} onLog={logSighting} />
+          <SkyNotebook selectedKey={sel ? skyKey(sel) : undefined} code={sel ? skyCode(sys.seed, sel) : ''} canLog={notebookAllowed} reason={!sel ? 'Select a comparison light to begin.' : sel.kind === 'star' ? 'Use the Year tab for solar-filter star-position observations.' : notebookStatus.reason} onLog={logSighting} />
           </>
         )}
 
@@ -612,15 +628,17 @@ export function Observatory() {
           <YearPanel
             locked
             onPoint={() => {}}
-            canLog={!obscured(t)}
-            reason="Clouds or flare glare obscure the reference stars. Wait for clear observing conditions."
+            canLog={yearStatus.ok}
+            reason={yearStatus.reason}
+            status={yearStatus}
             onLog={() => {
-              if (obscured(clock.t)) return;
+              const current = useGame.getState(), live = opticalStatus(sys, current, clock.t, 'locked-year');
+              if (!live.ok) return toast(live.reason);
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               // The reference star's hour angle: how far the sky has turned (with a small reading error).
               const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'tracker' }] }));
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'tracker', environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: live.seeing, frozen: false } } }] }));
               toast('Sky position logged');
               sfx('shutter');
             }}
@@ -629,13 +647,15 @@ export function Observatory() {
         {tab === 'year' && !sys.features.locked && (
           <YearPanel
             onPoint={() => (pointAt('star', 2), flag('scope-star'))}
-            canLog={mode === 'scope' && sel?.kind === 'star' && twilight && !obscured(t)}
-            reason={obscured(t) ? 'Clouds or flare glare obscure the field. Wait for clear observing conditions.' : sel?.kind !== 'star' ? 'Select the star and open the telescope (the solar filter fits automatically).' : mode !== 'scope' ? 'Open the telescope.' : !twilight ? 'Wait for sunrise or sunset: the tracker needs the star low in a twilight sky to see reference stars.' : ''}
+            canLog={yearReady && yearStatus.ok}
+            reason={!yearReady ? 'Select the star and open the telescope (the solar filter fits automatically).' : yearStatus.reason}
+            status={yearReady ? yearStatus : undefined}
             onLog={() => {
               const c = pointing(clock.t);
-              if (!c || mode !== 'scope' || sel?.kind !== 'star' || obscured(clock.t)) return;
-              const sunNow = toHorizontal(topocentric(sys, 'star', clock.t, sys.site), localFrame(sys, clock.t, sys.site)).alt / DEG;
-              if (sunNow <= -1 || sunNow >= 8) return;
+              if (!c || mode !== 'scope' || sel?.kind !== 'star') return;
+              const position = toHorizontal(topocentric(sys, 'star', clock.t, sys.site), localFrame(sys, clock.t, sys.site));
+              const live = opticalStatus(sys, useGame.getState(), clock.t, 'solar-year', { horizon: skyline(land, position.az), inField: inspectable(sel, clock.t) });
+              if (!live.ok) return toast(live.reason);
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               const v = eclLon(c);
@@ -647,7 +667,7 @@ export function Observatory() {
         )}
 
         {tab === 'track' && <TrackerPanel onWide={() => setMode('sky')} />}
-        {tab === 'transit' && <TransitPanel onPoint={() => pointAt('star', 1.2)} />}
+        {tab === 'transit' && <TransitPanel onPoint={() => pointAt('star', 1.2)} onTracker={() => { setTab('track'); setMode('sky'); }} />}
 
         {tab === 'micro' && (
           <div className="panel panel-pad stack">
@@ -667,14 +687,14 @@ export function Observatory() {
             <button
               data-tut="micro-log"
               className="btn primary"
-              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified && inspectable(sel, t))}
+              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified && diameterStatus.ok)}
               onClick={() => {
                 const a = wireDiameter(calip.current.x1, calip.current.x2), sample = scopeSample.current;
-                if (!sample || !sample.target || !sample.observable || !inspectable(sel, clock.t)) return toast('Bring an observable target into the current field first.');
-                if (obscured(clock.t)) return toast('The field is obscured. Wait for clear observing conditions.');
+                if (!sample || !sample.target || !sample.observable || sel?.kind !== 'target' || !useGame.getState().identified) return toast('Bring an observable target into the current field first.');
                 const { system: sysNow } = currentWorld();
-                const altNow = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site)).alt;
-                if (altNow < 0) return toast('The blue planet is below the horizon — wait for it to rise.');
+                const position = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site));
+                const live = opticalStatus(sysNow, useGame.getState(), clock.t, 'diameter', { horizon: skyline(land, position.az), inField: mode === 'scope' && inspectable(sel, clock.t) });
+                if (!live.ok) return toast(live.reason);
                 if (a === null || a < 0.3 * ARCSEC) return toast('The wires are on top of each other. Set them on opposite edges of the disk.');
                 const limit = Math.tan(sample.field / 2);
                 if (Math.abs(calip.current.x1) > limit || Math.abs(calip.current.x2) > limit) return toast('Both wires must be visible in the field.');
@@ -691,7 +711,7 @@ export function Observatory() {
             >
               Log diameter
             </button>
-            {!inspectable(sel, t) && <div className="faint">The selected target must be above the local horizon, clear of cloud/flare obstruction and inside the current field to log a diameter.</div>}
+            {mode === 'scope' && sel?.kind === 'target' && s.identified ? <ObservingStatus status={diameterStatus} /> : <div className="faint">Point the telescope at the identified blue planet to measure its diameter.</div>}
             <div className="faint">At a paused observation time, logging again updates that sighting. New dates alone do not guarantee independent errors.</div>
             <details className="measurement-help"><summary>Optional: diameter, distance and repeat observations</summary><p>Separate sights after the image changes can test repeatability. Re-marking the same observation time updates one reading. Shared blur, limb judgement and alignment offsets remain even with many dates. Fine wire steps improve control; they do not certify that precision.</p><p>Use the distance at the diameter’s date to infer radius. Distance uncertainty and angular uncertainty both matter; Flight School offers optional practice with their contributions.</p></details>
             <Formula>R₂ = d(t) · tan(α₂/2)</Formula>
@@ -724,7 +744,7 @@ function MicroReadout({ calip }: { calip: React.MutableRefObject<{ x1: number; x
   return <div className="stack"><div className="readout" aria-label="Measured angular diameter">{fmt((wireDiameter(calip.current.x1, calip.current.x2) ?? 0) / ARCSEC, 3)}″</div><div className="faint">A <output aria-label="Wire A position">{fmt(Math.atan(calip.current.x1) / ARCSEC, 3)}</output>″ · B <output aria-label="Wire B position">{fmt(Math.atan(calip.current.x2) / ARCSEC, 3)}</output>″ relative to the optical axis.</div></div>;
 }
 
-function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void; locked?: boolean }) {
+function YearPanel({ canLog, reason, onLog, onPoint, locked = false, status }: { canLog: boolean; reason: string; onLog: () => void; onPoint: () => void; locked?: boolean; status?: ReturnType<typeof opticalStatus> }) {
   const obs = useGame((s) => s.starObs);
   const [band, setBand] = useState<[number, number] | null>(null);
   const manual = hasChallenge(useGame.getState(), 'handFit');
@@ -751,7 +771,7 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog:
       <button className="btn primary" disabled={!canLog} onClick={onLog} data-tut="year-log">
         {locked ? 'Log the sky’s turn' : 'Log star position'}
       </button>
-      {!canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
+      {status ? <ObservingStatus status={status} /> : !canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
       {locked && <MeasurementSources instrument="locked-year" />}
       <div data-tut="year-fit" className="stack">
       <YearPlot analysis={analysis} manual={manual} band={band} onBand={setBand} />
@@ -829,7 +849,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
   const transformed = inner ? s.track.map((o) => ({ ...o, v: (((o.v - starLongitude(sysT, o.at, sysT.site)) / DEG + 540) % 360 - 180) * DEG })) : s.track;
   const cadence = sysT.features.locked ? DAY / 8 : currentWorld().solarDay;
   const replay = observedMotion(transformed, cadence), pts = replay.map(({ x, y }) => ({ x, y }));
-  const picks = inner ? [] : [...new Set(s.oppPicks.filter(Number.isFinite))].sort((a, b) => a - b);
+  const picks = [...new Set(s.oppPicks.filter(Number.isFinite))].sort((a, b) => a - b);
   const S = picks.length >= 2 && picks.at(-1)! > picks[0] ? (picks.at(-1)! - picks[0]) / (picks.length - 1) : null;
   return (
     <div className="panel panel-pad stack">
@@ -847,10 +867,8 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
           <button data-tut="track-toggle" className={`btn ${s.trackOn ? '' : 'primary'}`} onClick={() => (s.set({ trackOn: !s.trackOn }), checkMissions())}>
             {s.trackOn ? 'Auto-log: ON (nightly)' : 'Turn on nightly auto-log'}
           </button>
-          <div className="muted" style={{ fontSize: 13 }}>
-            {obs.ok ? 'Tracking now: target visible.' : obs.flare ? 'A flare is washing out the sky — the tracker waits it out.' : obs.cloudy ? 'Clouded out tonight.' : obs.sunAlt > obs.lim.sun ? (obs.lim.sun > -10 * DEG ? 'Waiting for twilight.' : 'Waiting for a dark sky.') : `Target below ${Math.round(obs.lim.track / DEG)}° altitude.`} Warp time to
-            collect weeks of data.
-          </div>
+          <ObservingStatus status={obs} />
+          <div className="faint">The tracker records usable observing sessions when switched on.</div>
         </>
       )}
       <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={!!s.settings.skyTrackTrail} onChange={(e) => { s.set({ settings: { ...s.settings, skyTrackTrail: e.target.checked } }); if (e.target.checked) onWide(); }} />Show saved sightings on the wide sky</label>
@@ -859,7 +877,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       {pts.length > 1 && (
         <Chart
           series={[{ pts, color: '#6cc4ff', kind: 'dots' }]}
-          markers={picks.map((p, i) => ({ x: p / DAY, color: '#5be3a4', label: `opp ${i + 1}` }))}
+          markers={picks.map((p, i) => ({ x: p / DAY, color: '#5be3a4', label: `${inner ? 'alignment' : 'opp'} ${i + 1}` }))}
           cursor={cursor}
           onCursor={setCursor}
           xLabel="day"
@@ -893,7 +911,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
               setTimeout(checkMissions, 0);
             }}
           >
-            {inner ? 'Mark: passed the star here' : 'Mark opposition here'}
+            {inner ? 'Mark candidate alignment' : 'Mark opposition here'}
           </button>
         </div>
       )}
@@ -903,19 +921,19 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
           {picks.map((p, i) => (
             <div key={p} className="row between">
               <span>
-                Opposition {i + 1}: <span className="mono">day {fmt(p / DAY, 2)}</span>
+                {inner ? 'Candidate alignment' : 'Opposition'} {i + 1}: <span className="mono">day {fmt(p / DAY, 2)}</span>
               </span>
               <button className="btn small ghost" onClick={() => s.set({ oppPicks: s.oppPicks.filter((x) => x !== p) })}>
                 ✕
               </button>
             </div>
           ))}
-          <b style={{ marginTop: 6 }}>Date of opposition t₀ (latest)</b>
+          <b style={{ marginTop: 6 }}>{inner ? 'Date of passing the star t₀ (latest candidate)' : 'Date of opposition t₀ (latest)'}</b>
           <SendToSheet k="tOpp" value={picks[picks.length - 1]} tut="track-send-t0" />
           {S && (
             <>
               <b style={{ marginTop: 6 }}>Synodic period S = {fmt(S / DAY, 2)} days</b>
-              <Formula>1/P₂ = 1/P₁ − 1/S</Formula>
+              <Formula>{inner ? '1/P₂ = 1/P₁ + 1/S' : '1/P₂ = 1/P₁ − 1/S'}</Formula>
               <SendToSheet k="S2" value={S} tut="track-send-S" />
             </>
           )}
@@ -1057,7 +1075,7 @@ function RelayInfo() {
  * offset changes steadily, so a straight-line fit gives the moment it crossed
  * the centre — even if that happened at night.
  */
-function TransitPanel({ onPoint }: { onPoint: () => void }) {
+function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: () => void }) {
   const s = useGame();
   const t = useGameTime(2);
   const { system: sys } = currentWorld();
@@ -1095,7 +1113,12 @@ function TransitPanel({ onPoint }: { onPoint: () => void }) {
       <button className={`btn ${s.sunCamOn ? '' : 'primary'}`} onClick={() => s.set({ sunCamOn: !s.sunCamOn })}>
         {s.sunCamOn ? 'Solar camera: ON (hourly)' : 'Turn on the solar camera'}
       </button>
-      {(mode.coaching || mode.missions === 'goals') && now && <div className="green" style={{ fontSize: 13 }}>A transit is happening now.</div>}
+      <ObservingStatus status={opticalStatus(sys, s, t, 'solar-camera')} />
+      <details className="measurement-help"><summary>Other ways to time the alignment</summary>
+        <p>A transit can happen at night or behind clouds. The planet tracker records elongation during usable sessions. Compare equivalent features on successive cycles, or bracket a star-passing gap with surrounding sightings. The two types of alignment are not two full cycles; check the track's direction. A weather gap alone does not establish an alignment. Keep candidate dates and state an uncertainty that covers your method.</p>
+        <button className="btn small" onClick={onTracker}>Open planet tracker</button>
+      </details>
+      {(mode.coaching || mode.missions === 'goals') && now && opticalStatus(sys, s, t, 'solar-camera').ok && <div className="green" style={{ fontSize: 13 }}>A transit is happening now.</div>}
       {pts.length > 1 && (
         <>
           <Chart
@@ -1118,7 +1141,7 @@ function TransitPanel({ onPoint }: { onPoint: () => void }) {
           <dl className="kv">
             <dt>Mid-transit (line crosses zero)</dt>
             <dd className="blue">day {fmt(mid, 3)}</dd>
-            <dt>Uncertainty</dt>
+            <dt>Scatter estimate (selected fit)</dt>
             <dd>{midSigma !== null ? `± ${fmt(midSigma * 24 * 60, 0)} min` : '—'}</dd>
           </dl>
           <button
@@ -1139,15 +1162,15 @@ function TransitPanel({ onPoint }: { onPoint: () => void }) {
           {picks.map((p, i) => (
             <div key={p} className="row between">
               <span>
-                Passage {i + 1}: <span className="mono">day {fmt(p / DAY, 3)}</span>
+                Alignment candidate {i + 1}: <span className="mono">day {fmt(p / DAY, 3)}</span>
               </span>
               <button className="btn small ghost" onClick={() => s.set({ oppPicks: s.oppPicks.filter((x) => x !== p) })}>
                 ✕
               </button>
             </div>
           ))}
-          <b style={{ marginTop: 6 }}>Date of transit t₀ (latest)</b>
-          <SendToSheet k="tOpp" value={picks[picks.length - 1]} spread={midSigma !== null ? midSigma * DAY : undefined} />
+          <b style={{ marginTop: 6 }}>Alignment date t₀ (latest candidate)</b>
+          <SendToSheet k="tOpp" value={picks[picks.length - 1]} />
           {S && (
             <>
               <b style={{ marginTop: 6 }}>Synodic period S = {fmt(S / DAY, 2)} days</b>

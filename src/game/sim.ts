@@ -6,7 +6,7 @@ import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
 import { flareAt } from '../engine/flares';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude, targetSkyLimits } from '../engine/measure';
-import { eclLon, localFrame, toHorizontal, topocentric } from '../engine/sky';
+import { eclLon, topocentric } from '../engine/sky';
 import { norm } from '../engine/vec';
 import { hash32 } from '../engine/rng';
 import { clock } from './clock';
@@ -17,11 +17,12 @@ import { MISSION_CODEX } from './codex';
 import { sfx } from './audio';
 import { WARPS } from './clock';
 import { useGame, type GameState, type TimedValue } from './store';
-import { isCloudy, lifeSupportEnd, survivalDay } from './survival';
+import { lifeSupportEnd, survivalDay } from './survival';
 import { world } from './world';
 import { variantOf } from '../engine/chapters';
 import { resolvePredictions } from './predictions';
 import { advanceSurface } from './surface';
+import { assessOpticalConditions, opticalStatus } from './observing';
 
 const TRACK_RES = 0.01 * DEG; // tracker reading resolution
 const MOON_RES = 0.5 * ARCSEC;
@@ -41,12 +42,9 @@ export function targetObservable(t: number, minAlt?: number) {
   const s = useGame.getState();
   const { system: sys } = currentWorld();
   const lim = targetSkyLimits(sys);
-  const f = localFrame(sys, t, sys.site);
-  const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
-  const alt = toHorizontal(topocentric(sys, 'target', t, sys.site), f).alt;
-  const cloudy = s.settings.survival && isCloudy(s.seed, t);
-  const flare = !!flareAt(sys, t);
-  return { ok: sunAlt < lim.sun && alt > (minAlt ?? lim.track) && !cloudy && !flare, sunAlt, alt, cloudy, flare, lim };
+  const current = opticalStatus(sys, s, t, 'target-track');
+  const status = minAlt === undefined ? current : assessOpticalConditions('target-track', current, { ...current.limits, minAlt });
+  return { ...status, alt: status.alt ?? NaN, lim };
 }
 
 /** Chapter 7: can the giant be seen right now (dark sky, high enough, no clouds)? */
@@ -54,10 +52,7 @@ export function giantObservable(t: number) {
   const s = useGame.getState();
   const { system: sys } = currentWorld();
   if (!sys.giant) return false;
-  const f = localFrame(sys, t, sys.site);
-  const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
-  const alt = toHorizontal(topocentric(sys, 'giant', t, sys.site), f).alt;
-  return sunAlt < -12 * DEG && alt > 12 * DEG && !(s.settings.survival && isCloudy(s.seed, t));
+  return opticalStatus(sys, s, t, 'giant-track').ok;
 }
 
 export function advance(dtReal: number) {
@@ -121,9 +116,13 @@ function stepTo(t1Wanted: number, dtReal: number) {
       if (s.trackOn && (night > lastNight || sys.features.locked)) {
         lastNight = night;
         const ray = topocentric(sys, 'target', t, sys.site);
-        track.push({ at: t, v: Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES, skyLatitude: Math.round(Math.asin(ray[2] / norm(ray)) / TRACK_RES) * TRACK_RES, source: 'tracker' });
+        const v = Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES;
+        track.push({ at: t, v, skyLatitude: Math.round(Math.asin(ray[2] / norm(ray)) / TRACK_RES) * TRACK_RES, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: obs.seeing, frozen: false } } });
       }
-      if (s.moonTrackOn && sys.features.moon) moon.push({ at: t, v: Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
+      if (s.moonTrackOn && sys.features.moon) {
+        const v = Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES;
+        moon.push({ at: t, v, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: obs.seeing, frozen: false } } });
+      }
     }
     if (track.length) {
       patch.track = [...s.track, ...track];
@@ -139,13 +138,16 @@ function stepTo(t1Wanted: number, dtReal: number) {
     let lastG = s.trackG.length ? Math.floor(s.trackG[s.trackG.length - 1].at / logDay) : -1;
     for (let k = Math.floor(t0 / step) + 1; k * step <= t1; k++) {
       const t = k * step;
-      if (!giantObservable(t)) continue;
+      const status = opticalStatus(sys, s, t, 'giant-track');
+      if (!status.ok) continue;
       const night = Math.floor(t / logDay);
       if (night > lastG) {
         lastG = night;
-        trackG.push({ at: t, v: Math.round(giantLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES });
+        const v = Math.round(giantLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES;
+        trackG.push({ at: t, v, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: status.seeing, frozen: false } } });
       }
-      moonG.push({ at: t, v: Math.round(giantMoonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES });
+      const v = Math.round(giantMoonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES;
+      moonG.push({ at: t, v, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: status.seeing, frozen: false } } });
     }
     if (trackG.length) patch.trackG = [...s.trackG, ...trackG];
     if (moonG.length) patch.moonTrackG = [...s.moonTrackG, ...moonG];
@@ -160,7 +162,8 @@ function stepTo(t1Wanted: number, dtReal: number) {
       const sv = topocentric(sys, 'star', t, sys.site);
       const tv = topocentric(sys, 'target', t, sys.site);
       if (norm(tv) > norm(sv)) continue;
-      if (toHorizontal(sv, localFrame(sys, t, sys.site)).alt < 3 * DEG) continue;
+      const status = opticalStatus(sys, s, t, 'solar-camera');
+      if (!status.ok) continue;
       let off = eclLon(tv) - eclLon(sv);
       if (off > Math.PI) off -= 2 * Math.PI;
       if (off < -Math.PI) off += 2 * Math.PI;
@@ -169,7 +172,8 @@ function stepTo(t1Wanted: number, dtReal: number) {
       const u1 = (hash32(sys.seed, k, 0x5e) + 1) / 4294967297;
       const u2 = hash32(sys.seed, k, 0x5f) / 4294967296;
       const jitter = 4 * ARCSEC * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      log.push({ at: t, v: Math.round((off + jitter) / ARCSEC) * ARCSEC });
+      const v = Math.round((off + jitter) / ARCSEC) * ARCSEC;
+      log.push({ at: t, v, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: status.seeing, frozen: false } } });
     }
     if (log.length) patch.sunLog = [...s.sunLog, ...log];
   }

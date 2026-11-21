@@ -155,7 +155,7 @@ with sync_playwright() as p:
             setup(page,'cadet','rover','none',chapter=6)
             page.evaluate('''async()=>{const{currentWorld}=await import('/src/game/sim.ts');const{flaresOf}=await import('/src/engine/flares.ts');const f=flaresOf(currentWorld().system)[0];__clock.t=(f.start+f.end)/2;__clock.paused=true;__clock.emit();__game.setState({identified:true,rover:{dist:1e6,target:1e6,departAt:0,arriveAt:0}})}''')
             assert page.get_by_role('button',name='Take simultaneous images',exact=True).is_disabled()
-            page.get_by_text('A stellar flare is washing out the cameras.',exact=False).wait_for(state='visible')
+            page.get_by_text('Flare glare — wait for it to fade.',exact=False).wait_for(state='visible')
         assert not errors,errors
         page.close()
     browser.close()

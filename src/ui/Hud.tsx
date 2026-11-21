@@ -41,7 +41,7 @@ export function Hud() {
               {flare ? (
                 'FLARE'
               ) : sys.features.locked ? (
-                'eternal dusk'
+                <><span className="hide-phone">eternal dusk</span><span className="show-phone">dusk</span></>
               ) : (
                 <>
                   {hhmm(sol)}
@@ -119,9 +119,10 @@ export function Hud() {
             className={`panel hud-block btn show-phone ${s.survival.leak || s.survival.power < 15 || s.survival.o2 < 30 ? 'red' : ''}`}
             onClick={() => s.go('workshop')}
             aria-label="Camp supplies"
+            title={`Camp supplies · oxygen ${fmt(Math.max(0, s.survival.o2), 0)}`}
           >
             <span className="mono" style={{ fontSize: 12 }}>
-              O₂ {fmt(Math.max(0, s.survival.o2), 0)}
+              O₂ <span className="mobile-supply-value">{fmt(Math.max(0, s.survival.o2), 0)}</span>
               {s.survival.leak || s.survival.power < 15 ? ' ⚠' : ''}
             </span>
           </button>
@@ -291,7 +292,7 @@ function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: nu
   const detail = mode.missions !== 'off';
   return (
     <>
-      <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title="Mission readiness">
+      <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title="Mission readiness" aria-label={`Mission readiness: ${pct !== null ? `${pct}%` : `${r.measured} of ${r.total} values`}`}>
         <div className="hide-phone">
           <div className="meter-label">Ready</div>
           <div className="meter" style={{ width: 70 }}>

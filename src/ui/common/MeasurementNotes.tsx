@@ -37,19 +37,21 @@ export function MeasurementNotes({ reading }: { reading: Reading }) {
 }
 
 /** An observable image-quality indicator in every mode; advice expands only on request. */
-export function SeeingConditions({ frozenAt }: { frozenAt?: number }) {
+export function SeeingConditions({ frozenAt, frozenFactor }: { frozenAt?: number; frozenFactor?: number }) {
   const s = useGame();
   const now = useGameTime(2);
   const at = frozenAt ?? now;
-  const factor = seeingFactor(s, at);
+  const recorded = frozenAt !== undefined;
+  const known = !recorded || frozenFactor !== undefined && Number.isFinite(frozenFactor) && frozenFactor > 0;
+  const factor = recorded ? frozenFactor ?? NaN : seeingFactor(s, at);
   return <section className="panel panel-pad stack" aria-label="Telescope conditions">
     <b>{frozenAt !== undefined ? 'Exposure conditions' : 'Image conditions'}</b>
-    <div className="muted" style={{ fontSize: 12 }}>{factor > 1.5 ? 'Turbulent air: a broad, unsteady image.' : 'Steadier air: allow for the remaining blur and alignment error.'}{frozenAt !== undefined && ` Frozen pair from expedition day ${(at / DAY + 1).toFixed(3)}.`}</div>
+    <div className="muted" style={{ fontSize: 12 }}>{!known ? 'Image quality was not recorded for this exposure.' : factor > 1.5 ? 'Turbulent air: a broad, unsteady image.' : 'Steadier air: allow for the remaining blur and alignment error.'}{frozenAt !== undefined && ` Frozen pair from expedition day ${(at / DAY + 1).toFixed(3)}.`}</div>
     <details className="measurement-help"><summary>Conditions and methods</summary>
       <p>Try another observing session, or make separate measurements after the image changes. Use their scatter to estimate random repeatability, and allow for edge placement and shared alignment errors.</p>
       <p>Taking more readings cannot remove a systematic offset. Identical repeats or repeated marks on one frozen image do not establish zero uncertainty. A larger apparent disk or a longer parallax baseline can improve relative precision.</p>
       {frozenAt !== undefined && <p>Take a new simultaneous pair for another exposure. Compare nearby sessions: the planet moves, so widely separated dates should not be averaged as if the distance were fixed.</p>}
-      {hasChallenge(s, 'seeing') && <p>The bad-seeing season keeps background blur elevated even on otherwise calmer nights. Account for that limitation rather than waiting for a guaranteed perfectly sharp image.</p>}
+      {!recorded && hasChallenge(s, 'seeing') && <p>The bad-seeing season keeps background blur elevated even on otherwise calmer nights. Account for that limitation rather than waiting for a guaranteed perfectly sharp image.</p>}
     </details>
   </section>;
 }

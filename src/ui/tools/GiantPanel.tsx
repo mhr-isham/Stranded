@@ -7,7 +7,9 @@ import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { fitOrbit, type OrbitFit } from '../../engine/orbitfit';
 import { moonFit, trackedPhase } from '../../game/fits';
 import { fmt } from '../../game/format';
-import { checkMissions, giantObservable } from '../../game/sim';
+import { checkMissions, currentWorld } from '../../game/sim';
+import { opticalStatus } from '../../game/observing';
+import { ObservingStatus } from '../common/ObservingStatus';
 import { useGame } from '../../game/store';
 import { sfx } from '../../game/audio';
 import { Chart, unwrapDeg } from '../common/Chart';
@@ -57,9 +59,7 @@ export function GiantPanel() {
         <button className={`btn ${s.trackGOn ? '' : 'primary'}`} onClick={() => (s.set({ trackGOn: !s.trackGOn }), checkMissions())}>
           {s.trackGOn ? 'Giant tracker: ON (nightly, moon 8×/day)' : 'Turn on the giant tracker'}
         </button>
-        <div className="muted" style={{ fontSize: 13 }}>
-          {giantObservable(t) ? 'Tracking now: the giant is up.' : 'Waiting for the giant in a dark sky.'} Warp time to collect data.
-        </div>
+        <ObservingStatus status={opticalStatus(currentWorld().system, s, t, 'giant-track')} />
         {pts.length > 1 && (
           <Chart
             series={[{ pts, color: '#ffe6b8', kind: 'dots' }]}

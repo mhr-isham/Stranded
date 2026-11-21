@@ -4,12 +4,10 @@
 // catalogue, give a navigation fix.
 
 import { useState } from 'react';
-import { ARCSEC, DAY, DEG } from '../../engine/constants';
+import { ARCSEC, DAY } from '../../engine/constants';
 import { deriveAll } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { catalogueOf, fitParallax, LIGHT_YEAR, matchCatalogue, nearStarsOf, parallaxOffset } from '../../engine/nearstars';
-import { localFrame, toHorizontal, topocentric } from '../../engine/sky';
-import { seeingFactor } from '../../game/challenges';
 import { clock } from '../../game/clock';
 import { sfx } from '../../game/audio';
 import { fmt } from '../../game/format';
@@ -19,6 +17,8 @@ import { Chart } from '../common/Chart';
 import { Formula, SendToSheet } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { MeasurementSources } from '../common/MeasurementSources';
+import { opticalStatus } from '../../game/observing';
+import { ObservingStatus } from '../common/ObservingStatus';
 
 const KEYS = ['pStarA', 'pStarB', 'pStarC'] as const;
 
@@ -30,10 +30,7 @@ export function StarsPanel() {
   const [sel, setSel] = useState(0);
   const st = stars[sel];
   if (!st) return null;
-  const f = localFrame(sys, t, sys.site);
-  const sunAlt = toHorizontal(topocentric(sys, 'star', t, sys.site), f).alt;
-  const alt = toHorizontal(catalog[st.index].dir, f).alt;
-  const canLog = sunAlt < -12 * DEG && alt > 15 * DEG;
+  const status = opticalStatus(sys, s, t, 'nearby-star', { direction: catalog[st.index].dir });
   const obs = s.starPar.filter((o) => o.i === sel);
   const P1 = s.sheet.P1?.value;
   const fit = P1 ? fitParallax(obs.map((o) => ({ t: o.at, v: o.v })), P1) : null;
@@ -41,10 +38,15 @@ export function StarsPanel() {
   const a1 = d.a1;
 
   const log = () => {
+    const current = useGame.getState(), { system, catalog: currentCatalog } = currentWorld();
+    const star = nearStarsOf(system)[sel];
+    if (!star) return;
+    const now = clock.t, live = opticalStatus(system, current, now, 'nearby-star', { direction: currentCatalog[star.index].dir });
+    if (!live.ok) return toast(live.reason);
     // A careful reading at high power: about 0.01″, worse on rough nights.
-    const noise = (Math.random() + Math.random() + Math.random() - 1.5) * 0.02 * ARCSEC * seeingFactor(s, clock.t);
-    const v = Math.round((parallaxOffset(sys, st, clock.t) + noise) / (0.001 * ARCSEC)) * 0.001 * ARCSEC;
-    s.set({ starPar: [...s.starPar, { i: sel, at: clock.t, v, source: 'tracker', environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(s, clock.t), frozen: false } } }] });
+    const noise = (Math.random() + Math.random() + Math.random() - 1.5) * 0.02 * ARCSEC * live.seeing;
+    const v = Math.round((parallaxOffset(system, star, now) + noise) / (0.001 * ARCSEC)) * 0.001 * ARCSEC;
+    current.set({ starPar: [...current.starPar, { i: sel, at: now, v, source: 'tracker', environment: { instrument: 'telescope', at: now, rawValue: v, seeing: { factor: live.seeing, frozen: false } } }] });
     toast(`${st.name}: ${fmt(v / ARCSEC, 3)}″ logged`);
     sfx('shutter');
   };
@@ -74,14 +76,10 @@ export function StarsPanel() {
             </button>
           ))}
         </div>
-        <button className="btn primary" disabled={!canLog} onClick={log}>
+        <button className="btn primary" disabled={!status.ok} onClick={log}>
           Log {st.name}’s position
         </button>
-        {!canLog && (
-          <div className="amber" style={{ fontSize: 13 }}>
-            {sunAlt >= -12 * DEG ? 'Wait for a dark sky.' : `${st.name} is ${alt < 0 ? 'below the horizon' : 'too low'} right now. Try later tonight — or, if it sits near the star this season, in a few months.`}
-          </div>
-        )}
+        <ObservingStatus status={status} />
         {obs.length > 0 && (
           <Chart
             ariaLabel="Recorded nearby-star positions"

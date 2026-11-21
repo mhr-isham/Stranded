@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ARCSEC, DAY, DEG } from '../../engine/constants';
-import { parallaxSite, targetSkyLimits } from '../../engine/measure';
+import { parallaxSite } from '../../engine/measure';
 import { localFrame, observerPos, toHorizontal, topocentric } from '../../engine/sky';
-import { flareAt } from '../../engine/flares';
 import { norm, sub, unit } from '../../engine/vec';
 import { sfx } from '../../game/audio';
 import { flag } from '../../game/tutorial';
@@ -10,7 +9,6 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
-import { isCloudy } from '../../game/survival';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { hhmm, localSolarHours } from '../../game/time';
 import { drawScope, scopeProjector } from '../../render/telescope';
@@ -20,6 +18,8 @@ import { toast, useGameTime } from '../common/widgets';
 import { SeeingConditions } from '../common/MeasurementNotes';
 import { measuredParallax, projectedBaseline, type CameraMark } from '../../game/parallaxObservation';
 import { ParallaxInvestigation } from '../tutorial/ParallaxInvestigation';
+import { opticalStatus } from '../../game/observing';
+import { ObservingStatus } from '../common/ObservingStatus';
 
 export function Rover() {
   const { system: sys } = currentWorld();
@@ -71,12 +71,12 @@ export function Rover() {
   const A = siteInfo(sys.site);
   const B = siteInfo(roverSite);
   const M = siteInfo(midSite);
-  const lim = targetSkyLimits(sys);
   // On a locked planet the rover drives south for parallax (engine/measure.ts parallaxSite).
   const heading = sys.features.locked ? 'south' : 'east';
-  const cloudy = s.settings.survival && isCloudy(s.seed, t);
-  const flare = !!flareAt(sys, t);
-  const canImage = s.identified && !driving && s.rover.dist > 0 && A.alt > lim.par / DEG && B.alt > lim.par / DEG && A.sun < lim.sun / DEG && B.sun < lim.sun / DEG && !cloudy && !flare;
+  const campView = opticalStatus(sys, s, t, 'parallax'), roverView = opticalStatus(sys, s, t, 'parallax', { site: roverSite });
+  const view = campView.ok ? roverView : campView;
+  const setupReason = !s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : '';
+  const canImage = !setupReason && campView.ok && roverView.ok;
 
   const drive = () => {
     if (s.northTrip.dist > 0 || s.northTrip.arriveAt > clock.t) return toast('The rover is out north at the shadow stick. Bring it back first.');
@@ -89,25 +89,24 @@ export function Rover() {
   };
 
   const capture = () => {
-    const tt = clock.t;
-    if (flareAt(sys, tt)) return toast('A stellar flare is washing out the cameras. Wait for it to fade.');
-    if (s.settings.survival && isCloudy(s.seed, tt)) return toast('Clouds obscure the target. Try a later observing session.');
-    const vA = topocentric(sys, body, tt, sys.site);
-    const vB = topocentric(sys, body, tt, roverSite);
-    for (const site of [sys.site, roverSite]) {
-      const f = localFrame(sys, tt, site);
-      if (!s.identified || s.rover.arriveAt > tt || s.rover.dist <= 0 || toHorizontal(topocentric(sys, body, tt, site), f).alt <= lim.par || toHorizontal(topocentric(sys, 'star', tt, site), f).alt >= lim.sun) return toast('The cameras cannot image at this instant. Recheck both sites and the rover arrival.');
+    const tt = clock.t, current = useGame.getState(), { system } = currentWorld();
+    if (!current.identified || current.rover.arriveAt > tt || current.rover.dist <= 0) return toast('Recheck the rover deployment and arrival.');
+    const liveSite = parallaxSite(system, system.site, current.rover.dist), liveBody = system.giant ? 'giant' : 'target';
+    for (const [label, site] of [['Camp', system.site], ['Rover', liveSite]] as const) {
+      const status = opticalStatus(system, current, tt, 'parallax', { site });
+      if (!status.ok) return toast(`${label}: ${status.reason}`);
     }
-    const id = `${s.runId}:${tt}:${s.rover.dist}`;
-    const same = cap?.id === id ? cap : null;
-    s.set({ parallaxPair: {
+    const vA = topocentric(system, liveBody, tt, system.site), vB = topocentric(system, liveBody, tt, liveSite);
+    const id = `${current.runId}:${tt}:${current.rover.dist}`;
+    const same = current.parallaxPair?.id === id ? current.parallaxPair : null;
+    current.set({ parallaxPair: {
       id, at: tt,
       dirA: unit(vA),
       dirB: unit(vB),
-      radius: Math.asin((sys.giant ?? sys.target).radius / norm(vA)),
-      baseline: norm(sub(observerPos(sys, tt, sys.site), observerPos(sys, tt, roverSite))),
-      projectedBaseline: projectedBaseline(observerPos(sys, tt, sys.site), observerPos(sys, tt, roverSite), vA),
-      roverDistance: s.rover.dist, seeing: seeingFactor(s, tt), marks: same?.marks ?? { A: null, B: null }, viewedB: same?.viewedB ?? false, prediction: same?.prediction,
+      radius: Math.asin((system.giant ?? system.target).radius / norm(vA)),
+      baseline: norm(sub(observerPos(system, tt, system.site), observerPos(system, tt, liveSite))),
+      projectedBaseline: projectedBaseline(observerPos(system, tt, system.site), observerPos(system, tt, liveSite), vA),
+      roverDistance: current.rover.dist, seeing: seeingFactor(current, tt), marks: same?.marks ?? { A: null, B: null }, viewedB: same?.viewedB ?? false, prediction: same?.prediction,
     } });
     setFrame('A'); setBlink(false);
     flag('rover-captured');
@@ -243,14 +242,10 @@ export function Rover() {
           <button className="btn primary" disabled={!canImage} onClick={capture}>
             Take simultaneous images
           </button>
-          {!canImage && (
-            <div className="amber" style={{ fontSize: 13 }}>
-              {!s.identified ? 'Identify the blue planet first.' : driving ? 'Rover still driving.' : s.rover.dist <= 0 ? 'Send the rover out first.' : flare ? 'A stellar flare is washing out the cameras. Wait for it to fade; an absent image cannot be recovered by a numerical correction.' : cloudy ? 'Clouds obscure the target. Try a later observing session; time and air continue to pass.' : `Both sites need ${lim.sun > -10 * DEG ? 'twilight or darker' : 'a dark sky'} with the planet above ${Math.round(lim.par / DEG)}°.`}
-            </div>
-          )}
+          {setupReason ? <div className="amber" style={{ fontSize: 12 }}>{setupReason}</div> : <ObservingStatus status={view} site={view.ok || ['flare', 'clouds'].includes(view.code) ? undefined : campView.ok ? 'Rover' : 'Camp'} />}
         </div>
 
-        <SeeingConditions frozenAt={cap?.at} />
+        <SeeingConditions frozenAt={cap?.at} frozenFactor={cap?.seeing} />
 
         {cap && (
           <div className="panel panel-pad stack" data-tut="rover-blink">

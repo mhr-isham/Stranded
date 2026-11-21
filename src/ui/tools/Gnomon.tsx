@@ -5,8 +5,7 @@ import { sfx } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { hasChallenge } from '../../game/challenges';
-import { flareAt } from '../../engine/flares';
-import { isCloudy } from '../../game/survival';
+import { opticalWeather } from '../../game/observing';
 import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { hhmm } from '../../game/time';
@@ -36,7 +35,7 @@ export function Gnomon() {
   const site = where === 'camp' ? sys.site : northSite(sys.site, distance, sys.home.radius);
   const live = shadowView(sys, t, site), view = capture ? capture[where] : live;
   const comparison = compareShadows(s.shadows), pair = comparison.pair, result = comparison.result;
-  const weather = s.settings.survival && isCloudy(s.seed, t), flare = !!flareAt(sys, t);
+  const conditions = opticalWeather(sys, s, t), weather = conditions.cloudy, flare = conditions.flare;
   const correctionValid = !correct || k.trim() !== '' && sigmaK.trim() !== '' && Number.isFinite(Number(k)) && Number(k) >= 0 && Number(k) <= .85 && Number.isFinite(Number(sigmaK)) && Number(sigmaK) > 0;
   const markValid = !!capture && mark !== null && mark > 0 && mark <= SHADOW_MAX && Number(sigma) > 0 && Number.isFinite(Number(sigma)) && correctionValid;
   const possible = !driving && trip.dist > 0 && !weather && !flare && makeShadowCapture(sys, t, trip.dist, Number(sigmaKm) * 1000, 'preview');
@@ -65,7 +64,8 @@ export function Gnomon() {
   }
   function freeze() {
     const current = useGame.getState();
-    if (!possible || waiting || current.northTrip.arriveAt > clock.t || current.settings.survival && isCloudy(current.seed, clock.t) || flareAt(sys, clock.t)) return;
+    const live = opticalWeather(sys, current, clock.t);
+    if (!possible || waiting || current.northTrip.arriveAt > clock.t || live.cloudy || live.flare) return;
     const shot = makeShadowCapture(sys, clock.t, current.northTrip.dist, Number(sigmaKm) * 1000, `${s.runId}:shadow:${clock.t}:${Date.now()}:${++serial.current}`);
     if (!shot) return;
     clock.paused = true; clock.emit();
@@ -129,7 +129,7 @@ export function Gnomon() {
             <details><summary>Plan the route</summary><p>A longer baseline enlarges the angle difference but takes more time. This remote northward survey takes {fmt(speed / 1000, 0)} km per expedition day. It shares the same rover as parallax and surface exploration. Arrival does not take the photographs for you.</p><p>The two 2 m sticks must be vertical and the odometer distance must follow the north–south meridian. The default error fields are editable working assumptions, not certified instrument accuracy. Baseline error is saved with each capture; capture a new pair after changing it.</p></details>
           </section>
           <section className="panel panel-pad stack" data-tut="shadow-capture"><span className="meter-label">2 · ONE MOMENT, TWO VIEWS</span><b>Catch the local noon</b><div className="shadow-clock">{hhmm(shadowSolarClock(sys, t).hours)} <small>local solar time</small></div><p>The shortest shadow is near noon. Capture pauses expedition time so you can measure both views at your own pace.</p><button className="btn small" disabled={!noon || waiting || driving} onClick={() => noon && waitUntil(noon)}>Wait to next local noon</button><button className="btn primary" disabled={!possible || waiting} onClick={freeze}>{capture ? 'Capture a new pair' : 'Capture both shadow views'}</button>
-            <div className="faint">{waiting ? 'Advancing expedition time…' : driving ? 'The rover must arrive before capture.' : !trip.dist ? 'Deploy the rover first.' : weather ? 'Cloud blocks the shadow; wait for clear weather.' : flare ? 'Flare glare obscures the instrument; wait for it to pass.' : !possible ? 'Both views need the Sun 15–89.5° high and a positive baseline uncertainty. Try another noon or season.' : capture ? 'Your frozen views and saved marks keep their original dates and conditions.' : 'Both stations are ready for a paired exposure.'}</div>
+            <div className="faint">{waiting ? 'Advancing expedition time…' : driving ? 'The rover must arrive before capture.' : !trip.dist ? 'Deploy the rover first.' : flare ? 'Flare glare obscures the instrument; wait for it to pass.' : weather ? 'Cloud blocks the shadow; wait for clear weather.' : !possible ? 'Both views need the Sun 15–89.5° high and a positive baseline uncertainty. Try another noon or season.' : capture ? 'Your frozen views and saved marks keep their original dates and conditions.' : 'Both stations are ready for a paired exposure.'}</div>
             {capture && <button className="btn small ghost" onClick={() => { setCapture(null); setMark(null); setNotice('Live preview restored. Saved marks are unchanged.'); }}>Return to live preview</button>}
           </section>
           <details className="panel panel-pad"><summary>Optional: account for high-Sun refraction</summary><div className="stack" style={{ paddingTop: 10 }}><p>High sunlight reduces refraction; it does not eliminate it. Raw marks are always retained. If you have a justified estimate for the instrument’s high-Sun coefficient, enter it here before keeping both marks.</p><label><input type="checkbox" checked={correct} onChange={(e) => setCorrect(e.target.checked)} /> Apply my shared refraction estimate</label>{correct && <><label>My coefficient k<input className="input" aria-label="Shadow refraction coefficient" type="number" min="0" max="0.85" step="0.01" value={k} onChange={(e) => setK(e.target.value)} /></label><label>± coefficient uncertainty<input className="input" aria-label="Shadow refraction uncertainty" type="number" min="0.001" step="0.01" value={sigmaK} onChange={(e) => setSigmaK(e.target.value)} /></label></>}<p>Both marks must use the same assumptions. This coefficient belongs to the stated shadow model; the hill’s damp-air sample is not automatically its calibration. Re-keep both marks to revise their treatment.</p><Formula>h_apparent = h_geometric + (2k / 60)° cot h_geometric</Formula></div></details>
