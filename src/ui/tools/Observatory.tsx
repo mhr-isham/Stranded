@@ -14,6 +14,7 @@ import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
 import { MoonAnalysisPanel } from './MoonAnalysis';
 import { fmt } from '../../game/format';
+import { MeasurementSources } from '../common/MeasurementSources';
 import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { paintSky, starRGB } from '../../render/paint';
@@ -615,11 +616,11 @@ export function Observatory() {
             reason="Clouds or flare glare obscure the reference stars. Wait for clear observing conditions."
             onLog={() => {
               if (obscured(clock.t)) return;
-              // The reference star's hour angle: how far the sky has turned (with a small reading error).
-              const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'manual' }] }));
+              // The reference star's hour angle: how far the sky has turned (with a small reading error).
+              const v = (((meridianAngle(sys, clock.t, sys.site) + (Math.random() - 0.5) * 0.04 * DEG) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'tracker' }] }));
               toast('Sky position logged');
               sfx('shutter');
             }}
@@ -751,13 +752,14 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false }: { canLog:
         {locked ? 'Log the sky’s turn' : 'Log star position'}
       </button>
       {!canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
+      {locked && <MeasurementSources instrument="locked-year" />}
       <div data-tut="year-fit" className="stack">
       <YearPlot analysis={analysis} manual={manual} band={band} onBand={setBand} />
       {pts.length > 0 && <>
         <div className="faint">Drag across the chart to select dates, or use these range fields. Excluded observations remain visible.</div>
         <div className="row year-date-range"><label className="field">From day<input className="input" type="number" step="any" value={band?.[0] ?? pts[0].x} onChange={(e) => { if (e.target.value !== '' && Number.isFinite(Number(e.target.value))) setBand([Number(e.target.value), band?.[1] ?? pts.at(-1)!.x]); }} /></label><label className="field">To day<input className="input" type="number" step="any" value={band?.[1] ?? pts.at(-1)!.x} onChange={(e) => { if (e.target.value !== '' && Number.isFinite(Number(e.target.value))) setBand([band?.[0] ?? pts[0].x, Number(e.target.value)]); }} /></label></div>
         <button className="btn small" onClick={() => setBand(null)}>Use all observing dates</button>
-        <details className="measurement-help"><summary>Observation log and conditions</summary><table className="log"><thead><tr><th>Day</th><th>Chart position (°)</th><th>Image</th></tr></thead><tbody>{pts.map((p, i) => <tr key={`${p.x}:${i}`}><td>{fmt(p.x, 3)}</td><td>{fmt(p.y, 3)}</td><td>{p.observation.environment?.seeing ? p.observation.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Not recorded'}{p.observation.source === 'echo' ? ' · ECHO supplied' : p.observation.source === 'manual' ? ' · manual' : ''}</td></tr>)}</tbody></table></details>
+        <details className="measurement-help"><summary>Observation log and conditions</summary><table className="log"><thead><tr><th>Day</th><th>Chart position (°)</th><th>Image / source</th></tr></thead><tbody>{pts.map((p, i) => <tr key={`${p.x}:${i}`}><td>{fmt(p.x, 3)}</td><td>{fmt(p.y, 3)}</td><td>{p.observation.environment?.seeing ? p.observation.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Not recorded'}{p.observation.source === 'echo' ? ' · ECHO supplied' : p.observation.source === 'manual' ? ' · manual' : p.observation.source === 'tracker' ? ' · tracker sample' : ' · source not recorded'}</td></tr>)}</tbody></table></details>
       </>}
       <YearFitDetails analysis={analysis} manual={manual} send />
       <details className="measurement-help"><summary>What can these dates establish?</summary><p>One date provides no time baseline. Two dates define an early line but cannot establish scatter. More separated dates can test that line; extra readings at the same instant do not provide more time coverage.</p><p>The fitted rate assumes approximately steady angular drift over the selected interval. Curvature, shared centring offsets and changing image quality can make a straight line inadequate. The shortest-turn unwrap also assumes no unobserved extra revolutions between successive dates; very long gaps can hide a turn.</p><p>Keep your observations and choose another date if the drift is small relative to your aiming uncertainty. More observations do not guarantee a narrower or more accurate result.</p></details>

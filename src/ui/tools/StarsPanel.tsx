@@ -18,6 +18,7 @@ import { useGame } from '../../game/store';
 import { Chart } from '../common/Chart';
 import { Formula, SendToSheet } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { MeasurementSources } from '../common/MeasurementSources';
 
 const KEYS = ['pStarA', 'pStarB', 'pStarC'] as const;
 
@@ -43,7 +44,7 @@ export function StarsPanel() {
     // A careful reading at high power: about 0.01″, worse on rough nights.
     const noise = (Math.random() + Math.random() + Math.random() - 1.5) * 0.02 * ARCSEC * seeingFactor(s, clock.t);
     const v = Math.round((parallaxOffset(sys, st, clock.t) + noise) / (0.001 * ARCSEC)) * 0.001 * ARCSEC;
-    s.set({ starPar: [...s.starPar, { i: sel, at: clock.t, v }] });
+    s.set({ starPar: [...s.starPar, { i: sel, at: clock.t, v, source: 'tracker', environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(s, clock.t), frozen: false } } }] });
     toast(`${st.name}: ${fmt(v / ARCSEC, 3)}″ logged`);
     sfx('shutter');
   };
@@ -65,6 +66,7 @@ export function StarsPanel() {
           Mira’s star map names three nearby stars. Seen from a moving planet, a near star wobbles to and fro against the far background once a year.
           Log each one every few weeks for most of a year, and fit the wobble with your year P₁.
         </div>
+        <MeasurementSources instrument="stars" />
         <div className="row" style={{ gap: 6 }}>
           {stars.map((x, i) => (
             <button key={x.name} className={`btn small ${sel === i ? 'primary' : ''}`} onClick={() => setSel(i)} style={{ flex: 1 }}>
@@ -82,6 +84,7 @@ export function StarsPanel() {
         )}
         {obs.length > 0 && (
           <Chart
+            ariaLabel="Recorded nearby-star positions"
             series={[
               { pts: obs.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC })), color: '#ffe6b8', kind: 'dots' },
               ...(fit && obs.length
@@ -99,9 +102,10 @@ export function StarsPanel() {
             ]}
             xLabel="day"
             yLabel="offset (″)"
-            yFmt={(y) => y.toFixed(2)}
+            yFmt={(y) => y.toFixed(3)}
           />
         )}
+        {obs.length > 0 && <details className="measurement-help"><summary>Recorded position log</summary><table className="log"><thead><tr><th>Day</th><th>Offset (″)</th><th>Source / image</th></tr></thead><tbody>{obs.map((o, i) => <tr key={`${o.at}:${i}`}><td>{fmt(o.at / DAY, 3)}</td><td>{fmt(o.v / ARCSEC, 3)}</td><td>{o.source === 'tracker' ? 'Position scan' : 'Source not recorded'} · {o.environment?.seeing ? o.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Conditions not recorded'}</td></tr>)}</tbody></table></details>}
         {!P1 && obs.length > 0 && <div className="hint">Put your year P₁ on the sheet: the wobble repeats once per year.</div>}
         {fit && obs.length >= 6 && (
           <>

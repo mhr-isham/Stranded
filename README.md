@@ -2,7 +2,7 @@
 
 *An astro-navigation game.* Your ship has crashed in an unknown star system. You have no star catalogue, no radio and a fixed amount of fuel. Measure the system with hand-operated tools, write down every number with an honest error bar, and plot a course to the blue planet before life support runs out.
 
-Every measurement error comes from how you use the tools (reaction time, aiming, reading a scale), not from random noise added by the game. Every system is generated fresh, and an automatic solver checks that it can be solved before you see it.
+Measurements depend on your technique (timing, aiming and reading scales), instrument resolution and observing conditions. Some receiver/tracker readings and ECHO-supplied examples also use simplified simulated scatter; shared effects such as refraction can bias a whole set of readings. These models are not calibrated specifications for real instruments. Recorded observations retain their values when charts are reopened or the expedition is reloaded. Every system is generated fresh, and an automatic solver checks that it can be solved before you see it.
 
 ## Play
 
@@ -16,7 +16,7 @@ npm run build      # static site in dist/ (works from any sub-path)
 
 It runs as a single web page on phones and laptops, with no sign-in. Progress is saved in the browser. To give friends the same system, share its **seed** (☰ menu), or use **Daily system**.
 
-**Ways to play:** a nine-chapter **Campaign** with a story, a **Single expedition** with random/daily/entered seeds and variations unlocked by completed Campaign chapters, and **Free Roam** (direct camp entry, every system type available, no deadline or score; optional guidance, truth overlay and landing practice). Five modes run from **Stargazer** (gentle, fully coached) to **Legend** (no formula sheet, no measurement warnings). New Astronomer and Legend runs require manual ascent and destination landing; ECHO rescue preserves the journey as assisted and unscored. **Flight School** groups 24 interactive lessons, 14 guided exercises, seven repeatable estimation workshops and two flight drills by skill. Estimation practice covers trends, interpolation, ratios, event bounds, travel times, repeated measurements and parallax uncertainty; two guided exercises compare predictions with your own new pendulum/star readings. All modules are optional and open, with saved completion/skip status and chapter recommendations. Basic Training and individual exercises preserve your current expedition. Chapter lessons also remain in the Codex. Flight controls support keyboard and simultaneous touch, pause, sensitivity adjustment and reduced camera motion.
+**Ways to play:** a nine-chapter **Campaign** with a story, a **Single expedition** with random/daily/entered seeds and variations unlocked by completed Campaign chapters, and **Free Roam** (direct camp entry, every system type available, no deadline or score; optional guidance, truth overlay and landing practice). Five modes run from **Stargazer** (gentle, fully coached) to **Legend** (no formula sheet, no measurement warnings). New Astronomer and Legend runs require manual ascent and destination landing; ECHO rescue preserves the journey as assisted and unscored. **Flight School** groups 25 interactive lessons, 14 guided exercises, seven repeatable estimation workshops and two flight drills by skill. Estimation practice covers trends, interpolation, ratios, event bounds, travel times, repeated measurements and parallax uncertainty; two guided exercises compare predictions with your own new pendulum/star readings. All modules are optional and open, with saved completion/skip status and chapter recommendations. Basic Training and individual exercises preserve your current expedition. Chapter lessons also remain in the Codex. Flight controls support keyboard and simultaneous touch, pause, sensitivity adjustment and reduced camera motion.
 
 **ECHO paid checks:** review your own evidence or verify an entered range against ship sensors. Each costs 40 m/s of flight reserve and shares the mode allowance: unlimited in Stargazer, five in Cadet, two in Navigator, none in Astronomer/Legend. Evidence reviews never consult hidden truth; sensor checks explicitly do. Saved results identify the checked entry and stale snapshots. Verification uses and costs persist through checkpoints and rewinds. Paid hint levels cost 25 base points each; unlocked hints and their costs also persist through loads/rewinds within the expedition, with no charge to read an unlocked hint again. Stargazer hints remain free. Basic calculations remain free.
 
@@ -42,7 +42,7 @@ Tool formula panels, progress-sheet equations and lesson formula blocks use loca
 | 8 | Lost Among Stars | Where are *we*? | Stellar parallax of three stars, and a navigation fix |
 | 9 | Home | The real Solar System, Mars to Earth | Your values against NASA's |
 
-Harder modes add real **anomalies** (wind on the pendulum, humid air at the horizon, rough seeing): consistent effects a careful observer can spot, with a "Sharp Eye" bonus for leaving affected readings out. Astronomer and Legend also unlock optional **challenges** (a worn stopwatch, fitting by hand, short supplies…). When a fit is ambiguous (period aliasing), both models are shown, with the night that will decide between them.
+Harder modes add real **anomalies** (wind on the pendulum, humid air at the horizon, rough seeing): consistent effects a careful observer can spot, with a "Sharp Eye" bonus for leaving affected readings out. Astronomer and Legend also unlock optional **challenges** (a worn stopwatch, fitting by hand, short supplies…). When a moon fit has a plausible alternative (period aliasing), an optional comparison shows both candidates and a model-derived follow-up date that may help distinguish them if visibility and precision allow. One night is not guaranteed to settle the question.
 
 ## The solve chain
 
@@ -56,7 +56,7 @@ Harder modes add real **anomalies** (wind on the pendulum, humid air at the hori
 | Angular diameter α₂ | Telescope micrometer | R₂ = d·tan(α₂/2) |
 | The moon's greatest elongation and period | Moon tracker plus a sine fit | M₂ = 4π²aₘ³/(GPₘ²) |
 
-ECHO, the ship's AI, works out the rest with full error propagation:
+ECHO, the ship's AI, works out the rest with independent-input, first-order error propagation. The optional worksheet breakdown shows each input's contribution; shared calibration errors and missing correlations still need attention:
 
 - M₁ = gR₁²/G
 - 1/P₂ = 1/P₁ − 1/S
@@ -64,7 +64,7 @@ ECHO, the ship's AI, works out the rest with full error propagation:
 - a₁ from d (law of cosines at the time of each reading)
 - M★ = 4π²a₁³/(GP₁²)
 
-You then plan the launch in the **launch planner**. It shows a porkchop cost map and an orrery, and forecasts your chance of success by running your plan in many versions of the system that fit your error bars. The flight itself uses the *true* system:
+You then plan the launch in the **launch planner**. It shows a porkchop cost map, an orrery and conditional outcomes from 36 attempted models sampled from your error bars, including unsuccessful and unassessable trials. These counts assume independent Gaussian primary inputs and are not calibrated chances of completing the expedition; they exclude the survival deadline, manual flight and later surface survival. The flight itself uses the *true* system:
 
 1. Ascent guidance hits your planned escape velocity, and the true surface-to-escape Δv is charged.
 2. ECHO makes one course correction at mid-course, aimed at the real planet.

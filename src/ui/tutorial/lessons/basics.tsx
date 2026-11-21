@@ -6,50 +6,62 @@ import { ArrowDefs, Demo, LessonShell, Note, P, Slider, fmtN } from './common';
 
 const TRUE_ROD = 1.0;
 
-/** Repeated readings, mean, spread and standard error — and why averaging can't fix a bent ruler. */
+/** Repeated readings, resolution and scatter-only error versus shared bias. */
 export function MeasureLesson() {
   const [readings, setReadings] = useState<number[]>([]);
   const [bent, setBent] = useState(false);
+  const [coarse, setCoarse] = useState(false);
   const [showTruth, setShowTruth] = useState(false);
   const rng = useMemo(() => makeRng(5), []);
-  const take = (n: number) =>
-    setReadings((r) => [...r, ...Array.from({ length: n }, () => TRUE_ROD + (bent ? 0.006 : 0) + rng.normal(0, 0.004))]);
+  const take = (n: number) => {
+    // Generate on the observation action, outside a replayable React updater.
+    const fresh = Array.from({ length: n }, () => {
+      const v = TRUE_ROD + (bent ? 0.006 : 0) + rng.normal(0, 0.004);
+      return coarse ? Math.round(v / .002) * .002 : v;
+    });
+    setReadings((r) => [...r, ...fresh]);
+  };
   const n = readings.length;
   const mean = n ? readings.reduce((a, b) => a + b, 0) / n : NaN;
   const sd = n > 1 ? Math.sqrt(readings.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : NaN;
   const se = sd / Math.sqrt(n);
-  const X = (v: number) => 30 + ((v - 0.985) / 0.03) * 540;
+  const lo = Math.floor(Math.min(.985, ...readings) / .005) * .005;
+  const hi = Math.ceil(Math.max(1.015, ...readings) / .005) * .005;
+  const X = (v: number) => 30 + ((v - lo) / (hi - lo)) * 540;
   return (
     <LessonShell
       kicker="Lesson 1 · Measuring"
       title="Every measurement has an error"
       demo={
         <Demo>
-          <svg viewBox="0 0 600 190">
+          <div className="faint" style={{ marginBottom: 8 }}>Practice model · Gaussian scatter σ = 4 mm{bent ? ' · shared +6 mm bias' : ' · no added bias'}{coarse ? ' · rounded to 2 mm' : ' · unrounded samples'}</div>
+          <svg viewBox="0 0 600 190" role="img" aria-label="Practice readings of a hypothetical one-metre rod">
             <ArrowDefs />
             <line x1={30} y1={120} x2={570} y2={120} stroke="#5d6a88" />
-            {Array.from({ length: 31 }, (_, i) => (
+            {Array.from({ length: 7 }, (_, i) => (
               <g key={i}>
-                <line x1={X(0.985 + i * 0.001)} y1={120} x2={X(0.985 + i * 0.001)} y2={i % 5 === 0 ? 132 : 126} stroke="#5d6a88" />
-                {i % 5 === 0 && (
-                  <text x={X(0.985 + i * 0.001)} y={148} fill="#93a2c3" fontSize={11} textAnchor="middle" fontFamily="JetBrains Mono">
-                    {(0.985 + i * 0.001).toFixed(3)}
-                  </text>
-                )}
+                <line x1={X(lo + i * (hi - lo) / 6)} y1={120} x2={X(lo + i * (hi - lo) / 6)} y2={132} stroke="#5d6a88" />
+                <text x={X(lo + i * (hi - lo) / 6)} y={148} fill="#93a2c3" fontSize={11} textAnchor="middle" fontFamily="JetBrains Mono">
+                  {(lo + i * (hi - lo) / 6).toFixed(3)}
+                </text>
               </g>
             ))}
             {readings.map((r, i) => (
-              <circle key={i} cx={X(r)} cy={110 - (i % 12) * 7} r={4} fill="#6cc4ff" opacity={0.75} />
+              <circle key={i} cx={X(r)} cy={110 - (i % 12) * 7} r={4} fill="#6cc4ff" opacity={0.75}><title>Reading {i + 1}: {r.toFixed(6)} m</title></circle>
             ))}
             {n > 0 && (
               <>
                 <line x1={X(mean)} y1={20} x2={X(mean)} y2={120} stroke="#ffc46b" strokeWidth={2} />
                 <text x={X(mean)} y={14} fill="#ffc46b" fontSize={12} textAnchor="middle">
-                  your average
+                  average · scatter-only bar
                 </text>
               </>
             )}
-            {n > 1 && <line x1={X(mean - se)} y1={30} x2={X(mean + se)} y2={30} stroke="#ffc46b" strokeWidth={4} markerStart="url(#arrow-amber)" markerEnd="url(#arrow-amber)" />}
+            {n > 1 && <g stroke="#ffc46b" strokeWidth={2}>
+              <line x1={X(mean - se)} y1={30} x2={X(mean + se)} y2={30} />
+              <line x1={X(mean - se)} y1={25} x2={X(mean - se)} y2={35} />
+              <line x1={X(mean + se)} y1={25} x2={X(mean + se)} y2={35} />
+            </g>}
             {showTruth && (
               <>
                 <line x1={X(TRUE_ROD)} y1={40} x2={X(TRUE_ROD)} y2={120} stroke="#5be3a4" strokeWidth={2} strokeDasharray="5 4" />
@@ -59,7 +71,7 @@ export function MeasureLesson() {
               </>
             )}
           </svg>
-          <div className="row">
+          <div className="row" style={{ flexWrap: 'wrap' }}>
             <button className="btn primary small" onClick={() => take(1)}>
               Take a reading
             </button>
@@ -70,39 +82,48 @@ export function MeasureLesson() {
               Reset
             </button>
           </div>
-          <div className="row">
+          <div className="stack" style={{ gap: 8 }}>
             <label className="row" style={{ fontSize: 13 }}>
-              <input type="checkbox" checked={bent} onChange={(e) => (setBent(e.target.checked), setReadings([]))} /> Use a bent ruler (+6 mm)
+              <input type="checkbox" checked={bent} onChange={(e) => (setBent(e.target.checked), setReadings([]))} /> Biased ruler (+6 mm)
+            </label>
+            <label className="row" style={{ fontSize: 13 }}>
+              <input type="checkbox" checked={coarse} onChange={(e) => (setCoarse(e.target.checked), setReadings([]))} /> Coarse ruler (2 mm steps)
             </label>
             <label className="row" style={{ fontSize: 13 }}>
               <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} /> Reveal the truth
             </label>
           </div>
+          <div className="faint" style={{ marginTop: 8 }}>Changing the ruler starts a new set of practice readings. Revealing the truth changes only the display. The real expedition is separate.</div>
           <dl className="kv">
             <dt>Readings</dt>
             <dd>{n}</dd>
             <dt>Average</dt>
             <dd>{n ? `${fmtN(mean, 4)} m` : '—'}</dd>
-            <dt>Spread of one reading (σ)</dt>
+            <dt>Observed spread (s)</dt>
             <dd>{n > 1 ? `${fmtN(sd * 1000, 1)} mm` : '—'}</dd>
-            <dt>Error of the average (σ/√N)</dt>
+            <dt>Scatter-only standard error</dt>
             <dd className="amber">{n > 1 ? `± ${fmtN(se * 1000, 2)} mm` : '—'}</dd>
           </dl>
         </Demo>
       }
-      formula={<Equation tex={"\\text{average}=\\frac{x_1+x_2+\\cdots+x_N}{N} \\\\ \\text{error of average}=\\frac{\\sigma}{\\sqrt N}"} />}
+      formula={<Equation tex={"\\bar{x}=\\frac{x_1+x_2+\\cdots+x_N}{N} \\\\ s_{\\bar{x}}=\\frac{s}{\\sqrt{N}}\\quad\\text{(independent repeats, scatter only)}"} />}
       keyIdea="For independent repeats of a stable quantity, the scatter of single readings stays the same, but the random error of the average shrinks like 1/√N: 4 readings halve it, 100 readings cut it to a tenth. New timestamps alone do not establish independence."
-      warn="Averaging only beats random scatter. A systematic error (the bent ruler, a wrong height, timing the wrong swing) moves every reading the same way. Tick the bent ruler and reveal the truth: more readings make you more sure of the wrong answer."
-      tip="In Stranded every tool works like this rod: your hands, eyes and reaction time cause the scatter. Keep several readings and let the game average them."
+      warn="A shared error can shift all readings together. Try the biased ruler: more independent readings can narrow the scatter-only bar while the mean stays displaced. Check calibration or compare another method. The bar omits shared bias and is not a guaranteed bound."
+      tip="Your timing and aiming matter. Instrument resolution, changing conditions and simplified simulated receiver or tracker scatter matter too. Inspect an instrument’s recorded conditions and distinguish a new observation from another view of the same data."
     >
       <P>
-        You are measuring a rod that is exactly one metre long — but you don’t know that. Every time you read the ruler you land a little off:
-        your eye is not perfectly lined up, the mark is thick, the rod wobbles.
+        This hypothetical rod is one metre long. Each click generates a new practice sample with illustrative random scatter; it does not measure your real reaction time or aiming. The examples are simplified models, not calibrated specifications for every tool in the game.
       </P>
       <P>
         Press <b>Take a reading</b> a few times. Each blue dot is one reading. The amber line is their <b>average</b>, and the amber bar shows
-        how uncertain that average is.
+        a scatter-only estimate of uncertainty in that average. Turn on the coarse scale to see finite reading steps; turn on the biased ruler to see a shared shift. Zero observed scatter would not prove perfect accuracy.
       </P>
+      <details className="measurement-help" aria-label="Connect error sources to instruments"><summary>Connect this to your instruments</summary>
+        <p><b>Technique:</b> stopwatch start/stop timing and telescope wire placement depend on your actions. Compare careful independent measurements.</p>
+        <p><b>Resolution:</b> scale divisions and reported angle steps limit what one reading can distinguish. More displayed digits do not establish greater accuracy.</p>
+        <p><b>Changing conditions and receiver scatter:</b> turbulent images can change between observations; probe and tracker readings also use simplified simulated scatter. A frozen image or received sample stays the same when viewed again.</p>
+        <p><b>Shared systematic effects:</b> an incorrect length calibration or refraction model can affect a whole set. Use a justified correction, calibration or independent method, and retain its uncertainty.</p>
+      </details>
     </LessonShell>
   );
 }

@@ -160,7 +160,7 @@ export interface GameState {
   moonTrackG: TimedValue[];
   oppPicksG: number[];
   /** Chapter 8: logged offsets of the three nearby stars, and the confirmed navigation fix. */
-  starPar: { i: number; at: number; v: number }[];
+  starPar: { i: number; at: number; v: number; source?: 'tracker'; environment?: MeasurementEnvironment }[];
   navFix: string | null;
   identified: boolean;
   oppPicks: number[]; // times the player marked as oppositions
@@ -299,7 +299,7 @@ const initial = {
   trackG: [] as TimedValue[],
   moonTrackG: [] as TimedValue[],
   oppPicksG: [] as number[],
-  starPar: [] as { i: number; at: number; v: number }[],
+  starPar: [] as GameState['starPar'],
   navFix: null as string | null,
   identified: false,
   oppPicks: [] as number[],

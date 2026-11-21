@@ -18,6 +18,7 @@ import { useGame } from '../../game/store';
 import { Chart } from '../common/Chart';
 import { Formula, SanityWarning, SendToSheet, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { MeasurementSources } from '../common/MeasurementSources';
 
 const MAX_PROBES = 2;
 
@@ -90,6 +91,7 @@ export function ProbeBay() {
           {samples.length > 0 ? (
             <div style={{ width: '100%', maxWidth: 760 }}>
               <Chart
+                ariaLabel="Recorded probe Doppler samples"
                 series={[{ pts: samples, color: '#6cc4ff', kind: 'dots', faded: (q) => !!band && (q.x < band[0] || q.x > band[1]) }]}
                 xLabel="hours from closest approach (log scale)"
                 xFmt={(x) => fmt(Math.sign(x) * (10 ** Math.abs(x) - 1), 0)}
@@ -149,6 +151,7 @@ export function ProbeBay() {
         {p && arrived && !p.crashed && (
           <div className="panel panel-pad stack">
             <b>2 · Read the flyby</b>
+            <MeasurementSources instrument="probe" />
             {mean !== null ? (
               <>
                 <dl className="kv">
