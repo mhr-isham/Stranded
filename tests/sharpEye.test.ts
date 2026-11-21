@@ -7,6 +7,7 @@ import { currentWorld } from '../src/game/sim';
 import { makeShadowCapture, markedShadow, nextShadowNoon } from '../src/game/shadowObservation';
 import { keepRadiusFieldNote, prepareRadiusComparison } from '../src/game/radiusCrossCheck';
 import { gradeRun } from '../src/engine/scoring';
+import { RULESET_VERSION } from '../src/game/world';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const timing = (id: string, protection: 'none' | 'windscreen' = 'none'): Reading => {
@@ -128,7 +129,7 @@ it('starts each new expedition without old investigation credit', () => {
   useGame.setState({ readings: wind(), sharpEyeNotified: ['wind'] });
   useGame.getState().newGame(17, { difficulty: 'navigator', survival: false, sound: false, formulas: true });
   expect(sharpEyePoints(useGame.getState())).toBe(0);expect(useGame.getState().sharpEyeNotified).toEqual([]);
-  expect(useGame.getState().settings.rulesetVersion).toBe(4);expect(SHARP_EYE_POLICY).toBe('investigation-v1');
+  expect(useGame.getState().settings.rulesetVersion).toBe(RULESET_VERSION);expect(SHARP_EYE_POLICY).toBe('investigation-v1');
 });
 it('does not award in unscored practice, tutorials, Free Roam or assisted journeys', () => {
   for (const patch of [

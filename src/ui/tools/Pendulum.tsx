@@ -13,13 +13,12 @@ import { Formula, ReadingsTable, SanityWarning, SendReadings, ToolHeader, outlie
 import { Modal, useClockState, useGameTime } from '../common/widgets';
 import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
-import { explain, makePrediction, resolveNow } from '../../game/predictions';
+import { comparePendulumTrial, lastOf, makePrediction, pendingOf } from '../../game/predictions';
 import { hasChallenge } from '../../game/challenges';
 import { useMode } from '../../game/modes';
-import { pendulumPeriod } from '../../engine/measure';
 import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
 import type { MeasurementEnvironment } from '../../game/measurementEnvironment';
-import { PredictCard } from '../common/Predict';
+import { FieldTrialResult, PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { toast } from '../common/widgets';
 
@@ -63,7 +62,7 @@ export function Pendulum() {
   const estimate = useGame((s) => s.sheet.g);
   useClockState();
 
-  const [nominal, setNominal] = useState(1.5); // m, the coarse knob setting
+  const [nominal, setNominal] = useState(() => pendingOf(useGame.getState(), 'pendulum')?.at ?? 1.5); // m, the coarse knob setting
   // The true length differs from the knob by a hidden knot/attachment offset.
   const trueL = nominal + ((hash32(sys.seed, Math.round(nominal * 100)) / 4294967296) * 3 - 1.5) / 100;
   const [lRead, setLRead] = useState<number | null>(null);
@@ -188,6 +187,7 @@ export function Pendulum() {
     phys.current.th = 0;
     phys.current.om = 0;
     phys.current.releaseAngle = 0;
+    phys.current.releaseId = '';
   };
 
   const layout = (w: number, h: number) => {
@@ -473,7 +473,9 @@ export function Pendulum() {
                 className="btn primary"
                 onClick={() => {
                   const already = (useGame.getState().pendulumMilestones ?? []).includes('twentySwings');
-                  addReading({ key: 'g', value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T, swings: result.N, time: result.time, technique: result.technique }, environment: result.environment });
+                  const observation = { key: 'g' as const, value: result.g, at: result.environment.at, note: `L ${fmt(result.L, 3)} m · ${result.N} sw · ${fmt(result.amp, 0)}°`, pendulum: { length: result.L, period: result.T, swings: result.N, time: result.time, technique: result.technique }, environment: result.environment };
+                  addReading(observation);
+                  comparePendulumTrial(observation);
                   setResult(null);
                   const earned = !already && useGame.getState().pendulumMilestones.includes('twentySwings');
                   if (earned) setCelebrate(true);
@@ -497,7 +499,7 @@ export function Pendulum() {
         </div>
         <TechniqueReview />
         <ReadingPredictionPractice kind="pendulum" currentLength={lRead} resultPending={!!result || running || !!ask} />
-        {keptG.length > 0 && !running && !ask && <PendulumPrediction nominal={nominal} setNominal={setNominal} keptG={keptG} g={g} />}
+        <PendulumPrediction applyLength={(length) => { stopSwing(); setResult(null); setLRead(null); setNominal(length); }} busy={running || !!ask || !!result} />
       </div>
 
       {ask && (
@@ -612,60 +614,47 @@ function Scale({ trueL, nominal, value, onChange, disabled }: { trueL: number; n
   );
 }
 
-/** Knot offset of the string at a knob setting (the same hidden offset the rig uses). */
-const knotL = (seed: number, nominal: number) => nominal + ((hash32(seed, Math.round(nominal * 100)) / 4294967296) * 3 - 1.5) / 100;
-
-/** "Use a ratio": predict the swing time at a new length before trying it. */
-function PendulumPrediction({ nominal, setNominal, keptG, g }: { nominal: number; setNominal: (v: number) => void; keptG: number[]; g: number }) {
-  const { system: sys } = currentWorld();
-  const preds = useGame((s) => s.predictions).filter((p) => p.kind === 'pendulum');
-  const tutorial = useGame((s) => s.tutorial.active);
+function PendulumPrediction({ applyLength, busy }: { applyLength: (length: number) => void; busy: boolean }) {
+  const s = useGame();
   const mode = useMode();
-  const [shown, setShown] = useState<string | null>(null);
-  if (tutorial || preds.length >= 2) {
-    const last = preds[preds.length - 1];
-    return last?.result && shown === last.id ? (
-      <div className="panel panel-pad">
-        <div className="hint">{explain(last, mode.coaching)}</div>
+  const coaching = mode.coaching && (s.settings.difficulty !== 'cadet' || s.settings.cadetGuidance !== false);
+  const pending = pendingOf(s, 'pendulum'), last = lastOf(s, 'pendulum');
+  const baseline = s.readings.filter((r) => r.kept && r.key === 'g' && r.pendulum?.technique?.source === 'manual' &&
+    r.pendulum.technique.releaseId && r.pendulum.length > 0 && r.pendulum.period > 0 &&
+    Number.isFinite(r.pendulum.length) && Number.isFinite(r.pendulum.period)).at(-1)?.pendulum;
+  const options = baseline ? [.6, 1, 1.5, 2, 2.5, 3].filter((length) => Math.abs(length / baseline.length - 1) >= .2) : [];
+  const [selected, setSelected] = useState<number>();
+  const length = selected !== undefined && options.includes(selected) ? selected : options[0];
+  if (s.tutorial.active || (!baseline && !pending && !last?.fieldTrial)) return null;
+  return <section className="panel panel-pad stack" aria-label="Pendulum field trial">
+    {last?.fieldTrial && <FieldTrialResult prediction={last} />}
+    {pending?.fieldTrial ? <div className="stack">
+      <b>Swing trial underway</b>
+      <div>Forecast {fmt(pending.value, 3)} ± {fmt(pending.sigma, 3)} s · {fmt(pending.at!, 1)} m setting</div>
+      <div className="muted">Measure the new length, release the bob, then time and keep a new reading.</div>
+      <div className="row">
+        <button className="btn small" disabled={busy} onClick={() => applyLength(pending.at!)}>Set trial length</button>
+        <button className="btn small ghost" disabled={busy} onClick={() => s.set({ predictions: s.predictions.filter((p) => p.id !== pending.id) })}>End trial</button>
       </div>
-    ) : null;
-  }
-  const k = nominal >= 2.4 ? 0.25 : nominal <= 0.75 ? 4 : nominal >= 1.5 ? 0.5 : 2;
-  const L2 = Math.round(nominal * k * 10) / 10;
-  const gMean = keptG.reduce((a, b) => a + b, 0) / keptG.length;
-  const own = 2 * Math.PI * Math.sqrt(L2 / gMean);
-  const last = preds[preds.length - 1] ?? null;
-  return (
-    <div className="panel panel-pad stack">
-      {last?.result && shown === last.id && <div className="hint">{explain(last, mode.coaching)}</div>}
-      <PredictCard
-        kind="pendulum"
-        question={
-          <>
-            Your string is set to about <b>{fmt(nominal, 1)} m</b>. If you set it to <b>{fmt(L2, 1)} m</b> ({k > 1 ? `${k}×` : `1/${1 / k}`} the length), how long
-            will one full swing take? Predict first, then try it.
-          </>
-        }
-        helper={`Use a ratio: swing time grows with the square root of the length. ${k > 1 ? `${k}× longer` : `${1 / k}× shorter`} means √${k > 1 ? k : 1 / k} = ${fmt(Math.sqrt(k > 1 ? k : 1 / k), 2)}× ${k > 1 ? 'slower' : 'faster'}.`}
-        pts={[]}
-        axis="y"
-        xMax={0}
-        xLabel=""
-        yLabel=""
-        ownFit={{ value: own }}
-        sigma0={0.1}
-        sigmaMax={1}
-        pending={null}
-        last={null}
-        onCommit={(value, sigma) => {
-          const id = makePrediction({ kind: 'pendulum', made: clock.t, due: clock.t, value, sigma, at: L2 });
-          const truth = pendulumPeriod(g, knotL(sys.seed, L2), 3 * DEG);
-          resolveNow(id, truth);
-          setShown(id);
-          setNominal(L2);
-          toast(`String set to ${fmt(L2, 1)} m — release it and time it yourself.`);
-        }}
-      />
-    </div>
-  );
+    </div> : baseline && length !== undefined && !last?.fieldTrial && <details className="measurement-help">
+      <summary>Optional · Try a different swing</summary>
+      <div className="stack">
+        <p>Your last swing took <b>{fmt(baseline.period, 3)} s</b> with a {fmt(baseline.length, 3)} m string.</p>
+        <label className="field">Trial length setting<select className="input" value={length} disabled={busy} onChange={(e) => setSelected(Number(e.target.value))}>
+          {options.map((option) => <option key={option} value={option}>{fmt(option, 1)} m</option>)}
+        </select></label>
+        <PredictCard key={length} kind="pendulum" fieldTrial disabled={busy}
+          question="Set a forecast, then see how the new swing compares."
+          helper="A longer string gives a slower swing. You can estimate the new period by multiplying your recorded period by the square root of the length ratio."
+          pts={[]} axis="y" xMax={0} xLabel="" yLabel="" sigma0={0.1} sigmaMax={1}
+          pending={null} last={null}
+          onCommit={(value, sigma) => {
+            if (value <= 0 || pendingOf(useGame.getState(), 'pendulum')) return;
+            makePrediction({ kind: 'pendulum', made: clock.t, due: clock.t, value, sigma, at: length, fieldTrial: true });
+            applyLength(length);
+          }} />
+      </div>
+    </details>}
+    {last?.fieldTrial && coaching && <details className="measurement-help"><summary>What can change the timing?</summary><p>Starting and stopping the watch, the swing count, release angle and wind can all change the measured period. Repeat the timing to see how much it varies.</p></details>}
+  </section>;
 }

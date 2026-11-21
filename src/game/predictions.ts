@@ -3,11 +3,11 @@
 // what really happened and explains the miss. Only observables are revealed
 // (what an instrument would show), never the hidden numbers on the sheet.
 
-import { DAY } from '../engine/constants';
+import { DAY, DEG } from '../engine/constants';
 import { moonOffset, starLongitude, targetLongitude } from '../engine/measure';
 import { sfx } from './audio';
 import { modeOf } from './modes';
-import { useGame, type GameState } from './store';
+import { useGame, type GameState, type Reading, type TimedValue } from './store';
 import { world } from './world';
 import type { StarSystem } from '../engine/types';
 
@@ -22,9 +22,12 @@ export interface Prediction {
   due: number;
   value: number;
   sigma: number;
-  /** For 'star': the day the player predicted for. For 'pendulum': the new length (m). */
+  /** For 'star': the forecast day. For 'pendulum': the trial knob setting (m). */
   at?: number;
-  result?: { truth: number; points: number; z: number };
+  /** Instrument comparisons are completed by the next matching kept observation. */
+  fieldTrial?: true;
+  missed?: true;
+  result?: { truth: number; points: number; z: number; observedAt?: number };
 }
 
 interface KindInfo {
@@ -108,7 +111,7 @@ export function nextMoonEast(sys: StarSystem, t: number) {
 }
 
 export function pendingOf(s: GameState, kind: PredictionKind) {
-  return s.predictions.find((p) => p.kind === kind && !p.result) ?? null;
+  return s.predictions.find((p) => p.kind === kind && !p.result && !p.missed) ?? null;
 }
 
 export function lastOf(s: GameState, kind: PredictionKind) {
@@ -119,10 +122,40 @@ export function lastOf(s: GameState, kind: PredictionKind) {
 /** Record a prediction. Event predictions get their resolve time from the event itself. */
 export function makePrediction(p: Omit<Prediction, 'id'>) {
   const s = useGame.getState();
-  const id = `${p.kind}-${Math.round(p.made)}`;
+  const base = `${p.kind}-${Math.round(p.made)}`;
+  let id = base, suffix = 1;
+  while (s.predictions.some((prior) => prior.id === id)) id = `${base}-${suffix++}`;
   useGame.setState({ predictions: [...s.predictions, { ...p, id }] });
   sfx('log');
   return id;
+}
+
+function keepFieldComparison(s: GameState, p: Prediction, value: number, at: number) {
+  const z = Math.abs(value - p.value) / p.sigma;
+  if (!Number.isFinite(z)) return;
+  useGame.setState({ predictions: s.predictions.map((entry) => entry.id === p.id ? {
+    ...p, result: { truth: value, points: 0, z, observedAt: at },
+  } : entry) });
+  sfx('log');
+}
+
+export function comparePendulumTrial(reading: Pick<Reading, 'at' | 'pendulum'>) {
+  const s = useGame.getState(), p = pendingOf(s, 'pendulum'), timing = reading.pendulum;
+  if (!p?.fieldTrial || s.tutorial.active || p.at === undefined || !timing ||
+      timing.technique?.source !== 'manual' || !timing.technique.releaseId ||
+      !Number.isFinite(reading.at) || reading.at < p.made ||
+      !Number.isFinite(timing.length) || Math.abs(timing.length - p.at) > .050001 ||
+      !Number.isFinite(timing.period) || timing.period <= 0) return;
+  keepFieldComparison(s, p, timing.period, reading.at);
+}
+
+export function compareStarTrial(observation: TimedValue) {
+  const s = useGame.getState(), p = pendingOf(s, 'star');
+  if (!p?.fieldTrial || s.tutorial.active || observation.source !== 'manual' ||
+      !Number.isFinite(observation.at) || observation.at < p.due || observation.at >= p.due + DAY ||
+      !Number.isFinite(observation.v)) return;
+  const angle = observation.v / DEG;
+  keepFieldComparison(s, p, angle + 360 * Math.round((p.value - angle) / 360), observation.at);
 }
 
 /** True value of the predicted observable. */
@@ -150,6 +183,7 @@ export function explain(p: Prediction, coaching: boolean): string {
   const info = PREDICTION_KINDS[p.kind];
   const f = (v: number) => v.toFixed(info.digits);
   const off = p.value - r.truth;
+  if (p.fieldTrial) return `You recorded ${f(r.truth)} ${info.unit}. Your forecast was ${f(p.value)} ± ${f(p.sigma)} ${info.unit}. ${r.z <= 1 ? 'The reading landed inside your range.' : 'The reading landed outside your range.'}`;
   const head =
     p.kind === 'star'
       ? `The star stood at ${f(r.truth)}°. You said ${f(p.value)} ± ${f(p.sigma)}°.`
@@ -179,7 +213,7 @@ export function explain(p: Prediction, coaching: boolean): string {
 export function resolveNow(id: string, truth: number) {
   const s = useGame.getState();
   const p = s.predictions.find((q) => q.id === id);
-  if (!p || p.result) return null;
+  if (!p || p.result || p.fieldTrial) return null;
   const { z, points } = scorePrediction(p.value, p.sigma, truth, PREDICTION_KINDS[p.kind].scale);
   const done = { ...p, result: { truth, points, z } };
   useGame.setState({ predictions: s.predictions.map((q) => (q.id === id ? done : q)) });
@@ -190,7 +224,10 @@ export function resolveNow(id: string, truth: number) {
 /** Called by the simulation as time passes. */
 export function resolvePredictions(t: number) {
   const s = useGame.getState();
-  const due = s.predictions.filter((p) => !p.result && p.kind !== 'pendulum' && p.due <= t);
+  if (s.predictions.some((p) => p.kind === 'star' && p.fieldTrial && !p.result && !p.missed && t >= p.due + DAY)) {
+    useGame.setState({ predictions: s.predictions.map((p) => p.kind === 'star' && p.fieldTrial && !p.result && !p.missed && t >= p.due + DAY ? { ...p, missed: true } : p) });
+  }
+  const due = s.predictions.filter((p) => !p.fieldTrial && !p.result && p.kind !== 'pendulum' && p.due <= t);
   if (!due.length) return;
   const coaching = modeOf(s.settings.difficulty).coaching;
   for (const p of due) {

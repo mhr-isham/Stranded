@@ -119,6 +119,8 @@ function Debrief() {
   const s = useGame();
   const assisted = assistedFlight(s);
   const scored = !s.settings.freeRoam && !assisted;
+  const scoredForecasts = s.predictions.filter((p) => !p.fieldTrial && p.result);
+  const fieldComparisons = s.predictions.filter((p) => p.fieldTrial && p.result).length;
   const mode = modeOf(s.settings.difficulty);
   const { system: sys } = currentWorld();
   const outcome = s.outcome;
@@ -193,7 +195,7 @@ function Debrief() {
         assisted: assistedFlight(g) || undefined,
         sharpEyePolicy: SHARP_EYE_POLICY,
         camp: g.camp,
-        predictions: { made: g.predictions.filter((p) => p.result).length, inside: g.predictions.filter((p) => p.result && p.result.z <= 1).length },
+        predictions: { made: g.predictions.filter((p) => !p.fieldTrial && p.result).length, inside: g.predictions.filter((p) => !p.fieldTrial && p.result && p.result.z <= 1).length },
         rows: rows.filter((r) => r.e && r.sc).map((r) => ({ k: r.k, value: r.e!.value, sigma: r.e!.sigma, truth: truth[r.k], z: r.sc!.z })),
       };
       useGame.setState({ atlas: [...g.atlas, card] });
@@ -253,14 +255,15 @@ function Debrief() {
               <dt>Course corrections</dt>
               <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
               {scored && <><dt>Hints used</dt><dd>{s.hintsUsed}</dd></>}
-              {s.predictions.some((p) => p.result) && (
+              {scoredForecasts.length > 0 && (
                 <>
                   <dt>Predictions</dt>
                   <dd>
-                    {s.predictions.filter((p) => p.result && p.result.z <= 1).length}/{s.predictions.filter((p) => p.result).length} inside{scored && ` · ${predictionPoints(s)} pts`}
+                    {scoredForecasts.filter((p) => p.result!.z <= 1).length}/{scoredForecasts.length} inside{scored && ` · ${predictionPoints(s)} pts`}
                   </dd>
                 </>
               )}
+              {fieldComparisons > 0 && <><dt>Field comparisons</dt><dd>{fieldComparisons} recorded</dd></>}
               {s.ascentPenalty !== null && (
                 <>
                   <dt>Your ascent vs ECHO’s</dt>

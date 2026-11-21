@@ -5,6 +5,7 @@
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useMode } from '../../game/modes';
+import { useGame } from '../../game/store';
 import { PREDICTION_KINDS, explain, type Prediction, type PredictionKind } from '../../game/predictions';
 import { LessonModal } from '../tutorial/Tutorial';
 import type { Pt } from './Chart';
@@ -118,6 +119,8 @@ export function PredictPlot({ pts, axis, xT, xMax, guess, sigma, onGuess, trend,
 
 interface CardProps {
   kind: PredictionKind;
+  fieldTrial?: boolean;
+  disabled?: boolean;
   question: ReactNode;
   helper: ReactNode;
   pts: Pt[];
@@ -141,8 +144,12 @@ interface CardProps {
 /** A complete prediction: open question, helper, plot, range, commit; or the pending / revealed state. */
 export function PredictCard(p: CardProps) {
   const mode = useMode();
+  const cadetGuidanceOff = useGame((s) => s.settings.difficulty === 'cadet' && s.settings.cadetGuidance === false && !s.tutorial.active);
+  const coaching = mode.coaching && !cadetGuidanceOff;
   const info = PREDICTION_KINDS[p.kind];
-  const [guess, setGuess] = useState<number | null>(null);
+  const [entry, setEntry] = useState('');
+  const guess = entry.trim() && Number.isFinite(Number(entry)) ? Number(entry) : null;
+  const setGuess = (value: number) => setEntry(value.toFixed(info.digits));
   const [sigma, setSigma] = useState(p.sigma0);
   const [trend, setTrend] = useState(false);
   const [lesson, setLesson] = useState(false);
@@ -162,17 +169,17 @@ export function PredictCard(p: CardProps) {
   }
 
   const nudge =
-    mode.sanity && mode.coaching && guess !== null && p.ownFit && Math.abs(guess - p.ownFit.value) > Math.max(3 * sigma, 3 * info.scale)
+    mode.sanity && coaching && !p.fieldTrial && guess !== null && p.ownFit && Math.abs(guess - p.ownFit.value) > Math.max(3 * sigma, 3 * info.scale)
       ? p.ownFit.value
       : null;
 
   return (
     <div className="predict panel-inset stack">
       <div className="row between">
-        <b>🎯 {info.title}</b>
-        <button className="btn small ghost" onClick={() => setLesson(true)}>
+        <b>{p.fieldTrial ? 'Set your forecast' : info.title}</b>
+        {!p.fieldTrial && <button className="btn small ghost" onClick={() => setLesson(true)}>
           How to estimate
-        </button>
+        </button>}
       </div>
       {p.last?.result && (
         <div className="hint" style={{ fontSize: 12 }}>
@@ -180,7 +187,7 @@ export function PredictCard(p: CardProps) {
         </div>
       )}
       <div style={{ fontSize: 14 }}>{p.question}</div>
-      {mode.coaching && <div className="hint">{p.helper}</div>}
+      {coaching && <details className="measurement-help"><summary>Use the log to estimate</summary><p>{p.helper}</p></details>}
       {p.extra}
       {p.pts.length > 0 && (
       <PredictPlot
@@ -209,15 +216,13 @@ export function PredictCard(p: CardProps) {
       )}
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <div className="field" style={{ flex: 1 }}>
-          <label>Guess ({info.unit === 'day' ? 'day' : info.unit})</label>
+          <label>Forecast ({info.unit === 'day' ? 'day' : info.unit})</label>
           <input
             className="input"
             inputMode="decimal"
-            value={guess === null ? '' : fmt(guess)}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) setGuess(v);
-            }}
+            aria-label={`Forecast (${info.unit})`}
+            value={entry}
+            onChange={(e) => setEntry(e.target.value)}
           />
         </div>
         <div className="field" style={{ flex: 1.4 }}>
@@ -226,6 +231,7 @@ export function PredictCard(p: CardProps) {
           </label>
           <input
             type="range"
+            aria-label="Forecast range"
             min={Math.log(info.scale / 10)}
             max={Math.log(p.sigmaMax)}
             step={0.01}
@@ -243,13 +249,31 @@ export function PredictCard(p: CardProps) {
           </button>
         </div>
       )}
-      <button className="btn primary" disabled={guess === null} onClick={() => guess !== null && p.onCommit(guess, sigma)}>
-        Commit prediction
+      <button className="btn primary" disabled={p.disabled || guess === null || (p.kind === 'pendulum' && guess <= 0)} onClick={() => guess !== null && p.onCommit(guess, sigma)}>
+        {p.fieldTrial ? 'Log forecast' : 'Commit prediction'}
       </button>
-      <div className="faint" style={{ fontSize: 12 }}>
+      {!p.fieldTrial && <div className="faint" style={{ fontSize: 12 }}>
         Scored like the sheet: a tight range that turns out right scores most; a confident miss loses points; a huge range earns little.
-      </div>
+      </div>}
       {lesson && <LessonModal id="estimate" onClose={() => setLesson(false)} />}
     </div>
   );
+}
+
+export function FieldTrialResult({ prediction: p }: { prediction: Prediction }) {
+  if (!p.result) return null;
+  const info = PREDICTION_KINDS[p.kind];
+  const difference = p.result.truth - p.value;
+  const span = Math.max(p.sigma * 1.3, Math.abs(difference) * 1.12);
+  const width = 100 * p.sigma / span;
+  const position = 50 + 50 * (difference / span);
+  return <div className="evidence-signal field-trial-result" role="status">
+    <span className="evidence-emblem" aria-hidden="true">✧</span>
+    <div className="stack">
+      <b>{p.kind === 'pendulum' ? 'Swing trial recorded' : 'Sky forecast compared'}</b>
+      <dl className="kv"><dt>Your forecast</dt><dd>{p.value.toFixed(info.digits)} ± {p.sigma.toFixed(info.digits)} {info.unit}</dd><dt>Your reading</dt><dd>{p.result.truth.toFixed(info.digits)} {info.unit}</dd></dl>
+      <div className="field-trial-range" aria-hidden="true"><span style={{ width: `${width}%` }} /><i style={{ left: `${position}%` }} /></div>
+      <div className="muted">Reading {p.result.z <= 1 ? 'inside' : 'outside'} your forecast range.</div>
+    </div>
+  </div>;
 }

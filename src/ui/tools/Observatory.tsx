@@ -28,8 +28,8 @@ import { Chart } from '../common/Chart';
 import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierNote } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
-import { lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
-import { PredictCard } from '../common/Predict';
+import { compareStarTrial, lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
+import { FieldTrialResult, PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { SeeingConditions } from '../common/MeasurementNotes';
@@ -660,7 +660,9 @@ export function Observatory() {
               const lastObs = useGame.getState().starObs.at(-1);
               if (lastObs && clock.t - lastObs.at < 0.5 * DAY) return toast('Already logged today. Log again on another day, so the sky has moved on.');
               const v = eclLon(c);
-              useGame.setState((st) => ({ starObs: [...st.starObs, { at: clock.t, v, source: 'manual', environment: { instrument: 'telescope', at: clock.t, rawValue: v, seeing: { factor: seeingFactor(st, clock.t), frozen: false } } }] }));
+              const observation = { at: clock.t, v, source: 'manual' as const, environment: { instrument: 'telescope' as const, at: clock.t, rawValue: v, seeing: { factor: live.seeing, frozen: false } } };
+              useGame.setState((st) => ({ starObs: [...st.starObs, observation] }));
+              compareStarTrial(observation);
               toast('Star position logged');
               sfx('shutter');
             }}
@@ -791,56 +793,42 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false, status }: {
       </div>
       <YearInvestigation observations={obs} locked={locked} manual={manual} />
       {!locked && <ReadingPredictionPractice kind="star" />}
-      {pts.length >= 2 && !locked && <StarPrediction pts={pts} fit={manual ? null : fit} />}
+      {!locked && <StarPrediction pts={analysis.used} ready={manual ? analysis.baseline >= .5 : !!fit} fit={manual ? null : fit} />}
     </div>
   );
 }
 
 /** "Extend the line": where will the star be against the stars on a future day? */
-function StarPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { slope: number; intercept: number } | null }) {
+function StarPrediction({ pts, fit, ready }: { pts: { x: number; y: number }[]; fit: { slope: number; intercept: number } | null; ready: boolean }) {
   const s = useGame();
   const t = useGameTime(1);
-  const [ahead, setAhead] = useState(14);
-  const pending = pendingOf(s, 'star');
-  useEffect(() => {
-    if (!s.tutorial.active) useGame.getState().say(ECHO.predict);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  if (s.tutorial.active) return null;
-  const nowDay = Math.floor(t / DAY);
-  const xT = nowDay + ahead;
+  const [ahead, setAhead] = useState(7);
+  const pending = pendingOf(s, 'star'), last = lastOf(s, 'star');
+  const latest = s.predictions.filter((p) => p.kind === 'star').at(-1);
+  if (s.tutorial.active || (!ready && !pending && !latest?.fieldTrial)) return null;
+  const xT = Math.floor(t / DAY) + ahead;
   const own = fit ? { value: fit.intercept + fit.slope * xT, line: [pts[0].x, xT].map((x) => ({ x, y: fit.intercept + fit.slope * x })) } : null;
-  return (
-    <PredictCard
-      kind="star"
-      question={
-        <>
-          Where will the star stand against the background stars on <b>day {xT}</b>?
-        </>
-      }
-      helper="Extend the line: the star drifts at a steady rate. Follow the trend of your logs out to the dashed line — and widen your range a little, because any error in the rate grows with time."
-      extra={
-        <div className="row" style={{ gap: 6 }}>
-          {[7, 14, 30].map((d) => (
-            <button key={d} className={`btn small ${ahead === d ? 'primary' : ''}`} onClick={() => setAhead(d)}>
-              in {d} days
-            </button>
-          ))}
-        </div>
-      }
-      pts={pts}
-      axis="y"
-      xT={xT}
-      xMax={xT + 2}
-      xLabel="day"
-      yLabel="star longitude (°)"
-      ownFit={own}
-      sigma0={1}
-      sigmaMax={20}
-      pending={pending}
-      last={lastOf(s, 'star')}
-      onCommit={(value, sigma) => makePrediction({ kind: 'star', made: clock.t, due: xT * DAY, value, sigma, at: xT })}
-    />
-  );
+  return <details className="measurement-help"><summary>Optional · Plan a star sighting{pending?.fieldTrial ? ' · forecast logged' : latest?.missed ? ' · window passed' : latest?.result && latest.fieldTrial ? ' · comparison ready' : ''}</summary>
+    <div className="stack">
+      {latest?.missed && <p>The observing window passed. You can pick another date when you have a usable drift record.</p>}
+      {last?.fieldTrial && <FieldTrialResult prediction={last} />}
+      {pending?.fieldTrial ? <div className="stack">
+        <b>Forecast logged</b>
+        <div>{fmt(pending.value, 2)}° ± {fmt(pending.sigma, 2)}° · elapsed day {pending.at}</div>
+        <div className="muted">Centre and log the star during that day to compare. Visibility still depends on your observing conditions.</div>
+        <button className="btn small ghost" onClick={() => s.set({ predictions: s.predictions.filter((p) => p.id !== pending.id) })}>End forecast</button>
+      </div> : (ready || pending) && <PredictCard key={xT} kind="star" fieldTrial
+        question={<>Choose a position for <b>elapsed day {xT}</b>, then return to log it during that day.</>}
+        helper="Follow the drift in your recorded positions. Allow more room in your range if the positions scatter or the forecast reaches far beyond your log."
+        extra={<div className="row">{[1, 7, 14, 30].map((d) => <button key={d} aria-pressed={ahead === d} className={`btn small ${ahead === d ? 'primary' : ''}`} onClick={() => setAhead(d)}>{d === 1 ? 'Tomorrow' : `In ${d} days`}</button>)}</div>}
+        pts={pts} axis="y" xT={xT} xMax={xT + 2} xLabel="elapsed days" yLabel="star longitude (°)"
+        ownFit={own} sigma0={1} sigmaMax={20} pending={pending} last={last?.fieldTrial ? null : last}
+        onCommit={(value, sigma) => {
+          if (xT * DAY <= clock.t || pendingOf(useGame.getState(), 'star')) return;
+          makePrediction({ kind: 'star', made: clock.t, due: xT * DAY, value, sigma, at: xT, fieldTrial: true });
+        }} />}
+    </div>
+  </details>;
 }
 
 function TrackerPanel({ onWide }: { onWide: () => void }) {
