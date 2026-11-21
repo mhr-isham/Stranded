@@ -104,7 +104,7 @@ export function Hill() {
     const used = apply ? correctHorizon(h, apparent, calibration.k, calibration.sigmaK) : raw;
     if (!raw || !used) return toast('The angle or refraction estimate is outside this model. Check the inputs.');
     const environment: MeasurementEnvironment = { instrument: 'horizon', at: atTime, rawValue: raw.radius, horizon: {
-      height: h, station: stations[at].name, aim: { braced: performance.now() < view.current.braceUntil, tripod, stepDeg: res, zoom }, rawAngle: apparent, usedAngle: used.angle, damp: instrumentHumidK(s, atTime) > 0, legacyCompensated,
+      height: h, station: stations[at].name, aim: { braced: performance.now() < view.current.braceUntil, tripod, stepDeg: res, zoom, adjusted: view.current.adjusted }, rawAngle: apparent, usedAngle: used.angle, damp: instrumentHumidK(s, atTime) > 0, legacyCompensated,
       ...(apply ? { correction: { source: treatment === 'manual' ? 'player' : 'echo-humidity', ...calibration, sigmaValue: used.sigmaValue, ...(treatment === 'auto' ? { sampledAt: atTime } : sampleAt !== null ? { sampledAt: sampleAt } : {}) } } : {}),
     } };
     setResult({ theta: used.angle, R: used.radius, h, untouched: !view.current.adjusted, environment });
@@ -258,6 +258,7 @@ export function Hill() {
             {!manualValid && <div className="muted" style={{ fontSize: 12 }}>Use 0 ≤ k ≤ 0.85 and a positive uncertainty, with k + uncertainty below 0.95.</div>}
           </>}
           <details className="measurement-help"><summary>Conditions and methods</summary>
+            <p>Optional Sharp Eye recognition gives 15 base points once for a deliberately aimed horizon investigation: compare damp/drier sightings at the same station, height and aiming setup, or complete the horizon and paired noon-shadow methods. Raw angles must be recorded; assistance may be labelled. Keeping or rejecting a reading, saving a field note and finding a particular discrepancy do not earn extra credit.</p>
             <p>Recheck after a damp spell passes. Bracing reduces hand sway; a higher station gives a larger dip and reduces relative aiming error. Neither removes persistent refraction. Time and air continue to pass while you wait.</p>
             <p>If you have a justified refraction estimate, correct the apparent dip and carry its uncertainty. A local humidity sample is not a measurement of a persistent atmospheric layer. Compare with the noon-shadow method when that is available; use independently measured radii to investigate the refraction instead of guessing a correction.</p>
             <Formula>θ_true ≈ θ_apparent / √(1 − k)</Formula>

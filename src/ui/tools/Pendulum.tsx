@@ -194,13 +194,15 @@ export function Pendulum() {
     // Leave room for the HUD on top and the stopwatch below.
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const top = (hudHeight() + 14) * dpr;
-    const bottom = 140 * dpr;
-    const ppm = (h - top - bottom) / 3.3;
+    const landscape = window.matchMedia('(min-width: 700px) and (max-width: 860px) and (max-height: 500px)').matches;
+    const bottom = (landscape ? 190 : 140) * dpr;
+    // A transient resize or a short stacked stage must never invert the rig.
+    const ppm = Math.max(dpr, (h - top - bottom) / 3.3);
     return { px: w / 2, py: top, ppm };
   };
 
   return (
-    <div className="tool">
+    <div className="tool pendulum-tool">
       <div className="tool-stage">
         <CanvasView
           onPointerDown={(e) => {
@@ -331,7 +333,7 @@ export function Pendulum() {
               ctx.moveTo(px + s * pr, py + c * pr);
               ctx.lineTo(px + s * (pr + len * dpr), py + c * (pr + len * dpr));
               ctx.stroke();
-              if (a % 10 === 0) {
+              if (a % (ppm / dpr < 60 ? 30 : 10) === 0) {
                 ctx.fillStyle = 'rgba(255,255,255,0.5)';
                 ctx.font = `${10 * dpr}px Inter`;
                 ctx.textAlign = 'center';
@@ -404,7 +406,7 @@ export function Pendulum() {
           <b>Wind protection</b>
           <button className="btn small" aria-pressed={screen} disabled={running || !!ask} onClick={() => { const s = useGame.getState(); s.set({ instrumentSetup: { ...s.instrumentSetup, pendulumScreen: !screen } }); stopSwing(); }}>{screen ? 'Remove windscreen' : 'Fit windscreen'}</button>
           <div className="muted" style={{ fontSize: 12 }}>{screen ? 'The fitted screen shelters the bob from the modeled crosswind. Length, timing and release-angle errors still need care.' : 'A folding windscreen is in the instrument kit. Fit it before timing, or return in calmer conditions.'}</div>
-          <details className="measurement-help"><summary>Conditions and methods</summary><p>A steady wind tilts the swing and can bias gravity high. Compare sheltered and exposed timings at the same length, or return to camp and use the clock to wait for calmer conditions. Average independent timings for random scatter; shared ruler or counting errors need separate care.</p></details>
+          <details className="measurement-help"><summary>Conditions and methods</summary><p>A steady wind tilts the swing and can bias gravity high. Compare sheltered and exposed timings at the same length, or return to camp and use the clock to wait for calmer conditions. Average independent timings for random scatter; shared ruler or counting errors need separate care.</p><p>Optional Sharp Eye recognition uses separate manual releases: exposed versus your windscreen, at least five counted swings, small releases (1–10°, within 2° of each other), measured lengths within 1%, and similar stable recorded strong wind. It gives 15 base points once for this investigation. No expected numerical shift or discarded reading is required.</p></details>
         </div>
         <div className="panel panel-pad stack">
           <b>1 · Set the string length</b>

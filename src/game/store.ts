@@ -23,6 +23,7 @@ import { RULESET_VERSION } from './world';
 import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
+import { earnedSharpEyeAwards, type SharpEyeAwards, type SharpEyeCondition } from './sharpEye';
 import type { VerificationRecord } from './verification';
 import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
 import type { SkySighting } from './skyObservation';
@@ -150,6 +151,8 @@ export interface GameState {
   starObs: TimedValue[]; // star longitude against background stars (rad)
   skySightings: SkySighting[];
   pendulumMilestones: string[];
+  sharpEyeAwards?: SharpEyeAwards;
+  sharpEyeNotified?: SharpEyeCondition[];
   trackOn: boolean;
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
@@ -291,6 +294,8 @@ const initial = {
   starObs: [],
   skySightings: [] as SkySighting[],
   pendulumMilestones: [] as string[],
+  sharpEyeAwards: {} as SharpEyeAwards,
+  sharpEyeNotified: [] as SharpEyeCondition[],
   trackOn: false,
   track: [],
   moonTrackOn: false,
@@ -432,6 +437,22 @@ export const useGame = create<GameState>()(
     },
   ),
 );
+
+// Credits belong to the expedition, not to current include/exclude flags.
+// Reconcile on evidence/context changes, not every clock save.
+let reconcilingSharpEye = false;
+function reconcileSharpEye() {
+  const s = useGame.getState();
+  if (reconcilingSharpEye || s.phase !== 'play') return;
+  const awards = earnedSharpEyeAwards(s);
+  if (!awards) return;
+  reconcilingSharpEye = true;
+  try { useGame.setState({ sharpEyeAwards: awards }); } finally { reconcilingSharpEye = false; }
+}
+useGame.subscribe((s, before) => {
+  if (s.readings !== before.readings || s.shadows !== before.shadows || s.runId !== before.runId || s.phase !== before.phase || s.settings !== before.settings || s.schoolSession !== before.schoolSession || s.piloting !== before.piloting || s.tutorial.active !== before.tutorial.active) reconcileSharpEye();
+});
+reconcileSharpEye();
 
 /** Scatter estimate, conditional on independent repeat observations of a stable
  * quantity. Known revisions share a source; keep the latest kept version once.

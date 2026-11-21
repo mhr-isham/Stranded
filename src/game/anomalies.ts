@@ -62,7 +62,7 @@ export function humidityCalibration(s: S, t: number) {
   return { k: Math.max(0, wet + offset), sigmaK: .02 };
 }
 
-/** Readings that a real anomaly bent (for the debrief and the Sharp Eye bonus). */
+/** Post-run condition review only. Sharp Eye uses recorded investigations. */
 export function affectedReadings(s: S & Pick<GameState, 'readings'>): Reading[] {
   return s.readings.filter((r) => {
     const e = r.environment;
@@ -72,5 +72,4 @@ export function affectedReadings(s: S & Pick<GameState, 'readings'>): Reading[] 
   });
 }
 
-/** Sharp Eye: points for each affected reading the player left out. */
-export const sharpEyePoints = (s: S & Pick<GameState, 'readings'>) => 15 * affectedReadings(s).filter((r) => !r.kept).length;
+export { sharpEyePoints } from './sharpEye';

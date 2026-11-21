@@ -34,6 +34,8 @@ export interface AtlasCard {
   score: number;
   /** The journey is preserved, but excluded from scores and expert unlocks. */
   assisted?: boolean;
+  /** Missing on historical cards; their recorded grades are not rewritten. */
+  sharpEyePolicy?: 'investigation-v1';
   camp: GameState['camp'];
   predictions: { made: number; inside: number };
   rows: AtlasRow[];

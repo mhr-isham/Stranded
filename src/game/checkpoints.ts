@@ -1,6 +1,6 @@
 // Manual checkpoints and the automatic pre-launch save behind "rewind".
 // Saved separately from the main save so they survive autosaves. Per-run
-// counters (checkpointsUsed, rewindsUsed, debriefSeen) and progress that
+// counters and earned investigation credit, and progress that
 // belongs to the player rather than the run (codex, achievements, lessons) are
 // never rolled back.
 
@@ -24,7 +24,7 @@ interface Store {
   prelaunch: Snapshot | null;
 }
 
-const KEEP: (keyof GameState)[] = ['codex', 'achievements', 'atlas', 'logs', 'campaign', 'tutorial', 'training', 'schoolRewards', 'radiusFieldNote', 'radiusDiscoveries', 'checkpointsUsed', 'rewindsUsed', 'debriefSeen', 'runId', 'cadetHelp', 'piloting', 'pendulumMilestones'];
+const KEEP: (keyof GameState)[] = ['codex', 'achievements', 'atlas', 'logs', 'campaign', 'tutorial', 'training', 'schoolRewards', 'radiusFieldNote', 'radiusDiscoveries', 'checkpointsUsed', 'rewindsUsed', 'debriefSeen', 'runId', 'cadetHelp', 'piloting', 'pendulumMilestones', 'sharpEyeAwards', 'sharpEyeNotified'];
 
 function read(): Store {
   const runId = useGame.getState().runId;
@@ -69,7 +69,7 @@ function restore(snap: Snapshot) {
   clock.t = snap.t;
   clock.stopAt = Infinity;
   clock.paused = true;
-  useGame.setState({ ...snap.state, moonStudies: snap.state.moonStudies ?? [], parallaxPair: snap.state.parallaxPair ?? null, parallaxInvestigations: snap.state.parallaxInvestigations ?? [], hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
+  useGame.setState({ ...snap.state, sharpEyeAwards: current.sharpEyeAwards ?? {}, sharpEyeNotified: current.sharpEyeNotified ?? [], moonStudies: snap.state.moonStudies ?? [], parallaxPair: snap.state.parallaxPair ?? null, parallaxInvestigations: snap.state.parallaxInvestigations ?? [], hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
 }
 
 export const listSlots = () => read().slots;

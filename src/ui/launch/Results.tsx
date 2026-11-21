@@ -21,6 +21,8 @@ import { CHAPTERS, chapterOf, chapterUnlocked, countsForCampaign } from '../../g
 import { randomSeed } from '../../game/world';
 import { CHAPTER_CODEX } from '../../game/codex';
 import { ANOMALIES, affectedReadings, sharpEyePoints } from '../../game/anomalies';
+import { SHARP_EYE_POLICY } from '../../game/sharpEye';
+import { SharpEyeSummary } from '../common/SharpEye';
 import { CHALLENGES, challengeBonus } from '../../game/challenges';
 import { probeTruth } from '../../game/probeState';
 import { assistedFlight } from '../../game/piloting';
@@ -135,7 +137,7 @@ function Debrief() {
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
   const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
-  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - sharpEyePoints(s), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
+  const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - (scored ? sharpEyePoints(s) : 0), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
   const affected = affectedReadings(s);
 
@@ -189,6 +191,7 @@ function Debrief() {
         grade: assistedFlight(g) ? '—' : grade.letter,
         score: assistedFlight(g) ? 0 : grade.total,
         assisted: assistedFlight(g) || undefined,
+        sharpEyePolicy: SHARP_EYE_POLICY,
         camp: g.camp,
         predictions: { made: g.predictions.filter((p) => p.result).length, inside: g.predictions.filter((p) => p.result && p.result.z <= 1).length },
         rows: rows.filter((r) => r.e && r.sc).map((r) => ({ k: r.k, value: r.e!.value, sigma: r.e!.sigma, truth: truth[r.k], z: r.sc!.z })),
@@ -204,7 +207,7 @@ function Debrief() {
       .filter((r) => r.sc)
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
-    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
+    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} · Sharp Eye ${SHARP_EYE_POLICY} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
     // Say "copied" only if it was; otherwise offer the text to copy by hand.
     const fallback = () => window.prompt('Copy your result:', text);
     if (!navigator.clipboard) return void fallback();
@@ -326,20 +329,23 @@ function Debrief() {
           </div>
         )}
 
+        <SharpEyeSummary scored={scored} />
         {affected.length > 0 && ANOMALIES[s.settings.difficulty].announce !== 'corrected' && (
           <div className="panel panel-pad stack">
             <h2 style={{ fontSize: 18 }}>Anomalies in your data</h2>
             <div className="muted" style={{ fontSize: 13 }}>
               These readings were taken in exposed or uncorrected conditions. Compare the wind gauge, haze and your other observations. Shelter the rig, remeasure in better conditions, or use a justified correction with an uncertainty; excluding a reading is another option.
             </div>
+            <details className="measurement-help"><summary>Review {affected.length} recorded reading{affected.length === 1 ? '' : 's'}</summary>
             {affected.map((r) => (
               <div key={r.id} className="row between" style={{ fontSize: 13 }}>
                 <span>
                   {r.key === 'g' ? '🌬 Exposed pendulum in wind' : '🌫 Uncorrected horizon in damp air'} · day {fmt(r.at / DAY, 1)}
                 </span>
-                <span className={r.kept ? 'amber' : 'green'}>{r.kept ? 'kept' : scored ? 'left out · Sharp Eye +15' : 'left out'}</span>
+                <span className={r.kept ? 'muted' : 'faint'}>{r.kept ? 'kept' : 'left out'}</span>
               </div>
             ))}
+            </details>
             <div className="faint" style={{ fontSize: 12 }}>
               Wind pushes the bob sideways, so it swings faster and g reads high. Humid air bends light from the horizon, so the dip reads small and the
               radius large. Both are in the Codex.

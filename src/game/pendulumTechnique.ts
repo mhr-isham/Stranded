@@ -4,7 +4,7 @@ export interface PendulumTechnique {
   source: 'manual' | 'echo';
   releaseId: string;
   angle: number;
-  /** Turning points observed while the watch runs, used only for milestones. */
+  /** Turning points observed while the watch runs, supporting recorded technique. */
   turns: number;
 }
 export interface SwingMotion { sign: number; turns: number }

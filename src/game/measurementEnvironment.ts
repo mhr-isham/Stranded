@@ -7,7 +7,7 @@ export interface MeasurementEnvironment {
   rawValue: number;
   wind?: { speed: number; endSpeed?: number; protection: 'none' | 'windscreen' | 'echo'; changed?: boolean };
   horizon?: {
-    height: number; station: string; aim?: { braced: boolean; tripod: boolean; stepDeg: number; zoom: number }; rawAngle: number; usedAngle: number; damp: boolean; legacyCompensated?: boolean;
+    height: number; station: string; aim?: { braced: boolean; tripod: boolean; stepDeg: number; zoom: number; adjusted?: boolean }; rawAngle: number; usedAngle: number; damp: boolean; legacyCompensated?: boolean;
     correction?: { source: 'player' | 'echo-humidity'; k: number; sigmaK: number; sigmaValue: number; sampledAt?: number };
   };
   seeing?: { factor: number; frozen: boolean };

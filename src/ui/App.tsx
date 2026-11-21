@@ -7,6 +7,7 @@ import { makeRng } from '../engine/rng';
 import { disposeAudio, startAmbient } from '../game/audio';
 import { useGame } from '../game/store';
 import { ToastHost } from './common/widgets';
+import { SharpEyeFeedback } from './common/SharpEye';
 import { Game } from './Game';
 import { Intro } from './Intro';
 import { Prologue } from './Prologue';
@@ -87,6 +88,7 @@ export default function App() {
       {school && <FlightSchool recommendedChapter={school.chapter} onClose={() => useGame.setState({ schoolOpen: null })} />}
       {phase !== 'title' && phase !== 'prologue' && <StoryHost />}
       <ToastHost />
+      <SharpEyeFeedback />
       <SchoolRewardFeedback />
     </>
   );
