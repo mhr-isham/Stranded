@@ -13,6 +13,7 @@ import { isCadetExpedition, noteCadetWarning } from '../../game/cadetGuidance';
 import { CadetGoal } from '../CadetGoal';
 import { MeasurementNotes } from './MeasurementNotes';
 import { conditionUncertainty } from '../../game/measurementEnvironment';
+import { ObservationReceipt } from './MeasurementFeedback';
 
 /** Table of logged readings for one quantity, with keep/discard toggles. */
 export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: number) => string }) {
@@ -21,9 +22,8 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
   const toggle = useGame((s) => s.toggleReading);
   const remove = useGame((s) => s.removeReading);
   const info = QUANTITY_INFO[k];
-  if (!readings.length) return <div className="muted" style={{ fontSize: 13 }}>No readings yet.</div>;
   return (
-    <table className="log">
+    <><ObservationReceipt k={k} readings={readings} />{!readings.length ? <div className="muted" style={{ fontSize: 13 }}>No readings yet.</div> : <table className="log">
       <thead>
         <tr>
           <th>#</th>
@@ -50,7 +50,7 @@ export function ReadingsTable({ k, render }: { k: PrimaryKey; render?: (v: numbe
           <tr><td colSpan={4}><MeasurementNotes reading={r} /></td></tr>
         </Fragment>)}
       </tbody>
-    </table>
+    </table>}</>
   );
 }
 

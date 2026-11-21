@@ -3,15 +3,18 @@ import { ARCSEC, DAY } from '../../engine/constants';
 import { hasChallenge } from '../../game/challenges';
 import { ECHO } from '../../game/echo';
 import type { SineFit } from '../../game/fits';
-import { fmt } from '../../game/format';
+import { fmt, sig } from '../../game/format';
+import { useMode } from '../../game/modes';
 import { analyzeMoon, moonStudy } from '../../game/moonObservations';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { Chart } from '../common/Chart';
 import { Formula, SendToSheet } from '../common/sheetBits';
+import { EvidenceSignal, FitInspection, FitResiduals } from '../common/MeasurementFeedback';
 
 export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (points: { x: number; y: number }[], fit: SineFit | null) => ReactNode }) {
   const s = useGame();
+  const mode = useMode();
   const [band, setBand] = useState<[number, number] | null>(null);
   const [dates, setDates] = useState(['', '']);
   const [dateError, setDateError] = useState('');
@@ -49,7 +52,8 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
         { pts: a.points, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
         ...(a.fit ? [{ pts: curve(a.fit), color: '#6cc4ff', kind: 'line' as const }] : []),
         ...(showB && a.alternative ? [{ pts: curve(a.alternative), color: '#b59cff', kind: 'line' as const }] : []),
-      ]} xLabel="expedition day" yLabel="moon offset (″)" band={band} onBand={select} brushMode="band" yFmt={(y) => y.toFixed(0)} />}
+      ]} xLabel="elapsed days" yLabel="moon offset (″)" band={band} onBand={select} brushMode="band" yFmt={(y) => y.toFixed(0)} />}
+      {a.points.length > 1 && <div className="faint">Chart dates count elapsed days from expedition start (0).</div>}
       <form onSubmit={(e) => { e.preventDefault(); apply(); }} className="stack">
         <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <label>Start day <input aria-label="Moon start day" className="input" type="number" step="any" value={dates[0]} onChange={(e) => setDates([e.target.value, dates[1]])} style={{ width: 105, maxWidth: '100%' }} /></label>
@@ -63,7 +67,9 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
         {dateError && <div role="alert" className="amber">{dateError}</div>}
       </form>
       <div aria-live="polite" aria-label="Moon fit status" style={{ fontSize: 13 }}>
-        <b>{a.used.length} of {a.points.length} sightings selected</b>{a.used.length > 0 && <> · {fmt(a.span, 2)} days</>}. {a.status}
+        <EvidenceSignal label="Moon investigation signal" title={manual ? 'Your chart, your orbit' : chosen ? a.alternative ? 'Two possible rhythms' : 'An orbit to test' : a.used.length ? 'Moon sightings recorded' : 'Catch the moon’s rhythm'}>
+          <b>{a.used.length} of {a.points.length} sightings selected</b>{a.used.length > 0 && <> · {fmt(a.span, 2)} days</>}. {a.status}
+        </EvidenceSignal>
       </div>
       {band && a.used.length > 1 && <details><summary>Enlarge the selected interval</summary>
         <p className="muted">A closer view of the selected sightings. The complete log remains visible above.</p>
@@ -71,13 +77,14 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
           { pts: a.used, color: '#d9d2c3', kind: 'dots' },
           ...(a.fit ? [{ pts: curve(a.fit), color: '#6cc4ff', kind: 'line' as const }] : []),
           ...(showB && a.alternative ? [{ pts: curve(a.alternative), color: '#b59cff', kind: 'line' as const }] : []),
-        ]} xLabel="selected expedition days" yLabel="moon offset (″)" yFmt={(y) => y.toFixed(0)} />
+        ]} xLabel="selected elapsed days" yLabel="moon offset (″)" yFmt={(y) => y.toFixed(0)} />
       </details>}
       {chosen && <>
         <dl className="kv" aria-label="Selected moon fit">
-          <dt>Candidate period Pₘ{pickB && a.alternative ? ' (B)' : ' (A)'}</dt><dd>{fmt(chosen.period, 3)} days</dd>
-          <dt>Angular half-swing θₘ</dt><dd>{fmt(chosen.amplitude, 2)}″ at day {fmt(a.mid, 2)}</dd>
+          <dt>Candidate period Pₘ{pickB && a.alternative ? ' (B)' : ' (A)'}</dt><dd>{fmt(chosen.period, 3)}{mode.sanity ? ` ± ${sig(chosen.sigmaPeriod, 2)}` : ''} days</dd>
+          <dt>Angular half-swing θₘ</dt><dd>{fmt(chosen.amplitude, 2)}{mode.sanity ? ` ± ${sig(chosen.sigmaAmplitude, 2)}` : ''}″ at day {fmt(a.mid, 2)}</dd>
         </dl>
+        {mode.sanity && <div className="faint">± fit estimates include heuristic model allowances; they are not calibrated confidence limits.</div>}
         <details><summary>Use this fit</summary><div className="stack" style={{ paddingTop: 8 }}>
           <p>Enter your uncertainty for each value. Match the planet’s distance to the angular swing’s date.</p>
           <b>Angular half-swing θₘ</b><SendToSheet k="thetaM" tut="moon-theta-send" value={chosen.amplitude * ARCSEC} at={a.mid * DAY} spread={chosen.sigmaAmplitude * ARCSEC} spreadLabel="Estimated fit error with heuristic model allowances (not calibrated confidence)" />
@@ -98,6 +105,10 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
         <MoonForecast first={a.fit!} second={a.alternative} end={a.to} />
         <p>Try another interval or collect observations at different spacings. Predictions beyond this interval are uncertain because distance and viewing direction may keep changing.</p>
       </>}
+      {chosen && !manual && <FitInspection summary="Inspect selected moon fit residuals">
+        <div className="faint">Candidate {pickB && a.alternative ? 'B' : 'A'} · period {fmt(chosen.period, 3)} days. Selecting another candidate or interval updates these residuals.</div>
+        <FitResiduals points={a.used} model={chosen.model} unit="″" label="Selected moon residuals" />
+      </FitInspection>}
       <Formula>aₘ = d · tan θₘ, M₂ = 4π² aₘ³ / (G Pₘ²)</Formula>
     </div></details>
     {inSchool && <details aria-label="Flight School moon investigation"><summary>Optional Flight School: compare observations</summary><div className="stack" style={{ paddingTop: 8 }}>

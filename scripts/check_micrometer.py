@@ -78,12 +78,16 @@ with sync_playwright() as p:
         page.get_by_role('button',name='Log diameter',exact=True).click()
         assert page.evaluate('__game.getState().readings.length')==1
         first=page.evaluate('__game.getState().readings[0]')
+        receipt=page.locator('.observation-receipt')
+        expect(receipt).to_contain_text('Observation saved')
         assert first['at']==at and first['micrometer']['revisions']==0
         page.get_by_role('button',name='Wire B',exact=True).click()
         page.get_by_role('button',name='Move selected wire right',exact=True).click()
         page.get_by_role('button',name='Log diameter',exact=True).click()
         assert page.evaluate('__game.getState().readings.length')==1
         assert page.evaluate('__game.getState().readings[0].micrometer.revisions')==1
+        expect(receipt).to_contain_text('Observation revised')
+        expect(receipt).to_contain_text('1 in log')
         before=(value(page,'A'),value(page,'B'))
         page.get_by_role('button',name='Magnify micrometer image',exact=True).click()
         page.get_by_role('button',name='Widen micrometer image',exact=True).click();page.wait_for_timeout(150)

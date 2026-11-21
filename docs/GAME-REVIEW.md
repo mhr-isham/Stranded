@@ -157,9 +157,13 @@ Evidence: [measurement equations](../src/engine/measure.ts), [solve chain](../sr
 
 ### SCI-24 — What should make measurement engaging
 
-The reward should happen at the instrument: a stable sightline, a fit separating two possible periods, a comparison finally agreeing. Keep uncertainty visible but avoid a dashboard of unexplained sigmas. A beginner needs “another night would help this slope”; an expert needs residuals, units, selection boundaries and provenance. Both should use the same data.
+**Agreed and implemented — 21 November 2026:** clear, satisfying instrument feedback with optional analysis depth. The user emphasized a gamified experience that remains understandable and manageable.
 
-Do not turn every fit into compulsory hand algebra. Data selection, model choice and checking assumptions are scientific skills. Expert “fit by hand” is a valid optional constraint, but normal automatic arithmetic is not inherently cheating.
+Native saved readings now receive a compact instrument receipt with their value, units, observing date, selection state and log count. A short highlight and accessible acknowledgment distinguish saving from revising one exposure; opening old logs, changing inclusion, checkpoint restoration and reload do not replay the recording moment. Keep the existing instrument sounds, bracing, seeing, manual controls, technique milestones and optional cross-method discoveries. Recognition means “recorded,” not “correct,” and adds no new score or resource economy.
+
+Year and moon analysis use clear evidence signals: first drift estimate, a line to test, a candidate orbit or two possible rhythms. Keep uncertainty visible where the mode permits its existing error guides, explaining scatter-only year ranges and heuristic moon-fit allowances. Detailed rate statistics and signed residual plots are requested disclosures, with selected dates, numerical working and units. Candidate/interval changes use the same selected observations, without truth grading or a promise that more data always improve a fit. Plot dates explicitly count elapsed days from expedition start.
+
+Normal automatic arithmetic remains legitimate. Data selection, model choice and checking assumptions are the player's scientific decisions; manual fitting stays an optional expert challenge. Hide automatic lines, values and residuals in that challenge. Preserve Legend's restrictions on automatic uncertainty guidance, and add no compulsory teaching, new hint bypass, collection quota, popup or worksheet change. See [measurement feedback QA](../reports/measurement-feedback-qa.md).
 
 ## 4. Predictions, planning and time
 

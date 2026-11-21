@@ -9,6 +9,7 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
+import { acknowledgeObservation } from '../../game/measurementFeedback';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { hhmm, localSolarHours } from '../../game/time';
 import { drawScope, scopeProjector } from '../../render/telescope';
@@ -292,7 +293,10 @@ export function Rover() {
                     parallax: { captureId: cap.id, baseline: cap.baseline, projectedBaseline: cap.projectedBaseline, shift: measured.shift, markA: { ...marks.A }, markB: { ...marks.B } },
                     environment: { instrument: 'telescope' as const, at: cap.at, rawValue: measured.distance, seeing: { factor: cap.seeing, frozen: true } } };
                   const prior = s.readings.find((r) => r.parallax?.captureId === cap.id);
-                  if (prior) s.set({ readings: s.readings.map((r) => r.id === prior.id ? { ...r, ...reading, kept: true } : r) });
+                  if (prior) {
+                    s.set({ readings: s.readings.map((r) => r.id === prior.id ? { ...r, ...reading, kept: true } : r) });
+                    acknowledgeObservation(s.readings, useGame.getState().readings, s.runId);
+                  }
                   else s.addReading(reading);
                   sfx('good');
                   toast('Pair measurement saved; re-marking updates this same reading.');

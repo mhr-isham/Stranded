@@ -5,6 +5,7 @@ import { fmt, sig } from '../../game/format';
 import { Chart, type Series } from '../common/Chart';
 import { SendToSheet } from '../common/sheetBits';
 import { useMode } from '../../game/modes';
+import { EvidenceSignal, FitInspection, FitResiduals } from '../common/MeasurementFeedback';
 
 export function YearPlot({ analysis: a, manual = false, teaching = false, band, onBand, label = 'Your recorded positions and year fit' }: { analysis: YearAnalysis; manual?: boolean; teaching?: boolean; band?: [number, number] | null; onBand?: (band: [number, number] | null) => void; label?: string }) {
   const { points, used, fit } = a;
@@ -19,8 +20,8 @@ export function YearPlot({ analysis: a, manual = false, teaching = false, band, 
       return { x, y: yearLineAt(fit, x) + sign * yearLineError(fit, x, used.length)! };
     }), color: '#a3afc4', kind: 'line' });
   }
-  return <><Chart series={series} xLabel="expedition day" yLabel="chart position (°)" band={band} onBand={onBand} brushMode="band" ariaLabel={label} />
-    <div className="faint">Dots: your recorded positions.{fit && !manual ? ` Blue line: fitted drift.${showError ? ' Grey edges, when visible: uncertainty in the fitted line.' : ''}` : ''}</div>
+  return <><Chart series={series} xLabel="elapsed days" yLabel="chart position (°)" band={band} onBand={onBand} brushMode="band" ariaLabel={label} />
+    <div className="faint">Dates count from expedition start (0). Dots: your recorded positions.{fit && !manual ? ` Blue line: fitted drift.${showError ? ' Grey edges, when visible: uncertainty in the fitted line.' : ''}` : ''}</div>
     {fit && !manual && showError && <details className="measurement-help"><summary>What do the grey edges mean?</summary><p>They show one standard error of the fitted mean, estimated from the scatter around the line. This assumes independent readings with similar random error. Shared offsets and model mismatch are not included; the band is not an interval for a future individual observation.</p></details>}
   </>;
 }
@@ -28,13 +29,19 @@ export function YearPlot({ analysis: a, manual = false, teaching = false, band, 
 export function YearFitDetails({ analysis: a, manual = false, teaching = false, send = false, children }: { analysis: YearAnalysis; manual?: boolean; teaching?: boolean; send?: boolean; children?: ReactNode }) {
   const mode = useMode(), f = a.fit;
   return <div className="stack year-fit-details" aria-label="Year fit assessment">
-    <div className="callout tip" role="status">{manual ? 'Manual-fit challenge: use the recorded positions and dates. Automatic fit lines, rates and year values are hidden.' : yearFitMessage(a)}</div>
+    <EvidenceSignal label="Year investigation signal" title={manual ? 'Your chart, your fit' : f ? a.used.length > 2 ? 'A line you can test' : 'Your first drift estimate' : a.used.length ? 'Positions recorded' : 'A year in the making'}>
+      <span role="status">{manual ? 'Manual-fit challenge: use the recorded positions and dates. Automatic fit lines, rates and year values are hidden.' : yearFitMessage(a)}</span>
+    </EvidenceSignal>
     <div className="muted">{a.used.length} distinct selected dates · baseline {fmt(a.baseline, 3)} days{a.duplicate ? ` · ${a.duplicate} same-time repeat(s) excluded from the fit` : ''}{a.invalid ? ` · ${a.invalid} invalid record(s) not plotted` : ''}</div>
     {f && !manual && <>
-      <dl className="kv"><dt>Measured drift rate</dt><dd>{sig(f.slope, 5)} °/day</dd><dt>Inferred year</dt><dd className="blue">{sig(f.yearDays, 5)} days</dd>
-        {(teaching || mode.sanity) && f.slopeSigma !== undefined && <><dt>Rate standard error from scatter</dt><dd>±{sig(f.slopeSigma, 3)} °/day</dd></>}
+      <dl className="kv"><dt>Measured drift rate</dt><dd>{sig(f.slope, 5)} °/day</dd><dt>Inferred year</dt><dd className="blue">{sig(f.yearDays, 5)}{(teaching || mode.sanity) && f.yearSigma !== undefined ? ` ± ${sig(f.yearSigma, 2)}` : ''} days</dd>
       </dl>
-      {(teaching || mode.sanity) && f.slopeSigma !== undefined && <div className="faint">{(f.residualSigma ?? 0) <= 1e-10 ? 'No measurable scatter in these selected points does not establish zero uncertainty.' : f.yearSigma === undefined ? 'The rate uncertainty is large relative to the rate: a small symmetric year error would be misleading.' : `First-order year standard error from scatter: ±${sig(f.yearSigma, 3)} days. Shared centring errors, angle-wrap ambiguity and model mismatch are additional.`}</div>}
+      {(teaching || mode.sanity) && <div className="faint">{f.yearSigma !== undefined ? '± from the selected points’ scatter only; shared errors are additional.' : 'These dates do not establish a usable year error range.'}</div>}
+      <FitInspection summary="Inspect year fit and residuals"><div className="stack">
+        {(teaching || mode.sanity) && f.slopeSigma !== undefined && <><dl className="kv"><dt>Rate standard error from scatter</dt><dd>±{sig(f.slopeSigma, 3)} °/day</dd></dl>
+          <div className="faint">{(f.residualSigma ?? 0) <= 1e-10 ? 'No measurable scatter in these selected points does not establish zero uncertainty.' : f.yearSigma === undefined ? 'The rate uncertainty is large relative to the rate: a small symmetric year error would be misleading.' : `First-order year standard error from scatter: ±${sig(f.yearSigma, 3)} days. Shared centring errors, angle-wrap ambiguity and model mismatch are additional.`}</div></>}
+        <FitResiduals points={a.used} model={(day) => yearLineAt(f, day)} unit="°" label="Selected year residuals" />
+      </div></FitInspection>
       {send && <SendToSheet k="P1" value={f.yearDays * DAY} spread={f.yearSigma !== undefined ? f.yearSigma * DAY : undefined} />}
     </>}
     {children}

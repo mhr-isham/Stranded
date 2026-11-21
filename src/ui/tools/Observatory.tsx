@@ -1,4 +1,5 @@
 import { nudgeWire, pickWire, wireDiameter, type WireChoice } from '../../game/micrometer';
+import { acknowledgeObservation } from '../../game/measurementFeedback';
 import { AngularSizeInvestigation } from '../tutorial/AngularSizeInvestigation';
 import { observedMotion, savedSkyDirection } from '../../game/observedMotion';
 import { ObservationReplay } from './ObservationReplay';
@@ -702,7 +703,10 @@ export function Observatory() {
                 const reading = { key: 'alpha2' as const, value: a, at: sample.at, note: `day ${fmt(sample.at / DAY, 4)} · manual micrometer`,
                   micrometer: { sightingId, wireA: calip.current.x1, wireB: calip.current.x2, field: sample.field, stepArcsec: wireStep, realSampleMs: sample.realTime, revisions: prior ? prior.micrometer!.revisions + 1 : 0 },
                   environment: { instrument: 'telescope' as const, at: sample.at, rawValue: a, seeing: { factor: sample.seeing, frozen: false } } };
-                if (prior) s.set({ readings: s.readings.map((r) => r.id === prior.id ? { ...r, ...reading, kept: true } : r) });
+                if (prior) {
+                  s.set({ readings: s.readings.map((r) => r.id === prior.id ? { ...r, ...reading, kept: true } : r) });
+                  acknowledgeObservation(s.readings, useGame.getState().readings, s.runId);
+                }
                 else s.addReading(reading);
                 const warn = outlierNote(a, s.readings.filter((r) => r.key === 'alpha2' && r.kept && r.id !== prior?.id).map((r) => r.value), 0.15);
                 toast(warn ? `${prior ? 'Revised' : 'Logged'} ${fmt(a / ARCSEC, 2)}″ — far from your other sightings. Check the wires.` : `${prior ? 'Sighting revised' : 'Diameter logged'}: ${fmt(a / ARCSEC, 2)}″`);

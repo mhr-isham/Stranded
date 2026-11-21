@@ -24,6 +24,7 @@ import type { ExerciseId, TrainingHistory } from './training';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
 import { earnedSharpEyeAwards, type SharpEyeAwards, type SharpEyeCondition } from './sharpEye';
+import { acknowledgeObservation } from './measurementFeedback';
 import type { VerificationRecord } from './verification';
 import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
 import type { SkySighting } from './skyObservation';
@@ -400,12 +401,16 @@ export const useGame = create<GameState>()(
           radiusDiscoveries: get().radiusDiscoveries ?? null,
         });
       },
-      addReading: (r) =>
+      addReading: (r) => {
+        const before = get().readings;
         set((s) => {
           const reading: Reading = { ...r, id: String(nextId++), kept: true, note: r.note ?? '' };
           const milestones = s.pendulumMilestones ?? [];
           return { readings: [...s.readings, reading], pendulumMilestones: earnsTwentySwings(reading) && !milestones.includes('twentySwings') ? [...milestones, 'twentySwings'] : milestones };
-        }),
+        });
+        const current = get();
+        acknowledgeObservation(before, current.readings, current.runId);
+      },
       toggleReading: (id) => set((s) => ({ readings: s.readings.map((r) => (r.id === id ? { ...r, kept: !r.kept } : r)) })),
       removeReading: (id) => set((s) => ({ readings: s.readings.filter((r) => r.id !== id) })),
       setSheet: (k, e) =>

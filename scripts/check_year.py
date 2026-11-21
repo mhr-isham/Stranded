@@ -60,6 +60,8 @@ with sync_playwright() as p:
         expect(fit).to_contain_text('360.00 days')
         assert 'Rate standard error from scatter' not in fit.inner_text()
         records(page,[[0,20],[1,21.02],[26,46]])
+        assert fit.get_by_role('img',name='Selected year residuals plot',exact=True).count()==0
+        fit.get_by_text('Inspect year fit and residuals',exact=True).click()
         expect(fit).to_contain_text('Rate standard error from scatter')
         expect(page.get_by_role('img',name='Your recorded positions and year fit')).to_be_visible()
         page.get_by_role('spinbutton',name='To day',exact=True).fill('1')
@@ -99,6 +101,7 @@ with sync_playwright() as p:
         lab.get_by_role('button',name='Observe 1 day later',exact=True).click()
         expect(lab).to_contain_text('Early estimate')
         lab.get_by_role('button',name='Observe 25 days later',exact=True).click()
+        lab.get_by_text('Inspect year fit and residuals',exact=True).click()
         expect(lab).to_contain_text('Rate standard error from scatter')
         lab.get_by_role('checkbox',name='Make the next teaching sighting rough (+3° offset)',exact=True).check()
         lab.get_by_role('button',name='Observe 10 days later',exact=True).click()
@@ -114,6 +117,7 @@ with sync_playwright() as p:
         expect(locked_lab).to_contain_text('one rotation per 60-day orbit')
         locked_lab.get_by_role('button',name='Observe 1 day later',exact=True).click()
         locked_lab.get_by_role('button',name='Observe 10 days later',exact=True).click()
+        locked_lab.get_by_text('Inspect year fit and residuals',exact=True).click()
         expect(locked_lab).to_contain_text('Rate standard error from scatter')
         assert page.evaluate('__game.getState().starObs.length')==0
         page.locator('.lesson-modal').get_by_role('button',name='Got it',exact=True).click()
