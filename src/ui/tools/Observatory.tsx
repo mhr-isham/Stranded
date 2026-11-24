@@ -1,4 +1,5 @@
 import { nudgeWire, pickWire, wireDiameter, type WireChoice } from '../../game/micrometer';
+import { OutingPlanner } from './RoverOuting';
 import { acknowledgeObservation } from '../../game/measurementFeedback';
 import { AngularSizeInvestigation } from '../tutorial/AngularSizeInvestigation';
 import { observedMotion, savedSkyDirection } from '../../game/observedMotion';
@@ -931,6 +932,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
           )}
         </div>
       )}
+      <OutingPlanner />
       {!inner && <><RetroInvestigation /><RetroPrediction pts={pts} /></>}
     </div>
   );

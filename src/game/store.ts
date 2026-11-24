@@ -28,6 +28,7 @@ import { acknowledgeObservation } from './measurementFeedback';
 import type { VerificationRecord } from './verification';
 import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
 import type { SkySighting } from './skyObservation';
+import type { RoverOuting } from './roverOuting';
 
 export type Screen =
   | 'map'
@@ -194,6 +195,7 @@ export interface GameState {
   moonStudies: MoonStudy[];
   retroStudy: RetroStudy | null;
   parallaxPair: ParallaxPair | null;
+  roverOuting: RoverOuting | null;
   parallaxInvestigations: ParallaxInvestigationRecord[];
   readingPredictions: ReadingPredictions;
   instrumentSetup: { pendulumScreen: boolean };
@@ -333,6 +335,7 @@ const initial = {
   moonStudies: [] as MoonStudy[],
   retroStudy: null as RetroStudy | null,
   parallaxPair: null as ParallaxPair | null,
+  roverOuting: null as RoverOuting | null,
   parallaxInvestigations: [] as ParallaxInvestigationRecord[],
   readingPredictions: {} as ReadingPredictions,
   instrumentSetup: { pendulumScreen: false },

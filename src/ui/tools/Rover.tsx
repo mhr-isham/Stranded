@@ -10,7 +10,9 @@ import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { acknowledgeObservation } from '../../game/measurementFeedback';
-import { hasChallenge, seeingFactor } from '../../game/challenges';
+import { seeingFactor } from '../../game/challenges';
+import { completeOuting, roverSpeed } from '../../game/roverOuting';
+import { SavedOuting } from './RoverOuting';
 import { hhmm, localSolarHours } from '../../game/time';
 import { drawScope, scopeProjector } from '../../render/telescope';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
@@ -26,7 +28,7 @@ export function Rover() {
   const { system: sys } = currentWorld();
   const s = useGame();
   const t = useGameTime(5);
-  const speed = (s.settings.survival && s.survival.upgrades.includes('rover') ? 700 : 400) * 1000 * (hasChallenge(s, 'rover') ? 0.5 : 1); // m per day
+  const speed = roverSpeed(s);
   const [target, setTarget] = useState(Math.max(1000, Math.round(s.rover.target / 1e5) * 100 || 3000));
   const cap = s.parallaxPair ?? null;
   const [frame, setFrame] = useState<'A' | 'B'>('A');
@@ -100,7 +102,8 @@ export function Rover() {
     const vA = topocentric(system, liveBody, tt, system.site), vB = topocentric(system, liveBody, tt, liveSite);
     const id = `${current.runId}:${tt}:${current.rover.dist}`;
     const same = current.parallaxPair?.id === id ? current.parallaxPair : null;
-    current.set({ parallaxPair: {
+    const outing = completeOuting(current.roverOuting, tt, current.rover.dist);
+    current.set({ roverOuting: outing ?? null, parallaxPair: {
       id, at: tt,
       dirA: unit(vA),
       dirB: unit(vB),
@@ -112,6 +115,7 @@ export function Rover() {
     setFrame('A'); setBlink(false);
     flag('rover-captured');
     sfx('shutter');
+    if (outing && outing !== current.roverOuting) toast('Outing captured · two views in the log');
   };
 
   const measured = cap ? measuredParallax(cap) : null;
@@ -214,13 +218,14 @@ export function Rover() {
 
       <div className="tool-side">
         <ToolHeader title="Rover & parallax" sub={`Two sites, one instant: the ${what} shifts against the distant stars. The shift gives the distance.`} />
+        <SavedOuting useSite={setTarget} target={target} driving={driving} />
         <div className="panel panel-pad stack" data-tut="rover-drive">
           <b>1 · Position the rover</b>
           <div className="row between">
             <span className="muted">Rover is</span>
             <span className="mono">{driving ? `driving… ${fmt((s.rover.arriveAt - t) / DAY, 1)} d left` : `${fmt(s.rover.dist / 1000, 0)} km ${heading}`}</span>
           </div>
-          <input type="range" min={500} max={6000} step={100} value={target} onChange={(e) => setTarget(Number(e.target.value))} disabled={driving} />
+          <input aria-label="Rover route distance in kilometres" type="range" min={500} max={6000} step={100} value={target} onChange={(e) => setTarget(Number(e.target.value))} disabled={driving} />
           <div className="row between">
             <span className="muted" style={{ fontSize: 13 }}>Send to {target} km {heading} · {fmt(Math.abs(target * 1000 - s.rover.dist) / speed, 1)} days</span>
             <button className="btn primary small" disabled={driving || target * 1000 === s.rover.dist} onClick={drive}>
