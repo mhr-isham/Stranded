@@ -61,7 +61,7 @@ export function closestApproach(sys: StarSystem, r0: Vec3, v0: Vec3, t0: number,
   return Math.min(best, dist(0.5 * (a + b)));
 }
 
-export function simulateLaunch(sys: StarSystem, plan: LaunchPlan): LaunchResult {
+export function simulateLaunch(sys: StarSystem, plan: LaunchPlan, coastLimit = Infinity): LaunchResult {
   const mu = G * sys.star.mass;
   const budget = sys.fuelDv;
   const t0 = plan.departTime;
@@ -82,9 +82,10 @@ export function simulateLaunch(sys: StarSystem, plan: LaunchPlan): LaunchResult 
     return { ...base, outcome: 'no-escape', totalCost: dep, fuelLeft: budget - dep, missUncorrected, path: [] };
   }
 
-  if (plan.flyby && sys.giant) return simulateSlingshot(sys, plan, { r1, v0, dep, missUncorrected, coast });
+  if (plan.flyby && sys.giant) return simulateSlingshot(sys, plan, { r1, v0, dep, missUncorrected, coast }, coastLimit);
 
   const half = plan.tof / 2;
+  if (coastLimit <= half) return exhausted(dep, budget, missUncorrected, sampleCoast(r1, v0, coastLimit, mu));
   const [rm, vm] = propagate(r1, v0, half, mu);
   const tArr = t0 + plan.tof;
   const r2 = planetPos(sys.target, tArr);
@@ -94,6 +95,10 @@ export function simulateLaunch(sys: StarSystem, plan: LaunchPlan): LaunchResult 
   }
   const correction = norm(sub(sol[0], vm));
   const arrivalVInf = norm(sub(sol[1], planetVel(sys.target, tArr)));
+  if (coastLimit <= plan.tof && dep + correction <= budget) {
+    const path = [...sampleCoast(r1, v0, half, mu), ...sampleCoast(rm, sol[0], coastLimit - half, mu)];
+    return exhausted(dep + correction, budget, missUncorrected, path, correction);
+  }
   const cap = captureCost(arrivalVInf, G * sys.target.mass, sys.parkingRadius);
   const total = dep + correction + cap;
   const path = [...sampleCoast(r1, v0, half, mu), ...sampleCoast(rm, sol[0], half, mu)];
@@ -111,6 +116,13 @@ export function simulateLaunch(sys: StarSystem, plan: LaunchPlan): LaunchResult 
   return { ...result, outcome: 'success', path };
 }
 
+function exhausted(burned: number, budget: number, missUncorrected: number, path: Vec3[], correctionCost = 0): LaunchResult {
+  return {
+    outcome: 'expired', departCost: burned - correctionCost, correctionCost, captureCost: 0, totalCost: burned,
+    fuelLeft: budget - burned, missUncorrected, arrivalVInf: 0, path,
+  };
+}
+
 /**
  * Chapter 7: depart, correct course at mid-leg to meet the REAL giant, fly past
  * it with its REAL mass (a wrong mass bends the path the wrong amount), correct
@@ -120,6 +132,7 @@ function simulateSlingshot(
   sys: StarSystem,
   plan: LaunchPlan,
   d: { r1: Vec3; v0: Vec3; dep: number; missUncorrected: number; coast: Vec3[] },
+  coastLimit: number,
 ): LaunchResult {
   const mu = G * sys.star.mass;
   const budget = sys.fuelDv;
@@ -140,6 +153,7 @@ function simulateSlingshot(
     arrivalVInf: 0,
     path,
   });
+  if (coastLimit <= fb.tof1 / 2) return exhausted(d.dep, budget, d.missUncorrected, sampleCoast(d.r1, d.v0, coastLimit, mu, 30));
   // Leg 1, with a mid-course correction aimed at the real giant.
   const [rm1, vm1] = propagate(d.r1, d.v0, fb.tof1 / 2, mu);
   const rG = planetPos(giant, t1);
@@ -147,6 +161,10 @@ function simulateSlingshot(
   const sol1 = lambert(rm1, rG, fb.tof1 / 2, mu);
   if (!sol1) return lost(0, d.coast);
   const corr1 = norm(sub(sol1[0], vm1));
+  if (coastLimit <= fb.tof1 && d.dep + corr1 <= budget) {
+    const path = [...sampleCoast(d.r1, d.v0, fb.tof1 / 2, mu, 30), ...sampleCoast(rm1, sol1[0], coastLimit - fb.tof1 / 2, mu, 30)];
+    return exhausted(d.dep + corr1, budget, d.missUncorrected, path, corr1);
+  }
   // On approach ECHO sights the real target and re-aims the flyby for it — but it can
   // only use the giant's mass from YOUR measurements. The real mass decides the bend.
   const vInfIn = sub(sol1[1], vG);
@@ -160,11 +178,19 @@ function simulateSlingshot(
   const r2 = planetPos(sys.target, t2);
   const sol2 = lambert(rm2, r2, tof2 / 2, mu);
   const path1 = [...sampleCoast(d.r1, d.v0, fb.tof1 / 2, mu, 30), ...sampleCoast(rm1, sol1[0], fb.tof1 / 2, mu, 30)];
+  const spentAtFlyby = d.dep + corr1 + fbCost;
+  if (coastLimit <= fb.tof1 + tof2 / 2 && spentAtFlyby <= budget) {
+    return exhausted(spentAtFlyby, budget, d.missUncorrected, [...path1, ...sampleCoast(rG, vOut, coastLimit - fb.tof1, mu, 30)], corr1);
+  }
   if (!sol2) return lost(corr1, path1);
   const corr2 = norm(sub(sol2[0], vm2));
   const arrivalVInf = norm(sub(sol2[1], planetVel(sys.target, t2)));
   const cap = captureCost(arrivalVInf, G * sys.target.mass, sys.parkingRadius);
   const correction = corr1 + corr2;
+  if (coastLimit <= plan.tof && spentAtFlyby + corr2 <= budget) {
+    const path = [...path1, ...sampleCoast(rG, vOut, tof2 / 2, mu, 30), ...sampleCoast(rm2, sol2[0], coastLimit - fb.tof1 - tof2 / 2, mu, 30)];
+    return exhausted(spentAtFlyby + corr2, budget, d.missUncorrected, path, correction);
+  }
   const total = d.dep + fbCost + correction + cap;
   const path = [...path1, ...sampleCoast(rG, vOut, tof2 / 2, mu, 30), ...sampleCoast(rm2, sol2[0], tof2 / 2, mu, 30)];
   const result = {

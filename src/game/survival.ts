@@ -46,15 +46,15 @@ export function isCloudy(seed: number, t: number) {
 export const o2Rate = (sv: SurvivalState) => (sv.upgrades.includes('recycler') ? 0.8 : 1) * (sv.power <= 0 ? 1.5 : 1) + (sv.leak ? 0.5 : 0);
 export const foodRate = () => 1;
 
-export function lifeSupportEnd(s: GameState, sys: StarSystem) {
+export function lifeSupportEnd(s: GameState, sys: StarSystem, now = clock.t) {
   // Free Roam: the air never runs out; a horizon that moves with time keeps planning finite.
-  if (s.settings.freeRoam) return clock.t + 3 * sys.synodic;
+  if (s.settings.freeRoam) return now + 3 * sys.synodic;
   // Short supplies challenge: a quarter less of the slack after the second opposition.
   const short = s.settings.challenges?.includes('shortAir') ? 0.25 * Math.max(0, sys.lifeSupport - (sys.firstOpposition + sys.synodic)) : 0;
   if (!s.settings.survival) return sys.lifeSupport - short + (s.lifeExtra ?? 0);
   const sv = s.survival;
   const days = Math.min(sv.o2 / o2Rate(sv), sv.food / foodRate());
-  return clock.t + Math.max(0, days) * DAY;
+  return now + Math.max(0, days) * DAY;
 }
 
 /** Apply daily upkeep for every day boundary crossed. */
@@ -67,8 +67,9 @@ export function survivalDay(s: GameState, _sys: StarSystem, d0: number, d1: numb
     const draw = 26 + (s.trackOn ? 5 : 0) + (s.moonTrackOn ? 4 : 0) + (roverBusy ? 10 : 0) + (sv.upgrades.includes('greenhouse') ? 5 : 0);
     const wasFlat = sv.power <= 0;
     sv.power = Math.max(0, Math.min(100, sv.power + solar - draw));
-    sv.o2 -= o2Rate(sv);
-    sv.food -= foodRate();
+    sv.o2 -= Math.max(0, o2Rate(sv) - (sv.hopUpkeep?.air ?? 0));
+    sv.food -= Math.max(0, foodRate() - (sv.hopUpkeep?.food ?? 0));
+    sv.hopUpkeep = undefined;
     if (sv.greenhouseSince !== null && day * DAY - sv.greenhouseSince > 30 * DAY && sv.power > 0) sv.food += 0.35;
     if (storm && !inStorm(s.seed, day - 1)) sv.log.unshift(`Day ${day}: dust storm rolling in. Solar power down, sky blacked out.`);
     if (!sv.leak && rand(s.seed, day, 31) < 0.012) {

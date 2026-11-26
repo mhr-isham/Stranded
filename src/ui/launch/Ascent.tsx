@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { G } from '../../engine/constants';
 import { apsides, ascentStart, autopilot, autopilotDv, inOrbit, stepAscent, type AscentParams } from '../../engine/ascent';
-import { simulateLaunch } from '../../engine/launch';
+import { flyTransfer } from '../../game/travelSupplies';
 import { setRumble, sfx, stopRumble } from '../../game/audio';
 import { fmt } from '../../game/format';
 import { useMode } from '../../game/modes';
@@ -87,8 +87,8 @@ export function Ascent() {
     const penalty = done?.penalty ?? 0;
     const g = useGame.getState();
     const budget = sys.fuelDv - g.penaltyDv - penalty;
-    const result = simulateLaunch({ ...sys, fuelDv: budget }, pending.plan);
-    useGame.setState({ penaltyDv: g.penaltyDv + penalty, ascentPenalty: penalty, outcome: { plan: pending.plan, result, sheet: g.sheet }, pendingLaunch: null, phase: 'flight' });
+    const outcome = flyTransfer(g, sys, budget, pending.plan);
+    useGame.setState({ penaltyDv: g.penaltyDv + penalty, ascentPenalty: penalty, outcome, pendingLaunch: null, phase: 'flight' });
   };
 
   function update(dt: number) {

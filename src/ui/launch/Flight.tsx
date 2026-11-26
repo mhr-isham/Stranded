@@ -10,6 +10,8 @@ import type { StarSystem } from '../../engine/types';
 import { mulberry32 } from '../../engine/rng';
 import type { Vec3 } from '../../engine/vec';
 import { fmt } from '../../game/format';
+import { clock } from '../../game/clock';
+import { dayNumber } from '../../game/time';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { CanvasView } from '../common/CanvasView';
@@ -37,9 +39,27 @@ export function Flight() {
   const path = (result.path ?? []).filter((v) => v && Number.isFinite(v[0]) && Number.isFinite(v[1]));
   // Where the player's own numbers said the ship would go (no correction burn).
   const predicted = modelPath.current ?? (modelPath.current = predictedPath(outcome, sys));
+  const cruise = outcome.cruise;
+  const exhausted = result.outcome === 'expired';
+  const elapsed = cruise?.elapsed ?? (result.outcome === 'no-escape' || exhausted ? 0 : plan.tof);
+  function conclude(phase: 'landing' | 'results') {
+    if (useGame.getState().phase !== 'flight') return;
+    if (cruise) {
+      clock.t = plan.departTime + elapsed;
+      clock.stopAt = Infinity;
+      clock.pauseAtStop = false;
+      clock.emit();
+    }
+    useGame.setState({ phase, savedT: clock.t });
+  }
+
   const noEscape = result.outcome === 'no-escape';
 
-  const stages = noEscape
+  const stages = exhausted
+    ? cruise
+      ? ['Escape burn complete.', 'Coasting. Cryo-pods engaged.', 'Life support has run out during the coast. Switching to emergency cryo.']
+      : ['Launch aborted. The camp supplies have run out.']
+    : noEscape
     ? ['Ignition…', 'The engines strain — we cannot reach escape speed.', 'Abort. We fall back to the surface.']
     : [
         `Ignition. Burning ${fmt(result.departCost / 1000, 2)} km/s to escape.`,
@@ -94,7 +114,7 @@ export function Flight() {
           sg.addColorStop(1, 'rgba(255,200,110,0)');
           ctx.fillStyle = sg;
           ctx.fillRect(cx - 30 * dpr, cy - 30 * dpr, 60 * dpr, 60 * dpr);
-          const tNow = plan.departTime + plan.tof * (noEscape ? 0 : p);
+          const tNow = plan.departTime + elapsed * p;
           const dot = (v: Vec3, c: string, r: number) => {
             ctx.fillStyle = c;
             ctx.beginPath();
@@ -130,7 +150,7 @@ export function Flight() {
           ctx.fillStyle = 'rgba(200,215,240,0.8)';
           ctx.font = `${12 * dpr}px JetBrains Mono`;
           ctx.textAlign = 'left';
-          ctx.fillText(`mission day ${fmt(tNow / DAY, 0)}`, 16 * dpr, h - 20 * dpr);
+          ctx.fillText(`mission day ${dayNumber(tNow)}`, 16 * dpr, h - 20 * dpr);
           ctx.fillStyle = 'rgba(181,156,255,0.85)';
           if (predicted.length) ctx.fillText('- - your numbers’ path (no correction)', 16 * dpr, 28 * dpr);
           ctx.fillStyle = '#ffc46b';
@@ -142,16 +162,20 @@ export function Flight() {
         <div style={{ flex: 1 }}>
           <div className="name">ECHO</div>
           <div className="text">{stages[stage]}</div>
+          {cruise?.airLeft !== undefined && stage === stages.length - 1 && <div className="muted">
+            {fmt(elapsed / DAY, 1)} days traveled · {fmt(cruise.airLeft, 1)} days of air left
+            {cruise.foodLeft !== undefined && ` · ${fmt(cruise.foodLeft, 1)} days of food left`}
+          </div>}
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn small" onClick={() => (prog.current = 1)}>
               Skip
             </button>
             {result.outcome === 'success' && !tutorial && !arrivalDone ? (
-              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => useGame.setState({ phase: 'landing' })}>
+              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => conclude('landing')}>
                 Land at the beacon →
               </button>
             ) : (
-              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => useGame.setState({ phase: 'results' })}>
+              <button className="btn small primary" disabled={stage < stages.length - 1 && prog.current < 1} onClick={() => conclude('results')}>
                 Debrief →
               </button>
             )}

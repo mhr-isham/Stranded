@@ -22,7 +22,7 @@ import { G } from '../engine/constants';
 import { makeRng } from '../engine/rng';
 import { setRumble, sfx, stopRumble } from '../game/audio';
 import { modeOf } from '../game/modes';
-import { currentWorld } from '../game/sim';
+import { advanceHopTime, currentWorld } from '../game/sim';
 import { useGame, type CampInfo } from '../game/store';
 import { FlightAssistDialog, FlightButton, FlightToolbar, useFlightControls } from './common/FlightControls';
 import { AttitudeIndicator } from './common/AttitudeIndicator';
@@ -164,7 +164,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const hopTo = hop ? (s.hop?.toX ?? 0) : 0;
   const hopFrom = hop ? (s.hop?.fromX ?? s.camp?.x ?? 0) : 0;
   const [echoFly, setEchoFly] = useState(false);
-  const hopPlan = useMemo(() => (hop ? hopEstimate(params, Math.abs(hopTo - hopFrom)).plan : { burnDeg: 45, brakeMargin: 1.05, hoverH: 10 }), [params, hop, hopTo, hopFrom]);
+  const hopProfile = useMemo(() => hop ? hopEstimate(params, Math.abs(hopTo - hopFrom)) : null, [params, hop, hopTo, hopFrom]);
+  const hopStartedAt = useRef<number | null>(null);
   const sim = useRef<Sim>({
     stage: hop ? 'descent' : arrival ? 'entry' : later ? 'deorbit' : 'tumble',
     stageT: 0,
@@ -265,6 +266,16 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     useGame.setState({ surface: { ...g0.surface, hopTank: tank - fromTank }, penaltyDv: g0.penaltyDv + (used - fromTank) });
   };
 
+  function finishHop(camp: CampInfo, fuel: number, seconds: number) {
+    // A landing button can only settle the currently active hop once.
+    if (useGame.getState().phase !== 'hop') return;
+    chargeHop(fuel);
+    if (!advanceHopTime(seconds)) return;
+    useGame.setState({ camp: { ...camp, landing: s.camp?.landing ?? camp.landing }, hop: null, phase: 'play', screen: 'map' });
+  }
+
+  const elapsedHop = () => hopStartedAt.current === null ? 0 : sim.current.d.t - hopStartedAt.current;
+
   const finish = (camp: CampInfo) => {
     stopRumble();
     if (s.settings.flightPractice) { leaveFlightPractice(); return; }
@@ -275,8 +286,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (hop) {
-      chargeHop(Math.max(0, (s.hop?.budget ?? 0) + sim.current.reserve - sim.current.d.fuel));
-      useGame.setState({ camp: { ...camp, landing: s.camp?.landing ?? camp.landing }, hop: null, phase: 'play', screen: 'map' });
+      finishHop(camp, Math.max(0, (s.hop?.budget ?? 0) + sim.current.reserve - sim.current.d.fuel), elapsedHop());
       return;
     }
     if (later) {
@@ -303,8 +313,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       return;
     }
     if (hop) {
-      chargeHop(s.hop?.cost ?? 0);
-      useGame.setState({ camp: { ...campAt(hopTo, 'skipped'), landing: s.camp?.landing ?? 'skipped' }, hop: null, phase: 'play', screen: 'map' });
+      if (hopStartedAt.current !== null) return;
+      finishHop(campAt(hopTo, 'skipped'), s.hop?.cost ?? 0, hopProfile?.seconds || 60);
       return;
     }
     if (s.settings.freeRoam) { useGame.setState({ camp: campAt(x, 'skipped'), phase: 'play', screen: 'hub', storyQueue: [], echo: [] }); return; }
@@ -480,7 +490,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       }
       let uu = { turn, throttle: u.thrust ? 1 : 0 };
       // ECHO flies the hop the way a good pilot would.
-      if (hop && S.echoFly && !S.rescued) uu = hopPilot(params, S.d, hopTo, terrain.height, hopPlan, S.pilot);
+      if (hopProfile && S.echoFly && !S.rescued) uu = hopPilot(params, S.d, hopTo, terrain.height, hopProfile.plan, S.pilot);
       if (S.rescued) {
         const targetVy = -Math.max(2, h * 0.12);
         const thCmd = Math.max(-0.45, Math.min(0.45, -S.d.vx * 0.035));
@@ -496,6 +506,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       }
       // ECHO's hops run at 4x (2x for the final settle) so a long one doesn't drag.
       const speedUp = hop && S.echoFly && !S.rescued ? (h > 60 ? 4 : 2) : h > 2500 && !S.rescued ? 3 : 1;
+      if (hop && uu.throttle > 0 && S.d.fuel > 0 && hopStartedAt.current === null) hopStartedAt.current = S.d.t;
       const n = Math.ceil((dt * speedUp) / 0.02);
       for (let i = 0; i < n; i++) S.d = stepDescent(params, S.d, uu, (dt * speedUp) / n);
       S.thr = S.d.fuel > 0 ? uu.throttle : 0;
@@ -1102,6 +1113,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       <CanvasView draw={draw} />
       {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? 'Destination landing' : 'Arrival · opening sequence'} status={s.settings.flightPractice ? 'Practice · unscored' : manualRequired && s.piloting.assisted.length ? 'Assisted · unscored' : manualRequired ? 'Manual flight required' : stage} controls={controls}>
         <p>Use short steering inputs. During entry, left makes the path shallower and right makes it steeper. During descent, tilt to control drift and burn to slow the fall. A parachute helps only within its pressure limit.</p>
+        {hop && <p>After takeoff, simulated flight seconds use supplies. Pausing leaves the flight and supplies where they are.</p>}
         <p>Land nearly upright, with little sideways drift and vertical speed below {assist ? 5 : 4} m/s. The instruments show the current conditions.</p>
       </FlightToolbar>}
       <div className="prologue-echo panel">
@@ -1110,7 +1122,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         </span>
         <div>{line}</div>
       </div>
-      {stage !== 'landed' && (
+      {stage !== 'landed' && (!hop || hopStartedAt.current === null) && (
         <button className="btn small ghost prologue-skip" onClick={() => { if (s.settings.flightPractice) leaveFlightPractice(); else if (manualRequired) { controls.pause(true); setAssistDialog(true); } else skip(); }}>
           {s.settings.flightPractice ? 'Exit practice' : manualRequired ? 'ECHO landing' : 'Skip'}
         </button>
@@ -1177,7 +1189,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
             <i style={{ width: `${hud.fuel * 100}%`, background: hud.fuel < 0.2 ? 'var(--red)' : 'var(--blue)' }} />
           </div>
           <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>
-            {hop ? `Ideal hop: ${(s.hop?.cost ?? 0).toFixed(0)} m/s — you pay for what you burn.` : 'Separate from the launch fuel.'} Land under {assist ? 5 : 4} m/s, nearly upright.
+            {hop ? `Ideal hop: ${(s.hop?.cost ?? 0).toFixed(0)} m/s. Flight time: ${Math.floor(elapsedHop())} s.` : 'Separate from the launch fuel.'} Land under {assist ? 5 : 4} m/s, nearly upright.
           </div>
         </div>
       )}

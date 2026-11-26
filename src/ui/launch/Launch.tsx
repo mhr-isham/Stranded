@@ -30,6 +30,7 @@ import { fmt } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
+import { cruiseLimit, cruiseReserve, cruiseSupplies, flyTransfer, type CruiseSupplies } from '../../game/travelSupplies';
 import { savePrelaunch } from '../../game/checkpoints';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Formula, ToolHeader } from '../common/sheetBits';
@@ -105,6 +106,10 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
   const custom = useMemo(() => model && !model.giant && routeMode === 'custom'
     ? planTransfer(model, departure, tofDays * DAY) : null, [model, departure, tofDays, routeMode]);
   const plan = model?.giant || routeMode === 'fuel-saver' ? fuelSaver : routeMode === 'fast' ? fast : custom;
+  const launchNowPlan = useMemo(() => confirm && plan && model
+    ? routeMode === 'fuel-saver' || model.giant ? bestTransfer(model, t) : planTransfer(model, t, plan.plan.tof)
+    : null, [confirm, plan, model, routeMode, t]);
+  const selectedSupplies = plan ? cruiseSupplies(s, sys, t, plan.plan) : null;
   const forecastRoutes = useMemo(() => [fuelSaver, fast, custom].filter((route): route is PlannedTransfer => !!route), [fuelSaver, fast, custom]);
 
   // Porkchop: estimated total delta-v over departure date x flight time.
@@ -206,15 +211,17 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
     if (!plan) return;
     const p = routeMode === 'fuel-saver' || model.giant ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, plan.plan.tof);
     if (!p) return toast('No transfer found for this date.');
+    const current = useGame.getState();
+    if (cruiseSupplies(current, sys, clock.t, p.plan)?.canDepart === false) return toast('The camp is out of supplies for takeoff.');
     sfx('launch');
-    if (!s.tutorial.active) savePrelaunch();
+    if (!current.tutorial.active) savePrelaunch();
     if (manual || manualRequired) {
       // Fly the ascent to parking orbit first; the flight is simulated after it.
       useGame.setState({ pendingLaunch: { plan: p.plan }, phase: 'ascent' });
       return;
     }
-    const result = simulateLaunch({ ...sys, fuelDv: budget }, p.plan);
-    useGame.setState({ outcome: { plan: p.plan, result, sheet: s.sheet }, phase: 'flight' });
+    const outcome = flyTransfer(useGame.getState(), sys, budget, p.plan);
+    useGame.setState({ outcome, phase: 'flight' });
   };
 
   const warpTo = () => {
@@ -295,14 +302,14 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
             <b>Compare routes</b>
             <span className="muted route-comparison-note">Same departure · Day {departureDate}</span>
             <div className="route-comparison">
-              <RouteOption label="Fuel-saver" route={fuelSaver} budget={budget} end={end}
+              <RouteOption label="Fuel-saver" route={fuelSaver} budget={budget} supplies={fuelSaver ? cruiseSupplies(s, sys, t, fuelSaver.plan) : null}
                 forecast={fuelSaver ? routeForecasts?.get(fuelSaver) : undefined}
                 selected={routeMode === 'fuel-saver'} onSelect={() => setRouteMode('fuel-saver')} />
-              <RouteOption label="Fast" route={fast} budget={budget} end={end}
+              <RouteOption label="Fast" route={fast} budget={budget} supplies={fast ? cruiseSupplies(s, sys, t, fast.plan) : null}
                 forecast={fast ? routeForecasts?.get(fast) : undefined}
                 selected={routeMode === 'fast'} onSelect={() => setRouteMode('fast')} />
             </div>
-            <p className="muted route-comparison-note">Fast targets 25% less flight time. Both routes use the same 36 trial models. Check arrival against your supplies separately.</p>
+            <p className="muted route-comparison-note">Fast targets 25% less flight time. Both routes use the same 36 fuel trials. Compare the supplies left at arrival before choosing.</p>
             <button type="button" className={`btn small ${routeMode === 'custom' ? 'primary' : ''}`} aria-pressed={routeMode === 'custom'} onClick={() => {
               if (customDays === null && plan) setCustomDays(Math.round(plan.plan.tof / DAY));
               setRouteMode('custom');
@@ -360,6 +367,14 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
               <dd className={margin > 0 ? 'green' : 'red'}>{fmt(margin / 1000, 3)} km/s</dd>
             </dl>
             <FuelBar plan={plan} budget={budget} />
+            {selectedSupplies && <section className="panel-inset stack" aria-label="Selected route supplies">
+              <b>Ship supplies · {fmt(selectedSupplies.needs, 1)} days in flight</b>
+              <ArrivalSupplies supplies={selectedSupplies} />
+              <details><summary>Where ship supplies come from</summary>
+                <p>The ship adds a sealed {cruiseReserve(s.chapter)}-day cruise reserve to what remains at camp on departure. The reserve opens after escape. The ship uses one day of supplies per day in flight.</p>
+                <p>Estimates for later departures use your current camp consumption. Weather, repairs and resupply can change what you bring.</p>
+              </details>
+            </section>}
             <div className="stack" style={{ gap: 6 }} aria-label="Simulated transfer outcomes">
               <div className="row between">
                 <span className="muted" style={{ fontSize: 13 }}>Simulated transfer outcomes</span>
@@ -371,13 +386,17 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
               <details style={{ fontSize: 12 }}><summary>What does this forecast include?</summary><div className="faint" style={{ marginTop: 8, lineHeight: 1.6 }}>
                 This plan is tested against 36 independently drawn models using Gaussian error bars on your primary inputs. Each sampled input is reused throughout the derived chain. Nonphysical models or numerically invalid outcomes remain unassessable attempts, rather than disappearing from the count. Success means the transfer simulator reports successful capture within the fuel budget; fuel remaining alone does not mean success.
                 <br />The draws assume different primary inputs are independent. Shared calibration errors, correlations, missing biases and an unsuitable orbit model are not captured. A small sample and smaller entered errors do not establish a calibrated probability.
-                <br />These trials cover the automatic transfer and capture model with the current fuel budget. They exclude the survival deadline, manual flight performance and later surface survival. Check the arrival deadline separately.
+                <br />These trials cover the automatic transfer and capture model with the current fuel budget. They exclude the survival deadline, manual flight performance and later surface survival. See the ship supplies estimate for the selected route.
               </div></details>
             </div>
             <div data-tut="launch-go">
             {ready ? (
               confirm ? (
                 <div className="stack" style={{ gap: 6 }}>
+                  {launchNowPlan && <div className="panel-inset" aria-label="Supplies if you launch now">
+                    <b>Launching now · {fmt(launchNowPlan.plan.tof / DAY, 1)} days in flight</b>
+                    <ArrivalSupplies supplies={cruiseSupplies(s, sys, t, launchNowPlan.plan)} />
+                  </div>}
                   <div className="row">
                     <button className="btn danger big" onClick={() => launch(manualRequired)} style={{ flex: 1 }}>
                       {manualRequired ? '🕹 Begin manual ascent' : '🚀 Confirm launch'}
@@ -415,11 +434,11 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
 
 const TAU_DEG = 360;
 
-function RouteOption({ label, route, budget, end, forecast, selected, onSelect }: {
+function RouteOption({ label, route, budget, supplies, forecast, selected, onSelect }: {
   label: string;
   route: PlannedTransfer | null;
   budget: number;
-  end: number;
+  supplies: CruiseSupplies | null;
   forecast?: ForecastSummary;
   selected: boolean;
   onSelect: () => void;
@@ -436,9 +455,20 @@ function RouteOption({ label, route, budget, end, forecast, selected, onSelect }
         <dd>{forecast ? `${forecast.succeeded} of ${forecast.attempted}` : 'Simulating…'}</dd>
       </dl>
       {forecast && forecast.unassessable > 0 && <div className="muted route-comparison-note">{forecast.unassessable} unassessable</div>}
-      {route.plan.departTime + route.plan.tof > end && <div className="amber route-comparison-note">Arrives after supplies run out</div>}
+      <ArrivalSupplies supplies={supplies} />
     </> : <div className="muted route-comparison-note">No usable transfer</div>}
   </section>;
+}
+
+function ArrivalSupplies({ supplies }: { supplies: CruiseSupplies | null }) {
+  if (!supplies) return null;
+  if (!supplies.canDepart) return <div className="amber route-comparison-note">Camp supplies run out before departure.</div>;
+  const margin = cruiseLimit(supplies) - supplies.needs;
+  return <div className={`route-comparison-note ${margin <= 0 ? 'amber' : 'muted'}`}>
+    {margin <= 0
+      ? `Supplies run out ${margin === 0 ? 'at arrival' : `${fmt(-margin, 1)} days before arrival`}.`
+      : `At arrival · ${fmt(supplies.air - supplies.needs, 1)} days of air${supplies.food === undefined ? '' : ` · ${fmt(supplies.food - supplies.needs, 1)} days of food`}`}
+  </div>;
 }
 
 function FuelBar({ plan, budget }: { plan: PlannedTransfer; budget: number }) {

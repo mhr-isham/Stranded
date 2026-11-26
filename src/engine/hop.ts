@@ -81,24 +81,24 @@ export function flyHop(p: DescentParams, d: number, plan: HopPlan, dt = 0.04) {
     s = stepDescent(p, s, hopPilot(p, s, d, 0, plan, mem), dt);
     if (s.y > 3) launched = true;
     if (!launched && s.y < 0) s = { ...s, y: 0, vy: Math.max(0, s.vy) };
-    if (launched && s.y <= 0) return { used: 1e9 - s.fuel, x: s.x, vy: s.vy };
+    if (launched && s.y <= 0) return { used: 1e9 - s.fuel, x: s.x, vy: s.vy, seconds: s.t };
   }
   return null;
 }
 
-const cache = new Map<string, { cost: number; plan: HopPlan }>();
+const cache = new Map<string, { cost: number; seconds: number; plan: HopPlan }>();
 
 /** The fuel a well-flown hop of distance d takes (searched over burn angles), and the plan that does it. */
 export function hopEstimate(p: DescentParams, d: number) {
   const key = `${p.g.toFixed(3)}:${Math.round(d / 50)}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  let best = { cost: Infinity, plan: { burnDeg: 45, brakeMargin: 1.5, hoverH: 15 } as HopPlan };
+  let best = { cost: Infinity, seconds: 0, plan: { burnDeg: 45, brakeMargin: 1.5, hoverH: 15 } as HopPlan };
   for (const burnDeg of [20, 35, 50, 60, 70]) {
     // Brake with some margin: a good pilot doesn't cut it fine (and ECHO's safety net stays quiet).
     const plan = { burnDeg, brakeMargin: 1.5, hoverH: 15 };
     const r = flyHop(p, Math.max(100, d), plan);
-    if (r && Math.abs(r.x - d) < 0.05 * d + 60 && r.vy > -6 && r.used < best.cost) best = { cost: r.used, plan };
+    if (r && Math.abs(r.x - d) < 0.05 * d + 60 && r.vy > -6 && r.used < best.cost) best = { cost: r.used, seconds: r.seconds, plan };
   }
   cache.set(key, best);
   return best;

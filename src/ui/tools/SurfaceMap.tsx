@@ -109,7 +109,8 @@ export function SurfaceMap() {
     if (target === null) return null;
     const p = hopParams(g, mode.landingAssist);
     const d = Math.abs(target - campX);
-    return { est: hopEstimate(p, d).cost, budget: hopBudget(p, d) };
+    const estimate = hopEstimate(p, d);
+    return { est: estimate.cost, seconds: estimate.seconds, budget: hopBudget(p, d) };
   }, [target, campX, g, mode.landingAssist]);
 
   const hop = () => {
@@ -321,6 +322,7 @@ export function SurfaceMap() {
               <button className="btn" style={{ whiteSpace: 'normal', height: 'auto' }} disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
                 🚀 Hop the ship there (≈{fmt(hopInfo?.est ?? 0, 0)} m/s flown well{rules.hopTank > 0 ? ', hop tank first' : ', launch fuel'})
               </button>
+              {!!hopInfo?.seconds && <div className="faint">About {fmt(hopInfo.seconds / 60, 1)} minutes of expedition time if flown well.</div>}
             </div>
           )}
           {!busy && (

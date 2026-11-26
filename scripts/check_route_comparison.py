@@ -42,6 +42,8 @@ with sync_playwright() as p:
         departure = compare.get_by_text(re.compile('^Same departure')).inner_text()
         days = lambda card: float(value(card, 'Flight time').inner_text().split()[0].replace(',', ''))
         assert abs(days(fast) - .75 * days(saver)) < .15
+        remaining = lambda card: float(card.get_by_text(re.compile(r'^At arrival')).inner_text().split(' · ')[1].split()[0].replace(',', ''))
+        assert abs((remaining(fast) - remaining(saver)) - (days(saver) - days(fast))) <= .2
         saver_total = value(fuel, 'Total planned').inner_text()
         expect(outcomes).to_contain_text(value(saver, 'Captures within budget').inner_text() + ' succeeded')
         cards = compare.locator('.route-comparison')

@@ -106,6 +106,8 @@ export interface SurvivalState {
   greenhouseSince: number | null;
   leak: boolean;
   lastDay: number;
+  /** Cabin supplies paid for hops during the current expedition day. */
+  hopUpkeep?: { air: number; food: number };
   log: string[];
 }
 
@@ -129,6 +131,7 @@ export interface CampInfo {
 export interface Outcome {
   plan: LaunchPlan;
   result: LaunchResult;
+  cruise?: { elapsed: number; departureMargin: number; airLeft?: number; foodLeft?: number };
   sheet: Partial<Record<PrimaryKey, Estimate>>;
 }
 

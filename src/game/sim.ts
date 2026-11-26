@@ -17,7 +17,7 @@ import { MISSION_CODEX } from './codex';
 import { sfx } from './audio';
 import { WARPS } from './clock';
 import { useGame, type GameState, type TimedValue } from './store';
-import { lifeSupportEnd, survivalDay } from './survival';
+import { foodRate, lifeSupportEnd, o2Rate, survivalDay } from './survival';
 import { world } from './world';
 import { variantOf } from '../engine/chapters';
 import { resolvePredictions } from './predictions';
@@ -81,18 +81,33 @@ export function fastForward(target: number) {
   clock.emit();
 }
 
-function stepTo(t1Wanted: number, dtReal: number) {
+/** Settle a completed hop with normal surface activity still in progress. */
+export function advanceHopTime(seconds: number) {
+  const target = clock.t + seconds;
+  while (clock.t < target && useGame.getState().phase === 'hop') {
+    stepTo(Math.min(target, (Math.floor(clock.t / DAY) + 1) * DAY), 0, true);
+  }
+  if (clock.t >= clock.stopAt) {
+    if (clock.pauseAtStop) clock.paused = true;
+    clock.stopAt = Infinity;
+    clock.pauseAtStop = false;
+  }
+  clock.emit();
+  return useGame.getState().phase === 'hop';
+}
+
+function stepTo(t1Wanted: number, dtReal: number, hopping = false) {
   const s = useGame.getState();
   const { system: sys, solarDay } = currentWorld();
   const t0 = clock.t;
-  let t1 = t1Wanted;
   // The tutorial never runs out of air: it is about learning, not pressure.
   const end = s.tutorial.active ? Infinity : lifeSupportEnd(s, sys);
-  if (t1 >= end) {
-    t1 = end;
+  const expires = t1Wanted >= end;
+  const t1 = Math.max(t0, Math.min(t1Wanted, end));
+  if (expires && !hopping) {
     clock.t = t1;
     clock.paused = true;
-    useGame.setState({ phase: 'results', outcome: null });
+    useGame.setState({ phase: 'results', outcome: null, hop: null });
     return;
   }
   clock.t = t1;
@@ -184,8 +199,18 @@ function stepTo(t1Wanted: number, dtReal: number) {
     s.say(ECHO.roverArrived);
   }
 
-  // Survival upkeep, once per day.
+  // Hops debit the actual fraction of a day. Daily upkeep credits this
+  // payment so crossing midnight never bills those minutes twice.
   if (s.settings.survival) {
+    if (hopping) {
+      const days = (t1 - t0) / DAY;
+      const air = days * o2Rate(s.survival);
+      const food = days * foodRate();
+      const paid = s.survival.hopUpkeep;
+      patch.survival = { ...s.survival, o2: s.survival.o2 - air, food: s.survival.food - food,
+        hopUpkeep: { air: (paid?.air ?? 0) + air, food: (paid?.food ?? 0) + food } };
+    }
+
     const d0 = Math.floor(t0 / DAY);
     const d1 = Math.floor(t1 / DAY);
     if (d1 > d0) Object.assign(patch, survivalDay({ ...s, ...patch }, sys, d0, d1));
@@ -195,6 +220,11 @@ function stepTo(t1Wanted: number, dtReal: number) {
   if (Object.keys(patch).length) useGame.setState(patch);
   resolvePredictions(t1);
 
+  if (hopping && (expires || (!s.settings.freeRoam && !s.tutorial.active && lifeSupportEnd(useGame.getState(), sys) <= t1))) {
+    clock.paused = true;
+    useGame.setState({ phase: 'results', hop: null, outcome: null });
+    return;
+  }
   // Story beats tied to time.
   const life = (end - t1) / end;
   if (life < 0.15) s.say(ECHO.lowLife);

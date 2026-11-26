@@ -10,6 +10,7 @@ import { fmt, sig, toDisplay } from '../../game/format';
 import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
+import { dayNumber } from '../../game/time';
 import { evaluateAchievements, ACHIEVEMENTS } from '../../game/achievements';
 import { startRun, toast } from '../common/widgets';
 import { hasPrelaunch, rewindToLaunch } from '../../game/checkpoints';
@@ -54,11 +55,16 @@ const OUTCOME_TEXT: Record<string, { title: string; text: string; cls: string; e
   },
   expired: {
     title: 'Life support exhausted',
-    text: 'The air ran out before launch.',
+    text: 'The expedition ran out of supplies.',
     cls: 'red',
     echo: 'Moving everyone to deep cryo on the last of the power. Someone will find the beacon. Someone always finds the beacon.',
   },
 };
+
+function outcomeMessage(kind: string, inCruise: boolean) {
+  const info = OUTCOME_TEXT[kind];
+  return kind === 'expired' && inCruise ? { ...info, text: 'Ship supplies ran out during the coast.' } : info;
+}
 
 function EchoQuote({ text }: { text: string }) {
   return (
@@ -79,9 +85,9 @@ export function Results() {
   const s = useGame();
   const mode = modeOf(s.settings.difficulty);
   const kind = s.outcome?.result.outcome ?? 'expired';
-  const canRewind = !s.settings.freeRoam && !s.tutorial.active && kind !== 'success' && kind !== 'expired' && !s.debriefSeen && s.rewindsUsed < mode.rewinds && hasPrelaunch();
+  const canRewind = !s.settings.freeRoam && !s.tutorial.active && kind !== 'success' && (kind !== 'expired' || !!s.outcome?.cruise) && !s.debriefSeen && s.rewindsUsed < mode.rewinds && hasPrelaunch();
   if (!canRewind) return <Debrief />;
-  const info = OUTCOME_TEXT[kind];
+  const info = outcomeMessage(kind, !!s.outcome?.cruise);
   const left = mode.rewinds - s.rewindsUsed;
   return (
     <div className="screen scroll" style={{ background: 'radial-gradient(ellipse at 50% 0%, #10204a 0%, #05070f 65%)' }}>
@@ -125,7 +131,7 @@ function Debrief() {
   const { system: sys } = currentWorld();
   const outcome = s.outcome;
   const kind = outcome?.result.outcome ?? 'expired';
-  const info = OUTCOME_TEXT[kind];
+  const info = outcomeMessage(kind, !!outcome?.cruise);
   const sheet: Primaries = outcome?.sheet ?? s.sheet;
   const variant = variantOf(sys.features);
   const truth = truthValues(sys, sheet, probeTruth(s));
@@ -138,7 +144,7 @@ function Debrief() {
   const measurementPoints = rows.reduce((a, r) => a + (r.sc?.points ?? 0), 0);
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
-  const daysLeftFraction = outcome ? (end - outcome.plan.departTime) / end : 0;
+  const daysLeftFraction = outcome ? (outcome.cruise?.departureMargin ?? (end - outcome.plan.departTime) / end) : 0;
   const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - (scored ? sharpEyePoints(s) : 0), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
   const affected = affectedReadings(s);
@@ -209,7 +215,7 @@ function Debrief() {
       .filter((r) => r.sc)
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
-    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} · Sharp Eye ${SHARP_EYE_POLICY} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? fmt(outcome.plan.departTime / DAY, 0) : '—'}`;
+    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} · Sharp Eye ${SHARP_EYE_POLICY} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? dayNumber(outcome.plan.departTime) : '—'}`;
     // Say "copied" only if it was; otherwise offer the text to copy by hand.
     const fallback = () => window.prompt('Copy your result:', text);
     if (!navigator.clipboard) return void fallback();
@@ -234,6 +240,10 @@ function Debrief() {
             {info.title}
           </h1>
           <div className="muted">{named(info.text)}</div>
+          {outcome?.cruise?.airLeft !== undefined && <div className="muted">
+            {fmt(outcome.cruise.elapsed / DAY, 1)} days traveled · {fmt(outcome.cruise.airLeft, 1)} days of air left
+            {outcome.cruise.foodLeft !== undefined && ` · ${fmt(outcome.cruise.foodLeft, 1)} days of food left`}
+          </div>}
           {assisted && <div className="callout tip" style={{ textAlign: 'left' }}>This journey used ECHO flight assistance or did not complete the required manual phases. Your measurements and story progress are preserved. No hard-mode score, grade, achievement or challenge unlock is awarded.</div>}
           {!s.tutorial.active && (!s.settings.freeRoam || s.settings.freeRoamGuidance) && <EchoQuote text={named(info.echo)} />}
           <div className="row" style={{ justifyContent: 'center', gap: 28, marginTop: 14 }}>
