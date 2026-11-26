@@ -858,10 +858,10 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       ) : (
         <>
           <button data-tut="track-toggle" className={`btn ${s.trackOn ? '' : 'primary'}`} onClick={() => (s.set({ trackOn: !s.trackOn }), checkMissions())}>
-            {s.trackOn ? 'Auto-log: ON (nightly)' : 'Turn on nightly auto-log'}
+            {s.trackOn ? 'Auto-log: ON' : sysT.features.locked ? 'Turn on auto-log' : 'Turn on nightly auto-log'}
           </button>
           <ObservingStatus status={obs} />
-          <div className="faint">The tracker records usable observing sessions when switched on.</div>
+          <div className="faint">{sysT.features.locked ? `The tracker checks for a usable view every ${cadence / (DAY / 24)} expedition hours in this locked sky.` : 'The tracker keeps one usable sighting per local solar day.'}</div>
         </>
       )}
       <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={!!s.settings.skyTrackTrail} onChange={(e) => { s.set({ settings: { ...s.settings, skyTrackTrail: e.target.checked } }); if (e.target.checked) onWide(); }} />Show saved sightings on the wide sky</label>
@@ -873,7 +873,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
           markers={picks.map((p, i) => ({ x: p / DAY, color: '#5be3a4', label: `${inner ? 'alignment' : 'opp'} ${i + 1}` }))}
           cursor={cursor}
           onCursor={setCursor}
-          xLabel="day"
+          xLabel="elapsed days"
           yLabel={inner ? 'elongation from the star (°)' : 'longitude vs stars (°)'}
           xFmt={(x) => x.toFixed(0)}
           yFmt={(y) => y.toFixed(1)}
@@ -881,7 +881,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       )}
       {pts.length > 1 && (
         <div className="faint" style={{ fontSize: 12 }}>
-          Drag across a region to zoom in, tap to place a date cursor. For an outer planet, opposition lies within the backward interval, distinct from its two turning points. Near-circular examples can place it near the middle; an exact symmetry is not guaranteed.
+          Chart dates start at zero when the expedition begins. Drag to zoom or tap to place a date cursor. For an outer planet, opposition lies within the backward interval, distinct from its two turning points. Near-circular examples can place it near the middle; an exact symmetry is not guaranteed.
         </div>
       )}
       {inner && pts.length > 1 && (
@@ -893,7 +893,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       {pts.length > 0 && <><ObservationReplay points={replay} inner={inner} onCursor={setCursor} /><label className="field">Chart cursor day<input className="input" type="number" step="any" value={cursor ?? ''} min={pts[0].x} max={pts.at(-1)!.x} onChange={(e) => { const v = Number(e.target.value); setCursor(e.target.value !== '' && Number.isFinite(v) && v >= pts[0].x && v <= pts.at(-1)!.x ? v : null); }} /></label></>}
       {cursor !== null && (
         <div className="row between">
-          <span className="mono">day {fmt(cursor, 2)}</span>
+          <span className="mono">elapsed day {fmt(cursor, 2)}</span>
           <button
             className="btn primary small"
             onClick={() => {
@@ -914,7 +914,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
           {picks.map((p, i) => (
             <div key={p} className="row between">
               <span>
-                {inner ? 'Candidate alignment' : 'Opposition'} {i + 1}: <span className="mono">day {fmt(p / DAY, 2)}</span>
+                {inner ? 'Candidate alignment' : 'Opposition'} {i + 1}: <span className="mono">elapsed day {fmt(p / DAY, 2)}</span>
               </span>
               <button className="btn small ghost" onClick={() => s.set({ oppPicks: s.oppPicks.filter((x) => x !== p) })}>
                 ✕
@@ -968,7 +968,7 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
       pts={pts.slice(Math.max(0, iMax - 30))}
       axis="x"
       xMax={t / DAY + 120}
-      xLabel="day"
+      xLabel="elapsed days"
       yLabel="longitude (°)"
       ownFit={hasChallenge(s, 'handFit') ? null : own}
       sigma0={5}
@@ -1019,7 +1019,7 @@ function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
       pts={recent}
       axis="x"
       xMax={nowDay + span}
-      xLabel="day"
+      xLabel="elapsed days"
       yLabel="moon offset (″)"
       ownFit={own}
       sigma0={0.5}
@@ -1123,7 +1123,7 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
             band={band}
             onBand={setBand}
             brushMode="band"
-            xLabel="day"
+            xLabel="elapsed days"
             yLabel="offset from the star’s centre (″)"
             yFmt={(y) => y.toFixed(0)}
           />

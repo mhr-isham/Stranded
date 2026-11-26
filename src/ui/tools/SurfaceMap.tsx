@@ -299,6 +299,7 @@ export function SurfaceMap() {
                 <dt>Hop tank</dt>
                 <dd>
                   {fmt(hopTank, 0)} / {rules.hopTank} m/s
+                  <div className="faint">{rules.hopRefill === 'nightly' ? 'Refills when the expedition day changes.' : rules.hopRefill === 'slow' ? 'Regains one third of capacity when the expedition day changes.' : 'Refill with processed ice.'}</div>
                 </dd>
               </>
             )}

@@ -61,11 +61,11 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
               {flare ? (
                 'FLARE'
               ) : sys.features.locked ? (
-                <><span className="hide-phone">eternal dusk</span><span className="show-phone">dusk</span></>
+                <><span className="hide-phone">Locked sky</span><span className="show-phone">locked</span></>
               ) : (
                 <>
                   {hhmm(sol)}
-                  <span className="hide-phone"> local</span>
+                  <span className="hide-phone"> solar</span>
                 </>
               )}
               {!s.tutorial.active && <span className="hud-time-caret hide-phone" aria-hidden="true"> ▾</span>}

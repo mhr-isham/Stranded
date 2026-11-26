@@ -239,7 +239,7 @@ export function Rover() {
           <b>2 · Image both sites at once</b>
           <dl className="kv">
             <dt>Camp: {what} altitude</dt>
-            <dd>{fmt(A.alt, 1)}° · {hhmm(localSolarHours(sys, t))}</dd>
+            <dd>{fmt(A.alt, 1)}° · {sys.features.locked ? 'Locked sky' : `${hhmm(localSolarHours(sys, t))} solar`}</dd>
             <dt>Rover: {what} altitude</dt>
             <dd>{fmt(B.alt, 1)}°</dd>
             <dt>Midpoint: altitude</dt>

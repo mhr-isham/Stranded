@@ -144,6 +144,14 @@ export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenL
         <button className="btn primary" disabled={!canWait} onClick={waitForEvent}>Wait and pause</button>
       </div>}
       <details className="measurement-help">
+        <summary>Which clock is this?</summary>
+        <dl className="timeline-key">
+          <dt>Expedition day</dt><dd>Day 1 starts when you arrive. Each expedition day is 24 simulated hours, so Day 1.5 is halfway through Day 1. Schedules and warp use this clock. A chart marked “elapsed days” counts from zero at the start of Day 1.</dd>
+          <dt>Local solar time</dt><dd>Use this clock to plan around the star’s position in your sky. Local days can be longer or shorter than expedition days. Locked worlds have no regular sunrise or sunset at a fixed site.</dd>
+          <dt>Real seconds</dt><dd>The pendulum stopwatch measures seconds as you play, even while the expedition is paused.</dd>
+        </dl>
+      </details>
+      <details className="measurement-help">
         <summary>While you wait</summary>
         <p>Review a tool or sketch the sky. Your clock and scheduled stop keep their current settings.</p>
         <div className="row">

@@ -112,6 +112,9 @@ with sync_playwright() as p:
         # The locked-world reference tracker remains usable without a solar day,
         # while actual flare glare blocks a fresh log at recording time.
         setup(page,6,'observatory',difficulty);ready=find(page,'locked-year');flare=find(page,'locked-year','flare');at(page,ready)
+        expect(page.get_by_role('button',name='Next event',exact=True).get_by_text(re.compile(r'^(Locked sky|locked)$')).filter(visible=True)).to_be_visible()
+        page.get_by_role('button',name='Tracker',exact=True).click()
+        expect(page.get_by_text('The tracker checks for a usable view every 3 expedition hours in this locked sky.',exact=True)).to_be_visible()
         page.get_by_role('button',name='Year',exact=True).click();log=page.locator('[data-tut="year-log"]');expect(log).to_be_enabled()
         stale_click(page,flare,'[data-tut="year-log"]');assert page.evaluate('__game.getState().starObs.length')==0
         at(page,flare);expect(log).to_be_disabled();check_status(page,'Flare glare')

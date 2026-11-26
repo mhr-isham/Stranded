@@ -100,7 +100,7 @@ function stepTo(t1Wanted: number, dtReal: number) {
   const patch: Partial<GameState> = {};
 
   // Tracker samples eight times per local day.
-  // A locked planet has no solar day: log once per 24 hours instead.
+  // A locked planet samples eight times per expedition day instead.
   const logDay = Number.isFinite(solarDay) ? solarDay : DAY;
   const step = logDay / 8;
   if (s.trackOn || s.moonTrackOn) {

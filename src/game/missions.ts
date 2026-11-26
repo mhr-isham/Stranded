@@ -66,7 +66,7 @@ export const MISSIONS: Mission[] = [
     id: 'track',
     title: 'Watch it wander',
     short: 'Start following the blue planet’s path.',
-    goal: 'Turn on the tracker’s nightly auto-log for the blue planet.',
+    goal: 'Turn on the tracker’s auto-log for the blue planet.',
     why: 'Its path against the stars will loop backwards (retrograde) when we overtake it — that loop marks opposition.',
     screen: 'observatory',
     done: (s) => s.trackOn,

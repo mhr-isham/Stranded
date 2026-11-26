@@ -69,7 +69,7 @@ export const hopCost = (g: number, d: number) => 2 * Math.sqrt(g * Math.max(0, d
 export interface SurfaceRules {
   /** Capacity of the separate hop tank (m/s); 0 = hops use launch fuel. */
   hopTank: number;
-  /** How the hop tank refills: every night, over three days, only from ice, or never. */
+  /** How the hop tank refills: at each expedition-day boundary, over three days, only from ice, or never. */
   hopRefill: 'nightly' | 'slow' | 'ice' | 'none';
   /** Days to process one load of ice. */
   isruDays: number;

@@ -33,6 +33,14 @@ with sync_playwright() as p:
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto('http://127.0.0.1:5178/', wait_until='networkidle')
         page.evaluate(SETUP)
+        page.get_by_role('button', name='Next event', exact=True).click()
+        guide = page.locator('details').filter(has=page.get_by_text('Which clock is this?', exact=True))
+        assert guide.get_attribute('open') is None
+        guide.locator('summary').click()
+        for label in ['Expedition day', 'Local solar time', 'Real seconds']:
+            expect(guide.get_by_text(label, exact=True)).to_be_visible()
+        page.get_by_role('button', name='Close', exact=True).click()
+        assert page.evaluate('__clock.t === 0 && __clock.paused')
         button = page.get_by_role('button', name=re.compile('^Estimated launch window:'))
         expect(button).to_have_count(0)
         page.evaluate('__game.setState({sheet:validSheet})')
@@ -52,13 +60,15 @@ with sync_playwright() as p:
         depart = page.locator('[data-tut="launch-departure"]')
         expect(depart).to_be_visible()
         same_day = depart.get_by_text(re.compile('^Same departure'))
-        expect(same_day).to_contain_text(f'{selected/86400:.1f}')
+        expect(same_day).to_contain_text(f'{selected/86400+1:.1f}')
+        expect(depart.get_by_role('slider', name='Departure day')).to_have_attribute(
+            'aria-valuetext', f'Expedition day {selected/86400+1:.1f}')
         assert abs(page.evaluate('__clock.t') - (selected-28800)) < 1
         assert page.evaluate('__clock.paused')
         page.get_by_role('button', name='Now', exact=True).click()
-        expect(same_day).not_to_contain_text(f'{selected/86400:.1f}')
+        expect(same_day).not_to_contain_text(f'{selected/86400+1:.1f}')
         button.click()
-        expect(same_day).to_contain_text(f'{selected/86400:.1f}')
+        expect(same_day).to_contain_text(f'{selected/86400+1:.1f}')
         page.evaluate('(at)=>{__clock.t=at+3600;__clock.emit()}', selected)
         expect(button).not_to_have_attribute('aria-label','Estimated launch window: under 1 day. Open launch planner.')
         page.evaluate('__game.setState({sheet:{...validSheet,g:{value:-1,sigma:1}}})')

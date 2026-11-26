@@ -377,7 +377,7 @@ export function Pendulum() {
         {celebrate && <div className="panel panel-pad pendulum-milestone" role="status" aria-label="Twenty-swing celebration"><b>✦ Twenty-swing observation kept</b><div>Technique milestone · cosmetic · 0 score points</div></div>}
         <div className="panel panel-pad stage-bottom" style={{ padding: '8px 12px' }} data-tut="pend-watch">
           <div className="pendulum-clock" aria-label="Pendulum clock status">
-            <b>Rig &amp; watch: real time</b>
+            <b>Stopwatch: real seconds</b>
             <span>{clock.paused ? 'Expedition paused' : 'Expedition: 1×'} · saved warp: {WARPS[clock.warpIndex].label}</span>
           </div>
           <div className="row" style={{ justifyContent: 'center', gap: 10, flexWrap: 'nowrap' }}>
@@ -400,7 +400,7 @@ export function Pendulum() {
       </div>
 
       <div className="tool-side">
-        <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. Operate the rig and stopwatch at real time." />
+        <ToolHeader title="Pendulum rig" sub="Surface gravity from the period of a pendulum. The rig and stopwatch run in real time." />
         <details className="panel panel-pad measurement-help"><summary>Time while measuring</summary><p>The bob and stopwatch use real elapsed time, even when the expedition is paused. An unpaused expedition advances one game second per real second here, consuming its usual air/time. Warp controls are disabled while using the rig.</p><p>Leaving the rig restores the saved warp setting; the expedition keeps its current pause/resume state. Leaving during timing abandons that unfinished timing.</p></details>
         <div className="panel panel-pad stack" aria-label="Pendulum conditions">
           <b>Wind protection</b>

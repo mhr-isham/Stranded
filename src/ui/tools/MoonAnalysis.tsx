@@ -32,7 +32,7 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
   function apply() {
     const next = dates.map(Number) as [number, number];
     if (dates.some((d) => !d.trim()) || !next.every(Number.isFinite) || next[0] > next[1]) {
-      setDateError('Enter both expedition days, with start no later than end.'); return;
+      setDateError('Enter both elapsed days, with start no later than end.'); return;
     }
     select(next);
   }
@@ -82,7 +82,7 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
       {chosen && <>
         <dl className="kv" aria-label="Selected moon fit">
           <dt>Candidate period Pₘ{pickB && a.alternative ? ' (B)' : ' (A)'}</dt><dd>{fmt(chosen.period, 3)}{mode.sanity ? ` ± ${sig(chosen.sigmaPeriod, 2)}` : ''} days</dd>
-          <dt>Angular half-swing θₘ</dt><dd>{fmt(chosen.amplitude, 2)}{mode.sanity ? ` ± ${sig(chosen.sigmaAmplitude, 2)}` : ''}″ at day {fmt(a.mid, 2)}</dd>
+          <dt>Angular half-swing θₘ</dt><dd>{fmt(chosen.amplitude, 2)}{mode.sanity ? ` ± ${sig(chosen.sigmaAmplitude, 2)}` : ''}″ at elapsed day {fmt(a.mid, 2)}</dd>
         </dl>
         {mode.sanity && <div className="faint">± fit estimates include heuristic model allowances; they are not calibrated confidence limits.</div>}
         <details><summary>Use this fit</summary><div className="stack" style={{ paddingTop: 8 }}>
@@ -139,7 +139,7 @@ function MoonForecast({ first, second, end }: { first: SineFit; second: SineFit;
     {finite.length > 1 && <Chart ariaLabel="Uncertain moon model forecasts, no observed samples" series={[
       { pts: finite.map((t) => ({ x: t, y: first.model(t) })), color: '#6cc4ff', kind: 'line' },
       { pts: finite.map((t) => ({ x: t, y: second.model(t) })), color: '#b59cff', kind: 'line' },
-    ]} xLabel="expedition day (projection)" yLabel="predicted offset (″)" />}
+    ]} xLabel="elapsed days (projection)" yLabel="predicted offset (″)" />}
     {best !== undefined && <p>Within this five-day projection, the candidates differ most near day {fmt(best, 2)}. An observation there may help distinguish them if visibility and precision allow; a single night is not guaranteed to settle the question.</p>}
   </details>;
 }

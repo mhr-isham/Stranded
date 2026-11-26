@@ -30,7 +30,7 @@ with sync_playwright() as p:
         page.goto('http://localhost:5173/',wait_until='networkidle')
         setup(page)
         status=page.locator('[aria-label="Pendulum clock status"]')
-        expect(status).to_contain_text('Rig & watch: real time')
+        expect(status).to_contain_text('Stopwatch: real seconds')
         expect(status).to_contain_text('Expedition: 1× · saved warp: 1 day/s')
         expect(page.get_by_role('button',name='Faster',exact=True)).to_be_disabled()
         expect(page.get_by_role('button',name='Slower',exact=True)).to_be_disabled()

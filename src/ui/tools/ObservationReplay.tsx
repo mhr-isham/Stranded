@@ -40,13 +40,13 @@ export function ObservationReplay({ points, inner = false, onCursor }: { points:
         <svg viewBox="0 0 350 220" className="recorded-motion-plot" role="img" aria-label="Replay of saved tracker positions">
           <path d="M43 20V176H338" stroke="#8d9bb5" fill="none" />
           {[0, .5, 1].map((f) => <g key={f}><text x={X(minX + f * (maxX - minX))} y="193" textAnchor="middle" fill="#becbe2" fontSize="10">{(minX + f * (maxX - minX)).toFixed(1)}</text><text x="39" y={Y(minY + f * (maxY - minY)) + 3} textAnchor="end" fill="#becbe2" fontSize="10">{(minY + f * (maxY - minY)).toFixed(1)}°</text></g>)}
-          <text x="337" y="211" textAnchor="end" fill="#becbe2" fontSize="10">expedition day</text>
+          <text x="337" y="211" textAnchor="end" fill="#becbe2" fontSize="10">elapsed days</text>
           {trail && segments.filter((p) => p.length > 1).map((part, i) => <polyline key={i} points={part.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} fill="none" stroke="#6cc4ff" strokeDasharray="3 4" />)}
           {visible.filter((p) => p.gap).map((p) => <text key={`gap:${p.at}`} x={X(p.x)} y="17" textAnchor="middle" fill="#ffc46b" fontSize="10">gap</text>)}
-          {visible.map((p) => <circle key={p.at} cx={X(p.x)} cy={Y(p.y)} r={p.at === selected.at ? 5 : 2.5} fill={p.at === selected.at ? '#fff4d0' : '#6cc4ff'}><title>day {p.x.toFixed(3)} · {p.y.toFixed(3)}°</title></circle>)}
+          {visible.map((p) => <circle key={p.at} cx={X(p.x)} cy={Y(p.y)} r={p.at === selected.at ? 5 : 2.5} fill={p.at === selected.at ? '#fff4d0' : '#6cc4ff'}><title>Elapsed day {p.x.toFixed(3)} · {p.y.toFixed(3)}°</title></circle>)}
         </svg>
         <label className="field">Observation in replay<input type="range" min={0} max={Math.max(0, points.length - 1)} step={1} value={Math.min(index, points.length - 1)} onChange={(e) => { setPlaying(false); setIndex(Number(e.target.value)); }} /></label>
-        <div role="status">Sighting {Math.min(index + 1, points.length)} / {points.length} · day {fmt(selected.at / DAY, 3)} · {fmt(selected.y, 3)}°</div>
+        <div role="status">Sighting {Math.min(index + 1, points.length)} / {points.length} · elapsed day {fmt(selected.at / DAY, 3)} · {fmt(selected.y, 3)}°</div>
         {index > 0 && prior && <div>{inner ? 'Recorded elongation change' : 'Recorded longitude change'}: {fmt(selected.y - prior.y, 3)}° over {fmt((selected.at - prior.at) / DAY, 3)} days. {inner ? '' : motionDirection(selected.y - prior.y) === 'east' ? 'Eastward net change.' : motionDirection(selected.y - prior.y) === 'west' ? 'Westward net change.' : 'Direction unresolved at this readout step.'}{selected.gap ? ' A gap separates these sightings; the intervening path was not recorded.' : ''}</div>}
         <button className="btn small" onClick={() => onCursor(selected.x)}>Use this recorded date as chart cursor</button>
       </>}

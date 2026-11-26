@@ -95,6 +95,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
   const firstWindow = affordable[0] ?? windows[0];
   const depDay = launchWindow !== null ? launchWindow / DAY : dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
   const departure = depDay * DAY;
+  const departureDate = fmt(depDay + 1, 1);
   const fuelSaver = useMemo(() => model ? bestTransfer(model, departure) : null, [model, departure]);
   const fast = useMemo(() => model && !model.giant && fuelSaver
     ? planTransfer(model, departure, .75 * fuelSaver.plan.tof) : null, [model, departure, fuelSaver]);
@@ -253,9 +254,9 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
         <div className="panel panel-pad stack" data-tut="launch-departure">
           <div className="row between">
             <b>Departure</b>
-            <span className="mono">day {fmt(depDay, 1)}</span>
+            <span className="mono">Day {departureDate}</span>
           </div>
-          <input aria-label="Departure day" type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
+          <input aria-label="Departure day" aria-valuetext={`Expedition day ${departureDate}`} type="range" min={Math.floor(nowDay)} max={Math.floor(end / DAY)} step={0.5} value={depDay} onChange={(e) => setDep(Number(e.target.value))} />
           <div className="row" data-tut="launch-windows">
             {windows.slice(0, 3).map((w, i) => (
               <button
@@ -264,7 +265,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
                 title={affordable.includes(w) ? undefined : 'By your numbers this window costs more fuel than we carry.'}
                 onClick={() => setDep(w / DAY)}
               >
-                Window {i + 1}: day {fmt(w / DAY, 1)}
+                Window {i + 1}: Day {fmt(w / DAY + 1, 1)}
                 {affordable.includes(w) ? '' : ' · over budget'}
               </button>
             ))}
@@ -292,7 +293,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
           )}
           {!model.giant && <section className="stack" aria-label="Compare routes">
             <b>Compare routes</b>
-            <span className="muted route-comparison-note">Same departure · day {fmt(depDay, 1)}</span>
+            <span className="muted route-comparison-note">Same departure · Day {departureDate}</span>
             <div className="route-comparison">
               <RouteOption label="Fuel-saver" route={fuelSaver} budget={budget} end={end}
                 forecast={fuelSaver ? routeForecasts?.get(fuelSaver) : undefined}
@@ -399,7 +400,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
               )
             ) : depDay > nowDay ? (
               <button className="btn primary" onClick={warpTo}>
-                Warp to day {fmt(depDay, 1)} ({fmt(depDay - nowDay, 0)} days of life support)
+                Warp to Day {departureDate} ({fmt(depDay - nowDay, 1)} expedition days of life support)
               </button>
             ) : (
               <div className="amber">That date has passed.</div>
@@ -480,7 +481,7 @@ function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; n
   return (
     <div>
       <div className="row between" style={{ fontSize: 12 }}>
-        <span className="muted">Cost map: departure date → (flight time ↑)</span>
+        <span className="muted">Cost map: departure day → (flight time ↑)</span>
         <span className="faint">tap to choose</span>
       </div>
       <div style={{ height: 130, position: 'relative' }}>
