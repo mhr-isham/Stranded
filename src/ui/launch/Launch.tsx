@@ -42,10 +42,15 @@ import { navigationProgress } from '../../game/readiness';
 
 interface McResult extends ForecastSummary {
   paths: Vec3[][];
-  plan: PlannedTransfer;
+}
+
+interface TransferForecasts {
+  byRoute: Map<PlannedTransfer, McResult>;
   budget: number;
   system: StarSystem;
 }
+
+type RouteMode = 'fuel-saver' | 'fast' | 'custom';
 
 export function Launch() {
   const s = useGame();
@@ -62,9 +67,9 @@ export function Launch() {
   const end = lifeSupportEnd(s, sys);
   const budget = sys.fuelDv - s.penaltyDv;
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
-  const [autoTof, setAutoTof] = useState(true);
-  const [tofDays, setTofDays] = useState(200);
-  const [forecast, setForecast] = useState<McResult | null>(null);
+  const [routeMode, setRouteMode] = useState<RouteMode>('fuel-saver');
+  const [customDays, setCustomDays] = useState<number | null>(null);
+  const [forecast, setForecast] = useState<TransferForecasts | null>(null);
   const [showPaths, setShowPaths] = useState(false);
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 860px)').matches);
   const [confirm, setConfirm] = useState(false);
@@ -86,10 +91,17 @@ export function Launch() {
   );
   const firstWindow = affordable[0] ?? windows[0];
   const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
-  const plan: PlannedTransfer | null = useMemo(() => {
-    if (!model) return null;
-    return autoTof || model.giant ? bestTransfer(model, depDay * DAY) : planTransfer(model, depDay * DAY, tofDays * DAY);
-  }, [model, depDay, autoTof, tofDays]);
+  const departure = depDay * DAY;
+  const fuelSaver = useMemo(() => model ? bestTransfer(model, departure) : null, [model, departure]);
+  const fast = useMemo(() => model && !model.giant && fuelSaver
+    ? planTransfer(model, departure, .75 * fuelSaver.plan.tof) : null, [model, departure, fuelSaver]);
+  const minDays = Math.max(1, Math.round((hoh?.tof ?? DAY) / DAY * .5));
+  const maxDays = Math.max(minDays, Math.round((hoh?.tof ?? DAY) / DAY * 1.6));
+  const tofDays = Math.min(maxDays, Math.max(minDays, customDays ?? Math.round((fuelSaver?.plan.tof ?? DAY) / DAY)));
+  const custom = useMemo(() => model && !model.giant && routeMode === 'custom'
+    ? planTransfer(model, departure, tofDays * DAY) : null, [model, departure, tofDays, routeMode]);
+  const plan = model?.giant || routeMode === 'fuel-saver' ? fuelSaver : routeMode === 'fast' ? fast : custom;
+  const forecastRoutes = useMemo(() => [fuelSaver, fast, custom].filter((route): route is PlannedTransfer => !!route), [fuelSaver, fast, custom]);
 
   // Porkchop: estimated total delta-v over departure date x flight time.
   const pork = useMemo(() => {
@@ -119,8 +131,9 @@ export function Launch() {
     return () => query.removeEventListener('change', sync);
   }, []);
 
-  // A departure, flight time or budget change immediately hides stale samples.
-  const mc = forecast && forecast.plan === plan && forecast.budget === budget && forecast.system === sys ? forecast : null;
+  // Only show results matching the current route, budget and system.
+  const routeForecasts = forecast && forecast.budget === budget && forecast.system === sys ? forecast.byRoute : null;
+  const mc = (plan && routeForecasts?.get(plan)) ?? null;
   const pathLimit = compact ? 12 : 24;
   const paths = useMemo(() => {
     if (!showPaths || !mc) return [];
@@ -129,25 +142,27 @@ export function Launch() {
     return Array.from({ length: pathLimit }, (_, i) => mc.paths[Math.round(i * (mc.paths.length - 1) / (pathLimit - 1))]);
   }, [mc, pathLimit, showPaths]);
 
-  // Monte Carlo over the player's own error bars (never the truth).
+  // Use the same sampled systems for each route so the comparison varies the
+  // flight plan, rather than drawing different inputs for each option.
   useEffect(() => {
-    if (!plan || !model) return;
+    if (!forecastRoutes.length) return;
     const id = setTimeout(() => {
       const rng = makeRng(42);
-      const trials: (ReturnType<typeof simulateLaunch> | null)[] = [];
-      const paths: Vec3[][] = [];
-      for (let i = 0; i < 36; i++) {
-        const m = sampleModel(s.sheet, rng, variant);
-        if (!assessableModel(m)) { trials.push(null); continue; }
-        const u = { ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity };
-        const r = simulateLaunch(u, plan.plan);
-        trials.push(r);
-        if (r.path.length > 1 && r.path.every((p) => p.every(Number.isFinite))) paths.push(r.path);
+      const systems = Array.from({ length: 36 }, () => {
+        const sampled = sampleModel(s.sheet, rng, variant);
+        return assessableModel(sampled) ? { ...systemFromModel(sampled, sys), fuelDv: budget, lifeSupport: Infinity } : null;
+      });
+      const byRoute = new Map<PlannedTransfer, McResult>();
+      for (const route of forecastRoutes) {
+        const trials = systems.map(system => system ? simulateLaunch(system, route.plan) : null);
+        const paths = trials.flatMap(trial => trial && trial.path.length > 1 &&
+          trial.path.every(point => point.every(Number.isFinite)) ? [trial.path] : []);
+        byRoute.set(route, { ...summarizeForecast(trials), paths });
       }
-      setForecast({ ...summarizeForecast(trials), paths, plan, budget, system: sys });
+      setForecast({ byRoute, budget, system: sys });
     }, 250);
     return () => clearTimeout(id);
-  }, [plan, model, s.sheet, sys, budget, variant]);
+  }, [forecastRoutes, s.sheet, sys, budget, variant]);
 
   if (!model || !hoh) {
     const entriesToReview = [...progress.missing, ...progress.invalid];
@@ -184,7 +199,8 @@ export function Launch() {
   const margin = plan ? budget - plan.total : NaN;
 
   const launch = (manual = false) => {
-    const p = autoTof || model.giant ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, tofDays * DAY);
+    if (!plan) return;
+    const p = routeMode === 'fuel-saver' || model.giant ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, plan.plan.tof);
     if (!p) return toast('No transfer found for this date.');
     sfx('launch');
     if (!s.tutorial.active) savePrelaunch();
@@ -214,7 +230,7 @@ export function Launch() {
   };
 
   return (
-    <div className="tool">
+    <div className="tool launch-tool">
       <div className="tool-stage" data-tut="launch-stage">
         <Orrery model={model} plan={plan} paths={paths} t={t} depDay={depDay} />
         {plan && <div className="panel stage-bottom orrery-overlay-controls" role="group" aria-label="Trajectory display">
@@ -271,38 +287,34 @@ export function Launch() {
               </div>
             </div>
           )}
-          {!model.giant && (
-          <>
-          <div className="row" style={{ gap: 6 }}>
-            <button className={`btn small ${autoTof ? 'primary' : ''}`} onClick={() => setAutoTof(true)} title="The cheapest flight time for this date">
-              ⛽ Fuel-saver
-            </button>
-            <button
-              className={`btn small ${!autoTof && Math.abs(tofDays - Math.round((hoh.tof / DAY) * 0.75)) <= 1 ? 'primary' : ''}`}
-              onClick={() => (setAutoTof(false), setTofDays(Math.round((hoh.tof / DAY) * 0.75)))}
-              title="A quarter less time in space: saves life support, costs fuel"
-            >
-              ⚡ Fast
-            </button>
-            <button className={`btn small ${!autoTof && Math.abs(tofDays - Math.round((hoh.tof / DAY) * 0.75)) > 1 ? 'primary' : ''}`} onClick={() => setAutoTof(false)}>
-              Custom
-            </button>
-          </div>
-          <div className="faint" style={{ fontSize: 12 }}>
-            Fuel-saver keeps the most fuel for corrections. Fast spends some of that margin to save days of air — worth it only if you trust your error bars.
-          </div>
-          {!autoTof && (
-            <>
+          {!model.giant && <section className="stack" aria-label="Compare routes">
+            <b>Compare routes</b>
+            <span className="muted route-comparison-note">Same departure · day {fmt(depDay, 1)}</span>
+            <div className="route-comparison">
+              <RouteOption label="Fuel-saver" route={fuelSaver} budget={budget} end={end}
+                forecast={fuelSaver ? routeForecasts?.get(fuelSaver) : undefined}
+                selected={routeMode === 'fuel-saver'} onSelect={() => setRouteMode('fuel-saver')} />
+              <RouteOption label="Fast" route={fast} budget={budget} end={end}
+                forecast={fast ? routeForecasts?.get(fast) : undefined}
+                selected={routeMode === 'fast'} onSelect={() => setRouteMode('fast')} />
+            </div>
+            <p className="muted route-comparison-note">Fast targets 25% less flight time. Both routes use the same 36 trial models. Check arrival against your supplies separately.</p>
+            <button type="button" className={`btn small ${routeMode === 'custom' ? 'primary' : ''}`} aria-pressed={routeMode === 'custom'} onClick={() => {
+              if (customDays === null && plan) setCustomDays(Math.round(plan.plan.tof / DAY));
+              setRouteMode('custom');
+            }}>Custom</button>
+            {routeMode === 'custom' && <>
               <div className="row between">
                 <span className="muted">Flight time</span>
-                <span className="mono">{fmt(tofDays, 0)} days</span>
+                <span className="mono">{fmt(tofDays, 1)} days</span>
               </div>
-              <input type="range" min={Math.round((hoh.tof / DAY) * 0.5)} max={Math.round((hoh.tof / DAY) * 1.6)} value={tofDays} onChange={(e) => setTofDays(Number(e.target.value))} />
-            </>
-          )}
-          </>
-          )}
-          {pork && <div data-tut="launch-porkchop"><Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => (setDep(d), setAutoTof(false), setTofDays(tf))} /></div>}
+              <input aria-label="Custom flight time" type="range" min={minDays} max={maxDays} value={tofDays} onChange={e => setCustomDays(Number(e.target.value))} />
+            </>}
+            {routeMode !== 'fuel-saver' && !plan && <span className="amber">No usable transfer for this route and departure.</span>}
+          </section>}
+          {pork && <div data-tut="launch-porkchop"><Porkchop pork={pork} budget={budget} depDay={depDay} tof={plan?.plan.tof ?? hoh.tof} onPick={(d, tf) => {
+            setDep(d); setCustomDays(tf); setRouteMode('custom');
+          }} /></div>}
           {model.giant ? (
             <div className="muted" style={{ fontSize: 13 }}>
               No single lead angle here: the route needs the giant AND the blue planet in the right places, so windows are rare. ECHO searches your own
@@ -398,6 +410,32 @@ export function Launch() {
 }
 
 const TAU_DEG = 360;
+
+function RouteOption({ label, route, budget, end, forecast, selected, onSelect }: {
+  label: string;
+  route: PlannedTransfer | null;
+  budget: number;
+  end: number;
+  forecast?: ForecastSummary;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const margin = route ? budget - route.total : 0;
+  return <section className="panel-inset route-option" aria-label={`${label} route`} data-selected={selected}>
+    <button type="button" className={`btn small ${selected ? 'primary' : ''}`} aria-pressed={selected} disabled={!route} onClick={onSelect}>{label}</button>
+    {route ? <>
+      <dl>
+        <dt>Flight time</dt><dd>{fmt(route.plan.tof / DAY, 1)} days</dd>
+        <dt>{margin < 0 ? 'Over budget by' : 'Fuel for corrections'}</dt>
+        <dd className={margin < 0 ? 'red' : 'blue'}>{fmt(Math.abs(margin) / 1000, 2)} km/s</dd>
+        <dt>Captures within budget</dt>
+        <dd>{forecast ? `${forecast.succeeded} of ${forecast.attempted}` : 'Simulating…'}</dd>
+      </dl>
+      {forecast && forecast.unassessable > 0 && <div className="muted route-comparison-note">{forecast.unassessable} unassessable</div>}
+      {route.plan.departTime + route.plan.tof > end && <div className="amber route-comparison-note">Arrives after supplies run out</div>}
+    </> : <div className="muted route-comparison-note">No usable transfer</div>}
+  </section>;
+}
 
 function FuelBar({ plan, budget }: { plan: PlannedTransfer; budget: number }) {
   const parts = [
