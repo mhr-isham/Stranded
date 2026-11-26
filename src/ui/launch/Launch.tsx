@@ -1,6 +1,7 @@
 import { PlanningModelNotes } from '../common/PlanningModelNotes';
 import { DistanceContext } from '../common/DistanceContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { StarSystem } from '../../engine/types';
 import { QUANTITY_INFO, labelFor } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { DAY, DEG, G } from '../../engine/constants';
@@ -41,6 +42,9 @@ import { navigationProgress } from '../../game/readiness';
 
 interface McResult extends ForecastSummary {
   paths: Vec3[][];
+  plan: PlannedTransfer;
+  budget: number;
+  system: StarSystem;
 }
 
 export function Launch() {
@@ -60,7 +64,9 @@ export function Launch() {
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
   const [autoTof, setAutoTof] = useState(true);
   const [tofDays, setTofDays] = useState(200);
-  const [mc, setMc] = useState<McResult | null>(null);
+  const [forecast, setForecast] = useState<McResult | null>(null);
+  const [showPaths, setShowPaths] = useState(false);
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 860px)').matches);
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
@@ -105,9 +111,26 @@ export function Launch() {
     // Recompute when the model changes or every ~10 days of game time.
   }, [model, hoh, end, Math.floor(t / (10 * DAY))]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 860px)');
+    const sync = () => setCompact(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+
+  // A departure, flight time or budget change immediately hides stale samples.
+  const mc = forecast && forecast.plan === plan && forecast.budget === budget && forecast.system === sys ? forecast : null;
+  const pathLimit = compact ? 12 : 24;
+  const paths = useMemo(() => {
+    if (!showPaths || !mc) return [];
+    if (mc.paths.length <= pathLimit) return mc.paths;
+    // Spread the displayed sample across all drawable paths in trial order.
+    return Array.from({ length: pathLimit }, (_, i) => mc.paths[Math.round(i * (mc.paths.length - 1) / (pathLimit - 1))]);
+  }, [mc, pathLimit, showPaths]);
+
   // Monte Carlo over the player's own error bars (never the truth).
   useEffect(() => {
-    setMc(null);
     if (!plan || !model) return;
     const id = setTimeout(() => {
       const rng = makeRng(42);
@@ -119,9 +142,9 @@ export function Launch() {
         const u = { ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity };
         const r = simulateLaunch(u, plan.plan);
         trials.push(r);
-        if (paths.length < 24 && r.path.length && r.path.every((p) => p.every(Number.isFinite))) paths.push(r.path);
+        if (r.path.length > 1 && r.path.every((p) => p.every(Number.isFinite))) paths.push(r.path);
       }
-      setMc({ ...summarizeForecast(trials), paths });
+      setForecast({ ...summarizeForecast(trials), paths, plan, budget, system: sys });
     }, 250);
     return () => clearTimeout(id);
   }, [plan, model, s.sheet, sys, budget, variant]);
@@ -193,7 +216,16 @@ export function Launch() {
   return (
     <div className="tool">
       <div className="tool-stage" data-tut="launch-stage">
-        <Orrery model={model} plan={plan} mc={mc} t={t} depDay={depDay} />
+        <Orrery model={model} plan={plan} paths={paths} t={t} depDay={depDay} />
+        {plan && <div className="panel stage-bottom orrery-overlay-controls" role="group" aria-label="Trajectory display">
+          <span className="orrery-route-key"><i aria-hidden="true" />Planned route</span>
+          <button type="button" className="btn small" aria-pressed={showPaths} onClick={() => setShowPaths(!showPaths)}>
+            {showPaths ? 'Hide possible paths' : 'Show possible paths'}
+          </button>
+          {showPaths && <span className="orrery-path-count" role="status">
+            {mc ? `${paths.length} paths shown from ${mc.attempted} trials` : 'Updating paths…'}
+          </span>}
+        </div>}
       </div>
       <div className="tool-side">
         <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
@@ -437,7 +469,7 @@ function Porkchop({ pork, budget, depDay, tof, onPick }: { pork: { nx: number; n
   );
 }
 
-function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<typeof modelFromPrimaries>>; plan: PlannedTransfer | null; mc: McResult | null; t: number; depDay: number }) {
+function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnType<typeof modelFromPrimaries>>; plan: PlannedTransfer | null; paths: Vec3[][]; t: number; depDay: number }) {
   const anim = useRef(0);
   // The planned transfer arc in the player's model, computed once per plan.
   const arc = useMemo(() => {
@@ -462,6 +494,7 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
   }, [plan, model, depDay]);
   return (
     <CanvasView
+      role="img" aria-label={paths.length ? 'Planned route with sampled trajectories' : 'Planned route and planetary orbits'}
       draw={({ ctx, w, h, dpr, dt }) => {
         anim.current = (anim.current + dt * 0.15) % 1;
         ctx.fillStyle = '#04060c';
@@ -499,15 +532,13 @@ function Orrery({ model, plan, mc, t, depDay }: { model: NonNullable<ReturnType<
         ctx.beginPath();
         ctx.arc(cx, cy, 26 * dpr, 0, Math.PI * 2);
         ctx.fill();
-        // Uncertainty spaghetti from the Monte Carlo.
-        if (mc) {
-          ctx.lineWidth = dpr;
-          for (const p of mc.paths) {
-            ctx.strokeStyle = 'rgba(255,196,107,0.13)';
-            ctx.beginPath();
-            p.forEach((v, i) => (i ? ctx.lineTo(X(v), Y(v)) : ctx.moveTo(X(v), Y(v))));
-            ctx.stroke();
-          }
+        // Sampled trajectories sit behind the selected route.
+        ctx.lineWidth = dpr;
+        ctx.strokeStyle = 'rgba(124,166,224,0.24)';
+        for (const path of paths) {
+          ctx.beginPath();
+          path.forEach((v, i) => (i ? ctx.lineTo(X(v), Y(v)) : ctx.moveTo(X(v), Y(v))));
+          ctx.stroke();
         }
         const td = depDay * DAY;
         if (plan) {

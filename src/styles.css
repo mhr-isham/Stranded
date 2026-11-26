@@ -746,3 +746,8 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .outing-fields .input { width: 100%; min-width: 0; }
 .outing-ticket { padding: 10px 12px; border: 1px solid #6cc4ff45; border-radius: 10px; background: linear-gradient(125deg, #19345080, #0a142480); }
 .outing-ticket > .row, .outing-ticket .btn { white-space: normal; }
+
+.orrery-overlay-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; padding: 6px 9px; font-size: 12px; }
+.orrery-route-key { display: inline-flex; align-items: center; gap: 6px; }
+.orrery-route-key i { width: 17px; border-top: 2px dashed var(--amber); }
+.orrery-path-count { flex-basis: 100%; color: var(--muted); text-align: center; }
