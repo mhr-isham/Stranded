@@ -15,6 +15,7 @@ import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
 import { flightReadiness, navigationModel, navigationProgress, quantityName, weakestValue } from '../game/readiness';
 import { flareAt } from '../engine/flares';
 import { AudioSettings } from './common/AudioSettings';
+import { EventMenu } from './common/EventMenu';
 import { isCadetExpedition } from '../game/cadetGuidance';
 
 export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }) {
@@ -24,6 +25,8 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
   const mode = useMode();
   const { system: sys } = currentWorld();
   const [menu, setMenu] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const ClockPanel = s.tutorial.active ? 'div' : 'button';
   const end = lifeSupportEnd(s, sys);
   const lifeFrac = s.tutorial.active ? 1 : Math.max(0, Math.min(1, (end - t) / sys.lifeSupport));
   const daysLeft = Math.max(0, (end - t) / DAY);
@@ -40,11 +43,13 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
   return (
     <>
       <div className="hud">
-        <div className="panel hud-block hud-time" data-tut="hud-time">
-          <span style={{ fontSize: 20 }}>{flare ? '🔥' : sys.features.locked ? '🌒' : night ? '🌙' : '☀️'}</span>
-          <div>
-            <div className="day">Day {dayNumber(t)}</div>
-            <div className={`clock ${flare ? 'amber' : ''}`}>
+        <ClockPanel className={`panel hud-block hud-time${s.tutorial.active ? '' : ' hud-time-button'}`} data-tut="hud-time"
+          type={s.tutorial.active ? undefined : 'button'} aria-label={s.tutorial.active ? undefined : 'Next event'}
+          title={s.tutorial.active ? undefined : 'Open scheduled events'} onClick={s.tutorial.active ? undefined : () => setEventsOpen(true)}>
+          <span className="hud-clock-icon" style={{ fontSize: 20 }}>{flare ? '🔥' : sys.features.locked ? '🌒' : night ? '🌙' : '☀️'}</span>
+          <span className="hud-clock-readout">
+            <span className="day">Day {dayNumber(t)}</span>
+            <span className={`clock ${flare ? 'amber' : ''}`}>
               {flare ? (
                 'FLARE'
               ) : sys.features.locked ? (
@@ -55,9 +60,10 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
                   <span className="hide-phone"> local</span>
                 </>
               )}
-            </div>
-          </div>
-        </div>
+              {!s.tutorial.active && <span className="hud-time-caret hide-phone" aria-hidden="true"> ▾</span>}
+            </span>
+          </span>
+        </ClockPanel>
         <div className="panel hud-block warp" data-tut="hud-warp">
           <button
             className="btn icon small"
@@ -162,6 +168,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
           ☰
         </button>
       </div>
+      {!s.tutorial.active && <EventMenu open={eventsOpen} onClose={() => setEventsOpen(false)} now={t} supplyEnd={end} />}
       {menu && (
         <Modal top onClose={() => setMenu(false)}>
           <h2>Expedition</h2>

@@ -102,6 +102,7 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 }
 .hud > * { pointer-events: auto; }
 .hud-block { display: flex; align-items: center; gap: 10px; padding: 6px 12px; min-height: 48px; }
+.hud-clock-readout, .hud-clock-readout > span { display: block; }
 .hud-time .day { font-family: var(--display); font-weight: 700; font-size: 17px; }
 .hud-time .clock { font-family: var(--mono); color: var(--muted); font-size: 13px; }
 .show-phone, .show-phone-block { display: none; }
@@ -282,7 +283,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .hud { gap: 5px; left: 6px; right: 6px; }
   .hud-block { min-height: 46px; padding: 4px 8px; gap: 6px; }
   .hud-time .day { font-size: 15px; }
-  .hud-time > span { display: none; }
+  .hud-time > .hud-clock-icon { display: none; }
   .hud-life { flex: 1; min-width: 0; flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
   .hud-life .meter { width: 100%; }
   .hud-life > span { font-size: 11px !important; text-align: right; }
@@ -800,3 +801,14 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .hud-navigation.has-window { width: 51px; flex: 0 0 51px; }
   .hud-navigation.has-window .hud-window .mono { font-size: 10px; }
 }
+
+.hud-time-button { cursor: pointer; text-align: left; }
+.hud-time-button .clock { color: var(--blue); }
+.hud-time-button .clock.amber { color: var(--amber); }
+.hud-time-button:hover { border-color: var(--blue); }
+.hud-time-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.hud-time-caret { color: var(--muted); }
+.event-menu .event-choice { justify-content: space-between; text-align: left; white-space: normal; }
+.event-choice[aria-pressed="true"] { border-color: var(--blue); background: rgba(108,196,255,.12); }
+.event-source { display: block; color: var(--muted); font-size: 12px; }
+.event-choice .mono { flex-shrink: 0; color: var(--blue); font-size: 12px; }
