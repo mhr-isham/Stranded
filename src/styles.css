@@ -828,3 +828,14 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .timeline-source { font-size: 12px; }
 .modal:has(.event-menu) { background: var(--panel-solid); }
 .event-menu:focus { outline: none; }
+
+.sketch-capture { align-items: flex-end; }
+.sketch-capture .field { flex: 1; min-width: 96px; }
+.sketch-chart { aspect-ratio: 8 / 5; position: relative; overflow: hidden; border: 1px solid var(--panel-border); border-radius: 10px; background: radial-gradient(ellipse at 50% 100%, #172c48, #050913 73%); }
+.sketch-chart svg { width: 100%; height: 100%; position: absolute; inset: 0; pointer-events: none; }
+.sketch-chart line { stroke: #6cc4ff; stroke-width: 1.4; }
+.sketch-chart circle { fill: #dcecff; }
+.sketch-star { position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; padding: 0; }
+.sketch-star::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: #dcecff; box-shadow: 0 0 5px #a7cfff90; }
+.sketch-star:is(:focus-visible, :hover, [aria-pressed="true"]) { border-color: var(--blue); z-index: 1; }
+.sketch-star[aria-pressed="true"]::before { background: var(--amber); }

@@ -28,6 +28,7 @@ import { acknowledgeObservation } from './measurementFeedback';
 import type { VerificationRecord } from './verification';
 import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
 import type { SkySighting } from './skyObservation';
+import type { ConstellationSketch } from './constellationSketch';
 import type { RoverOuting } from './roverOuting';
 
 export type Screen =
@@ -152,6 +153,7 @@ export interface GameState {
   sheet: Partial<Record<PrimaryKey, Estimate>>;
   starObs: TimedValue[]; // star longitude against background stars (rad)
   skySightings: SkySighting[];
+  constellationSketches: ConstellationSketch[];
   pendulumMilestones: string[];
   sharpEyeAwards?: SharpEyeAwards;
   sharpEyeNotified?: SharpEyeCondition[];
@@ -296,6 +298,7 @@ const initial = {
   sheet: {},
   starObs: [],
   skySightings: [] as SkySighting[],
+  constellationSketches: [] as ConstellationSketch[],
   pendulumMilestones: [] as string[],
   sharpEyeAwards: {} as SharpEyeAwards,
   sharpEyeNotified: [] as SharpEyeCondition[],

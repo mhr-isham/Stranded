@@ -5,6 +5,7 @@ import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
 import { dayNumber } from '../../game/time';
+import { ConstellationSketchpad } from './ConstellationSketchpad';
 import { Modal, toast } from './widgets';
 
 function durationLabel(seconds: number) {
@@ -23,7 +24,7 @@ export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenL
   open: boolean; onClose: () => void; now: number; supplyEnd: number; launchWindow?: number; onOpenLaunch: () => void;
 }) {
   const state = useGame();
-  const [timeline, setTimeline] = useState(false);
+  const [view, setView] = useState<'events' | 'timeline' | 'sketch'>('events');
   const [selected, setSelected] = useState<ScheduledEvent | null>(null);
   const [active, setActive] = useState<ScheduledEvent | null>(null);
   const cancel = useRef<null | (() => void)>(null);
@@ -74,21 +75,24 @@ export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenL
   }
 
   function close() {
-    setTimeline(false);
+    setView('events');
     onClose();
   }
 
-  function switchView(next: boolean) {
-    setTimeline(next);
+  function switchView(next: typeof view) {
+    setView(next);
     menu.current?.focus();
   }
 
-  const timelineEntries = timeline ? expeditionTimeline(state, now, launchWindow) : [];
+  const timelineEntries = view === 'timeline' ? expeditionTimeline(state, now, launchWindow) : [];
   return <Modal onClose={close}>
     <div ref={menu} tabIndex={-1} className="stack event-menu" role="region" aria-label="Scheduled events">
-      <h2>{timeline ? 'Expedition timeline' : 'Next event'}</h2>
-      {timeline ? <>
-        <button className="btn small timeline-switch" onClick={() => switchView(false)}>Back to next event</button>
+      <h2>{view === 'timeline' ? 'Expedition timeline' : view === 'sketch' ? 'Constellation sketchpad' : 'Next event'}</h2>
+      {view === 'sketch' ? <>
+        <button className="btn small timeline-switch" onClick={() => switchView('events')}>Back to next event</button>
+        <ConstellationSketchpad />
+      </> : view === 'timeline' ? <>
+        <button className="btn small timeline-switch" onClick={() => switchView('events')}>Back to next event</button>
         <p className="muted timeline-intro">See what’s coming up and decide what to do before you get there.</p>
         <dl className="timeline-key">
           <dt>Scheduled</dt><dd>A rover trip or job already underway.</dd>
@@ -114,7 +118,7 @@ export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenL
         </ol> : <div className="panel-inset">Nothing on the timeline yet. Your trips, jobs and observing plans will appear here.</div>}
       </> : <>
       <div className="muted">Scheduled operations and observing times you saved.</div>
-      <button className="btn small timeline-switch" onClick={() => switchView(true)}>View timeline</button>
+      <button className="btn small timeline-switch" onClick={() => switchView('timeline')}>View timeline</button>
       {active && <div className="panel-inset stack" aria-label="Scheduled wait">
         <b>Waiting · {active.label}</b>
         <span>{durationLabel(active.at - now)} remaining</span>
@@ -139,6 +143,15 @@ export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenL
         {realtime && <span className="muted">Leave the real-time instrument before using warp.</span>}
         <button className="btn primary" disabled={!canWait} onClick={waitForEvent}>Wait and pause</button>
       </div>}
+      <details className="measurement-help">
+        <summary>While you wait</summary>
+        <p>Review a tool or sketch the sky. Your clock and scheduled stop keep their current settings.</p>
+        <div className="row">
+          <button className="btn small" onClick={() => { useGame.getState().go('observatory'); close(); }}>Review sky observations</button>
+          <button className="btn small" onClick={() => { useGame.getState().go('launch'); close(); }}>Open launch planner</button>
+          <button className="btn small" onClick={() => switchView('sketch')}>Open constellation sketchpad</button>
+        </div>
+      </details>
       </>}
     </div>
   </Modal>;
