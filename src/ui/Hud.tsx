@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DAY } from '../engine/constants';
 import { variantOf } from '../engine/chapters';
+import { predictedWindows } from '../engine/planner';
 import { WARPS, clock, setWarp, togglePause } from '../game/clock';
 import { checkMissions, currentWorld } from '../game/sim';
 import { useGame } from '../game/store';
@@ -11,12 +12,12 @@ import { flag } from '../game/tutorial';
 import { Modal, Toggle, toast, useClockState, useGameTime } from './common/widgets';
 import { useMode } from '../game/modes';
 import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
-import { flightReadiness, navigationProgress, quantityName, weakestValue } from '../game/readiness';
+import { flightReadiness, navigationModel, navigationProgress, quantityName, weakestValue } from '../game/readiness';
 import { flareAt } from '../engine/flares';
 import { AudioSettings } from './common/AudioSettings';
 import { isCadetExpedition } from '../game/cadetGuidance';
 
-export function Hud() {
+export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }) {
   const t = useGameTime(6);
   useClockState();
   const s = useGame();
@@ -30,6 +31,11 @@ export function Hud() {
   const sol = localSolarHours(sys, t);
   const night = sol < 5 || sol > 19;
   const flare = flareAt(sys, t);
+  const variant = variantOf(sys.features);
+  const model = useMemo(() => navigationModel(s.sheet, variant), [s.sheet, variant]);
+  const launchWindow = !s.tutorial.active && model ? predictedWindows(model, t, end, 1)[0] : undefined;
+  const windowDays = launchWindow === undefined ? 0 : Math.ceil((launchWindow - t) / DAY);
+  const windowCountdown = windowDays <= 1 ? 'Under 1 day' : `${fmt(windowDays, 0)} days`;
 
   return (
     <>
@@ -128,7 +134,22 @@ export function Hud() {
             </span>
           </button>
         )}
-        {!s.tutorial.active && <ReadinessBlock t={t} end={end} budget={fuel} />}
+        {!s.tutorial.active && <div className={`hud-navigation${launchWindow === undefined ? '' : ' has-window'}`}>
+          <ReadinessBlock t={t} end={end} budget={fuel} />
+          {launchWindow !== undefined && <button type="button" className="panel hud-block btn hud-window"
+            title="Estimated from your navigation sheet. Measurement errors can shift the window."
+            aria-label={`Estimated launch window: ${windowCountdown.toLowerCase()}. Open launch planner.`}
+            onClick={() => {
+              const current = useGame.getState();
+              const currentModel = navigationModel(current.sheet, variant);
+              if (!currentModel) return;
+              const at = predictedWindows(currentModel, clock.t, lifeSupportEnd(current, sys), 1)[0];
+              if (at !== undefined) onLaunchWindow(at);
+            }}>
+            <span className="meter-label"><span className="hide-phone">Est. launch window</span><span className="show-phone">Est. window</span></span>
+            <span className="mono">{windowDays <= 1 ? '< 1 d' : `${fmt(windowDays, 0)} d`}</span>
+          </button>}
+        </div>}
         <div className="panel hud-block hide-phone" data-tut="hud-fuel">
           <div>
             <div className="meter-label">Fuel Δv</div>

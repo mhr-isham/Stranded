@@ -267,17 +267,18 @@ function slingshotWindows(m: PlayerModel, t1: number): number[] {
 }
 
 /** Hohmann windows predicted by the player's model between t0 and t1. */
-export function predictedWindows(m: PlayerModel, t0: number, t1: number) {
-  if (m.ecc) return ellipseWindows(m).filter((t) => t >= t0 && t <= t1);
-  if (m.giant) return slingshotWindows(m, t1).filter((t) => t >= t0 && t <= t1);
+export function predictedWindows(m: PlayerModel, t0: number, t1: number, limit = Infinity) {
+  if (!Number.isFinite(t0) || !Number.isFinite(t1) || t0 > t1 || limit <= 0) return [];
+  if (m.ecc) return ellipseWindows(m).filter((t) => t >= t0 && t <= t1).slice(0, limit);
+  if (m.giant) return slingshotWindows(m, t1).filter((t) => t >= t0 && t <= t1).slice(0, limit);
   const { lead } = hohmannFor(m);
   const out: number[] = [];
   // Outer target: the lead shrinks with time; inner target: it grows.
   const offset = m.inner ? -((((lead / TAU) % 1) + 1) % 1) * m.S2 : (lead / TAU) * m.S2;
   const k0 = Math.ceil((t0 - m.tOpp + offset) / m.S2);
-  for (let k = k0; ; k++) {
+  for (let k = k0; Number.isSafeInteger(k) && out.length < limit; k++) {
     const t = m.tOpp + k * m.S2 - offset;
-    if (t > t1) break;
+    if (!Number.isFinite(t) || t > t1) break;
     if (t >= t0) out.push(t);
   }
   return out;

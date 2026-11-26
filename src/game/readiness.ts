@@ -19,6 +19,13 @@ export function navigationProgress(sheet: Primaries, variant: ChainVariant) {
   return { logged: keys.length - missing.length, total: keys.length, missing, invalid };
 }
 
+export function navigationModel(sheet: Primaries, variant: ChainVariant) {
+  const progress = navigationProgress(sheet, variant);
+  if (progress.missing.length || progress.invalid.length) return null;
+  const model = modelFromPrimaries(sheet, variant);
+  return assessableModel(model) ? model : null;
+}
+
 export type FlightReadiness =
   | { status: 'missing' | 'invalid-model' | 'no-window' | 'no-transfer' }
   | { status: 'sampled'; window: number; summary: ForecastSummary };
@@ -58,9 +65,9 @@ export function flightReadiness(sheet: Primaries, system: StarSystem, budget: nu
   const progress = navigationProgress(sheet, variant);
   if (progress.missing.length) return { status: 'missing' };
   if (progress.invalid.length) return { status: 'invalid-model' };
-  const model = modelFromPrimaries(sheet, variant);
-  if (!assessableModel(model)) return { status: 'invalid-model' };
-  const window = end >= now ? predictedWindows(model, now, end).find(Number.isFinite) : undefined;
+  const model = navigationModel(sheet, variant);
+  if (!model) return { status: 'invalid-model' };
+  const window = predictedWindows(model, now, end, 1)[0];
   if (window === undefined) return { status: 'no-window' };
   const previous = estimateCache.get(sheet);
   if (previous?.system === system && previous.budget === budget && previous.window === window) return previous.estimate;

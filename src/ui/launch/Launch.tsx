@@ -38,7 +38,7 @@ import { flag, jumpTo } from '../../game/tutorial';
 import { manualFlightRequired } from '../../game/piloting';
 import { assessableModel, summarizeForecast, type ForecastSummary } from '../../game/forecast';
 
-import { navigationProgress } from '../../game/readiness';
+import { navigationModel, navigationProgress } from '../../game/readiness';
 
 interface McResult extends ForecastSummary {
   paths: Vec3[][];
@@ -52,18 +52,14 @@ interface TransferForecasts {
 
 type RouteMode = 'fuel-saver' | 'fast' | 'custom';
 
-export function Launch() {
+export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: number | null; clearLaunchWindow: (value: null) => void }) {
   const s = useGame();
   const manualRequired = manualFlightRequired(s);
   const { system: sys } = currentWorld();
   const t = useGameTime(2);
   const variant = variantOf(sys.features);
   const progress = useMemo(() => navigationProgress(s.sheet, variant), [s.sheet, variant]);
-  const model = useMemo(() => {
-    if (progress.missing.length || progress.invalid.length) return null;
-    const candidate = modelFromPrimaries(s.sheet, variant);
-    return assessableModel(candidate) ? candidate : null;
-  }, [s.sheet, variant, progress]);
+  const model = useMemo(() => navigationModel(s.sheet, variant), [s.sheet, variant]);
   const end = lifeSupportEnd(s, sys);
   const budget = sys.fuelDv - s.penaltyDv;
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
@@ -73,6 +69,13 @@ export function Launch() {
   const [showPaths, setShowPaths] = useState(false);
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 860px)').matches);
   const [confirm, setConfirm] = useState(false);
+
+  useEffect(() => {
+    if (launchWindow === null) return;
+    setDep(launchWindow / DAY);
+    setConfirm(false);
+    clearLaunchWindow(null);
+  }, [launchWindow, clearLaunchWindow]);
 
   useEffect(() => {
     if (model && !s.missionsDone.includes('plan')) {
@@ -90,7 +93,7 @@ export function Launch() {
     [model, windows, budget],
   );
   const firstWindow = affordable[0] ?? windows[0];
-  const depDay = dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
+  const depDay = launchWindow !== null ? launchWindow / DAY : dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
   const departure = depDay * DAY;
   const fuelSaver = useMemo(() => model ? bestTransfer(model, departure) : null, [model, departure]);
   const fast = useMemo(() => model && !model.giant && fuelSaver

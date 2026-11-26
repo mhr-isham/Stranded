@@ -767,3 +767,36 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .launch-tool .tool-side { margin-top: calc(var(--hud-h) + var(--safe-top)); max-height: none; }
   .launch-tool .stage-bottom { bottom: calc(84px + var(--safe-bottom)) !important; }
 }
+
+.hud-navigation { display: flex; gap: 8px; }
+.hud-window { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; white-space: nowrap; text-align: left; border-color: rgba(108,196,255,.32); }
+.hud-window.btn { background: #0c1624; }
+.hud-window.btn:hover { background: #13263b; }
+.hud-window .mono { color: var(--blue); font-size: 14px; }
+@media (max-width: 860px) {
+  .hud-navigation { gap: 5px; }
+  .hud-window { gap: 1px; }
+  .hud-window .meter-label { font-size: 9px; }
+  .hud-window .mono { font-size: 12px; }
+}
+@media (max-width: 600px) {
+  .hud-navigation.has-window { flex-direction: column; gap: 2px; width: 58px; flex: 0 0 58px; }
+  .hud-navigation.has-window .hud-ready, .hud-navigation.has-window .hud-window { min-height: 24px; padding: 2px 5px; border-radius: 6px; }
+  .hud-navigation.has-window .hud-ready .mono { font-size: 10px !important; }
+  .hud-navigation.has-window .hud-ready .mono::before { content: 'Nav '; color: var(--muted); }
+  .hud-navigation.has-window .hud-ready .show-phone { display: none !important; }
+  .hud-navigation.has-window .hud-window { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .hud-navigation.has-window .hud-window .meter-label { font-size: 8px; white-space: normal; line-height: 1.1; }
+  .hud-navigation.has-window .hud-window .mono { font-size: 11px; }
+}
+@media (max-width: 360px) {
+  .hud:has(.hud-window) { gap: 3px; }
+  .hud:has(.hud-window) .warp { padding-inline: 3px; column-gap: 1px; }
+  .hud:has(.hud-window) .warp .btn.icon { width: 22px; }
+  .hud:has(.hud-window) .warp .rate { min-width: 36px; padding-inline: 1px; font-size: 10px; }
+  .hud:has(.hud-window) .hud-life { min-width: 36px; padding-inline: 3px; }
+  .hud:has(.hud-window) .hud-life > span { font-size: 9px !important; }
+  .hud:has(.hud-window) > button { min-width: 28px; }
+  .hud-navigation.has-window { width: 51px; flex: 0 0 51px; }
+  .hud-navigation.has-window .hud-window .mono { font-size: 10px; }
+}

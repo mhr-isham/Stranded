@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { checkMissions } from '../game/sim';
 import { ECHO } from '../game/echo';
 import { modeOf } from '../game/modes';
@@ -34,6 +34,7 @@ export function Game() {
   const screen = useGame((s) => s.screen);
   const go = useGame((s) => s.go);
   const tutorial = useGame((s) => s.tutorial.active);
+  const [launchWindow, setLaunchWindow] = useState<number | null>(null);
 
   useEffect(() => {
     const g = useGame.getState();
@@ -49,14 +50,14 @@ export function Game() {
       {screen === 'observatory' && <Observatory />}
       {screen === 'rover' && <Rover />}
       {screen === 'sheet' && <Sheet />}
-      {screen === 'launch' && <Launch />}
+      {screen === 'launch' && <Launch launchWindow={launchWindow} clearLaunchWindow={setLaunchWindow} />}
       {screen === 'workshop' && <Workshop />}
       {screen === 'codex' && <Codex />}
       {screen === 'probe' && <ProbeBay />}
       {screen === 'map' && <SurfaceMap />}
       {screen === 'drive' && <RoverDrive />}
       {screen === 'gnomon' && <Gnomon />}
-      <Hud />
+      <Hud onLaunchWindow={(at) => { setLaunchWindow(at); go('launch'); }} />
       {screen === 'hub' && !tutorial && <MissionPanel />}
       <nav className="nav panel" data-tut="nav">
         {NAV.map((n) => (
