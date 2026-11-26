@@ -1,7 +1,7 @@
 import { PlanningModelNotes } from '../common/PlanningModelNotes';
 import { DistanceContext } from '../common/DistanceContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { QUANTITY_INFO, keysFor, labelFor } from '../../engine/chain';
+import { QUANTITY_INFO, labelFor } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { DAY, DEG, G } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
@@ -37,6 +37,8 @@ import { flag, jumpTo } from '../../game/tutorial';
 import { manualFlightRequired } from '../../game/piloting';
 import { assessableModel, summarizeForecast, type ForecastSummary } from '../../game/forecast';
 
+import { navigationProgress } from '../../game/readiness';
+
 interface McResult extends ForecastSummary {
   paths: Vec3[][];
 }
@@ -47,7 +49,12 @@ export function Launch() {
   const { system: sys } = currentWorld();
   const t = useGameTime(2);
   const variant = variantOf(sys.features);
-  const model = useMemo(() => modelFromPrimaries(s.sheet, variant), [s.sheet, variant]);
+  const progress = useMemo(() => navigationProgress(s.sheet, variant), [s.sheet, variant]);
+  const model = useMemo(() => {
+    if (progress.missing.length || progress.invalid.length) return null;
+    const candidate = modelFromPrimaries(s.sheet, variant);
+    return assessableModel(candidate) ? candidate : null;
+  }, [s.sheet, variant, progress]);
   const end = lifeSupportEnd(s, sys);
   const budget = sys.fuelDv - s.penaltyDv;
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
@@ -120,16 +127,19 @@ export function Launch() {
   }, [plan, model, s.sheet, sys, budget, variant]);
 
   if (!model || !hoh) {
-    const missing = keysFor(variant).filter((k) => !s.sheet[k] || !Number.isFinite(s.sheet[k]!.value));
+    const entriesToReview = [...progress.missing, ...progress.invalid];
     return (
       <div className="tool">
         <div className="tool-stage" />
         <div className="tool-side">
           <ToolHeader title="Launch planner" sub="Plot a course to the blue planet using your own measurements." />
           <div className="panel panel-pad stack">
-            <b>Not enough data yet</b>
-            <div className="muted">The planner needs every measured quantity on the progress sheet. Still missing:</div>
-            {missing.map((k) => (
+            <b>{progress.missing.length ? 'More navigation values needed' : 'Review the flight model'}</b>
+            <div>{progress.logged} of {progress.total} navigation values logged</div>
+            <div className="muted">{progress.missing.length
+              ? 'Log the remaining values on the progress sheet before estimating a transfer.'
+              : 'The current values or ranges do not form a usable flight model. Review the progress sheet.'}</div>
+            {entriesToReview.map((k) => (
               <div key={k} className="row between" style={{ fontSize: 13 }}>
                 <span>{labelFor(k, variant)}</span>
                 <span className="faint">{QUANTITY_INFO[k].symbol}</span>

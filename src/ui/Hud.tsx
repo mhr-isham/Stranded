@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DAY } from '../engine/constants';
+import { variantOf } from '../engine/chapters';
 import { WARPS, clock, setWarp, togglePause } from '../game/clock';
 import { checkMissions, currentWorld } from '../game/sim';
 import { useGame } from '../game/store';
@@ -10,7 +11,7 @@ import { flag } from '../game/tutorial';
 import { Modal, Toggle, toast, useClockState, useGameTime } from './common/widgets';
 import { useMode } from '../game/modes';
 import { SLOTS, listSlots, loadSlot, saveSlot } from '../game/checkpoints';
-import { quantityName, readiness } from '../game/readiness';
+import { flightReadiness, navigationProgress, quantityName, weakestValue } from '../game/readiness';
 import { flareAt } from '../engine/flares';
 import { AudioSettings } from './common/AudioSettings';
 import { isCadetExpedition } from '../game/cadetGuidance';
@@ -279,74 +280,63 @@ function CheckpointPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Mission readiness from the player's own error bars. Detail depends on the mode. */
+/** The HUD meter tracks sheet entries. Transfer trials are available on request. */
 function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: number }) {
   const s = useGame();
   const mode = useMode();
-  const { system: sys } = currentWorld();
+  const { system } = currentWorld();
   const [open, setOpen] = useState(false);
-  const r = readiness(s.sheet, sys, budget, t, end);
-  const pct = r.success !== null ? Math.round(r.success * 100) : null;
-  const frac = pct !== null ? pct / 100 : r.measured / r.total;
-  const cls = pct === null ? '' : pct >= 80 ? 'green' : pct >= 40 ? 'amber' : 'red';
-  const detail = mode.missions !== 'off';
+  const variant = variantOf(system.features);
+  const progress = navigationProgress(s.sheet, variant);
+  const flight = open ? flightReadiness(s.sheet, system, budget, t, end) : null;
+  const weakest = open && mode.missions !== 'off' && !progress.invalid.length ? weakestValue(s.sheet, variant) : null;
+  const count = `${progress.logged} of ${progress.total} navigation values logged`;
   return (
     <>
-      <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title="Mission readiness" aria-label={`Mission readiness: ${pct !== null ? `${pct}%` : `${r.measured} of ${r.total} values`}`}>
+      <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title={count} aria-label={`Mission readiness: ${count}`}>
         <div className="hide-phone">
-          <div className="meter-label">Ready</div>
+          <div className="meter-label">Nav log</div>
           <div className="meter" style={{ width: 70 }}>
-            <i
-              style={{
-                width: `${frac * 100}%`,
-                background: pct === null ? 'var(--blue)' : `var(--${cls === 'green' ? 'green' : cls === 'amber' ? 'amber' : 'red'})`,
-              }}
-            />
+            <i style={{ width: `${100 * progress.logged / progress.total}%`, background: 'var(--blue)' }} />
           </div>
         </div>
-        <span className={`mono ${cls}`} style={{ fontSize: 13 }}>
-          <span className="show-phone">🎯 </span>
-          {pct !== null ? `${pct}%` : `${r.measured}/${r.total}`}
+        <span className="mono" style={{ fontSize: 13 }}>
+          <span className="show-phone" aria-hidden="true">🎯 </span>
+          {progress.logged}/{progress.total}
         </span>
       </button>
-      {open && (
+      {open && flight && (
         <Modal onClose={() => setOpen(false)}>
           <h2>Mission readiness</h2>
-          <p className="muted" style={{ fontSize: 13 }}>
-            Worked out only from your own sheet and error bars — ECHO doesn’t know the true values either.
-          </p>
-          <dl className="kv">
-            <dt>Values measured</dt>
-            <dd>
-              {r.measured} of {r.total}
-            </dd>
-            {pct !== null && (
-              <>
-                <dt>Chance of success at the next window</dt>
-                <dd className={cls}>{pct}%</dd>
-                <dt>Next window</dt>
-                <dd>{r.window !== null ? `day ${fmt(r.window / DAY, 0)}` : '—'}</dd>
-              </>
-            )}
-          </dl>
-          {detail && r.weakest && (
-            <div className="callout tip">
-              <b>{mode.coaching && mode.missions === 'coach' ? 'Improve this next' : 'Weakest value'}</b>
-              {quantityName(r.weakest.k)} causes about {Math.round(r.weakest.share * 100)}% of the flight’s uncertainty.
-              {mode.missions === 'coach' &&
-                ' More readings, a longer baseline or a steadier hand on that one will raise your chance the most.'}
-            </div>
-          )}
-          {pct === null && (
-            <div className="faint" style={{ fontSize: 12 }}>
-              Once every value is on the sheet, ECHO flies the plan through versions of the system that fit your error bars and shows how
-              many arrive.
-            </div>
-          )}
-          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-            <button className="btn primary" onClick={() => setOpen(false)}>
-              OK
-            </button>
+          <div className="stack" style={{ marginBlock: 12 }}>
+            <section className="panel panel-pad stack" aria-label="Navigation log">
+              <b>Navigation log</b>
+              <span>{count}</span>
+              {progress.missing.length > 0 && <span className="muted">{progress.missing.length} still needed on the progress sheet.</span>}
+              {weakest && <details className="measurement-help"><summary>Review measurement uncertainty</summary>
+                <p>{quantityName(weakest.k)} makes the largest contribution in the current comparison of derived errors. This estimate uses the values and ranges on your sheet.</p>
+              </details>}
+            </section>
+            <section className="panel panel-pad stack" aria-label="Transfer estimate">
+              <b>Transfer estimate</b>
+              {flight.status === 'missing' && <span className="muted">Log the remaining navigation values to estimate fuel and capture.</span>}
+              {flight.status === 'invalid-model' && <span className="muted">The current values or ranges do not form a usable flight model. Review the progress sheet.</span>}
+              {flight.status === 'no-window' && <span className="muted">Your model shows no upcoming departure window before the current supplies deadline.</span>}
+              {flight.status === 'no-transfer' && <span className="muted">The planner could not evaluate a transfer at the next modeled window.</span>}
+              {flight.status === 'sampled' && <>
+                <span className="muted">Next modeled window · Day {dayNumber(flight.window)}</span>
+                {flight.summary.unassessable === flight.summary.attempted
+                  ? <span>None of the {flight.summary.attempted} simulations could be evaluated. Review your inputs and ranges.</span>
+                  : <span><b>{flight.summary.succeeded} of {flight.summary.attempted}</b> simulations reached capture within the fuel budget.</span>}
+                <span className="muted">{flight.summary.unsuccessful} unsuccessful · {flight.summary.unassessable} unassessable</span>
+                <details className="measurement-help"><summary>What this covers</summary>
+                  <p>These trials use the ranges on your sheet, assuming independent errors between inputs. They cover automatic transfer and capture. Check the arrival deadline and any manual flight separately.</p>
+                </details>
+              </>}
+            </section>
+          </div>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn primary" onClick={() => setOpen(false)}>OK</button>
           </div>
         </Modal>
       )}

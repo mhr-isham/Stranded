@@ -1,28 +1,27 @@
-// Mission readiness, computed only from the player's own sheet (never the
-// truth): how many values are measured, which one adds most uncertainty to
-// the flight, and — once everything is measured — the chance that a launch at
-// the next window succeeds if the system is anywhere inside the error bars.
-
 import { QUANTITY_INFO, deriveAll, keysFor, type ChainVariant, type DerivedKey, type Estimate, type Primaries, type PrimaryKey } from '../engine/chain';
-import { DAY } from '../engine/constants';
 import { simulateLaunch } from '../engine/launch';
 import { bestTransfer, modelFromPrimaries, predictedWindows, sampleModel, systemFromModel } from '../engine/planner';
 import { makeRng } from '../engine/rng';
 import type { StarSystem } from '../engine/types';
 import { variantOf } from '../engine/chapters';
+import { assessableModel, summarizeForecast, type ForecastSummary } from './forecast';
 
 /** Derived values the flight depends on most. */
 const FLIGHT_KEYS: DerivedKey[] = ['a2', 'Mstar', 'M2', 'P2', 'a1', 'M1'];
 
-export interface Readiness {
-  measured: number;
-  total: number;
-  /** Primary whose error matters most for the flight, with its share of the uncertainty (0–1). */
-  weakest: { k: PrimaryKey; share: number } | null;
-  /** Chance of success at the next window, when the sheet is complete. */
-  success: number | null;
-  window: number | null;
+export function navigationProgress(sheet: Primaries, variant: ChainVariant) {
+  const keys = keysFor(variant);
+  const missing = keys.filter(key => !sheet[key]);
+  const invalid = keys.filter(key => {
+    const entry = sheet[key];
+    return entry && (!Number.isFinite(entry.value) || !Number.isFinite(entry.sigma) || entry.sigma < 0);
+  });
+  return { logged: keys.length - missing.length, total: keys.length, missing, invalid };
 }
+
+export type FlightReadiness =
+  | { status: 'missing' | 'invalid-model' | 'no-window' | 'no-transfer' }
+  | { status: 'sampled'; window: number; summary: ForecastSummary };
 
 function flightVariance(p: Primaries, variant: ChainVariant) {
   const d = deriveAll(p, variant) as Record<string, Estimate | undefined>;
@@ -37,47 +36,49 @@ function flightVariance(p: Primaries, variant: ChainVariant) {
 /** Which measured value, if it were perfect, would shrink the flight's uncertainty most. */
 export function weakestValue(p: Primaries, variant: ChainVariant = 'standard') {
   const base = flightVariance(p, variant);
-  if (!(base > 0)) return null;
+  if (!Number.isFinite(base) || base <= 0) return null;
   let best: { k: PrimaryKey; share: number } | null = null;
   for (const k of keysFor(variant)) {
     const e = p[k];
     if (!e) continue;
     const share = (base - flightVariance({ ...p, [k]: { ...e, sigma: 0 } }, variant)) / base;
-    if (!best || share > best.share) best = { k, share };
+    if (Number.isFinite(share) && share > 0 && (!best || share > best.share)) best = { k, share };
   }
   return best;
 }
 
-const cache = new WeakMap<object, Map<string, Readiness>>();
+const estimateCache = new WeakMap<Primaries, {
+  system: StarSystem; budget: number; window: number; estimate: FlightReadiness;
+}>();
 
-export function readiness(p: Primaries, sys: StarSystem, budget: number, now: number, end: number): Readiness {
-  const variant = variantOf(sys.features);
-  const keys = keysFor(variant);
-  const model = modelFromPrimaries(p, variant);
-  const window = model ? (predictedWindows(model, now, end)[0] ?? null) : null;
-  // Cached per sheet and per window, so warping time doesn't re-run the simulation.
-  const key = `${Math.round(budget)}:${window === null ? '-' : Math.round(window / DAY)}`;
-  const hit = cache.get(p)?.get(key);
-  if (hit) return hit;
-  const measured = keys.filter((k) => p[k]).length;
-  const r: Readiness = { measured, total: keys.length, weakest: weakestValue(p, variant), success: null, window };
-  const plan = model && window !== null ? bestTransfer(model, window) : null;
-  if (plan) {
+/** Assess one upcoming departure using only the sheet's model and the current
+ * fuel budget. A sampled success requires capture, not just fuel remaining. */
+export function flightReadiness(sheet: Primaries, system: StarSystem, budget: number, now: number, end: number): FlightReadiness {
+  const variant = variantOf(system.features);
+  const progress = navigationProgress(sheet, variant);
+  if (progress.missing.length) return { status: 'missing' };
+  if (progress.invalid.length) return { status: 'invalid-model' };
+  const model = modelFromPrimaries(sheet, variant);
+  if (!assessableModel(model)) return { status: 'invalid-model' };
+  const window = end >= now ? predictedWindows(model, now, end).find(Number.isFinite) : undefined;
+  if (window === undefined) return { status: 'no-window' };
+  const previous = estimateCache.get(sheet);
+  if (previous?.system === system && previous.budget === budget && previous.window === window) return previous.estimate;
+
+  const plan = bestTransfer(model, window);
+  let estimate: FlightReadiness = { status: 'no-transfer' };
+  if (plan && Number.isFinite(plan.total) && Number.isFinite(budget)) {
     const rng = makeRng(7);
-    let ok = 0;
-    let n = 0;
-    for (let i = 0; i < 24; i++) {
-      const m = sampleModel(p, rng, variant);
-      if (!m) continue;
-      n++;
-      const res = simulateLaunch({ ...systemFromModel(m, sys), fuelDv: budget, lifeSupport: Infinity }, plan.plan);
-      if (res.fuelLeft >= 0) ok++;
-    }
-    r.success = n ? ok / n : null;
+    const trials = Array.from({ length: 24 }, () => {
+      const sampled = sampleModel(sheet, rng, variant);
+      if (!assessableModel(sampled)) return null;
+      const result = simulateLaunch({ ...systemFromModel(sampled, system), fuelDv: budget, lifeSupport: Infinity }, plan.plan);
+      return { outcome: result.outcome, fuelLeft: result.fuelLeft };
+    });
+    estimate = { status: 'sampled', window, summary: summarizeForecast(trials) };
   }
-  if (!cache.has(p)) cache.set(p, new Map());
-  cache.get(p)!.set(key, r);
-  return r;
+  estimateCache.set(sheet, { system, budget, window, estimate });
+  return estimate;
 }
 
 export const quantityName = (k: PrimaryKey) => `${QUANTITY_INFO[k].label} (${QUANTITY_INFO[k].symbol})`;
