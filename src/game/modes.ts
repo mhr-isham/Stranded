@@ -189,5 +189,14 @@ export function effectiveMode(settings: import('./store').Settings): ModeRules {
     : rules;
 }
 
+/** Prediction help is opt-in and independent of the expedition mission list. */
+export function predictionGuidance(settings: Pick<import('./store').Settings, 'difficulty' | 'cadetGuidance' | 'freeRoam' | 'freeRoamGuidance' | 'challenges'>) {
+  const { difficulty } = settings;
+  const enabled = settings.freeRoam ? !!settings.freeRoamGuidance : difficulty !== 'cadet' || settings.cadetGuidance !== false;
+  const walkthrough = enabled && (difficulty === 'stargazer' || difficulty === 'cadet');
+  const logEstimate = enabled && !settings.challenges?.includes('handFit') && (walkthrough || difficulty === 'navigator');
+  return { walkthrough, logEstimate };
+}
+
 /** "∞" for unlimited counts, else the number. */
 export const countText = (n: number) => (Number.isFinite(n) ? String(n) : '∞');

@@ -1,13 +1,10 @@
-// The prediction card: plot your own data with the future marked, drag your
-// guess onto it, set an honest ± range, commit. The estimate helper teaches the
-// three moves (extend the line, use a ratio, bracket it); easier modes can show
-// the player's own trend line, and warn when a guess ignores their own data.
+// The prediction panel keeps the recorded chart and entry controls available.
+// Mode-specific help opens only when the player requests it.
 
 import { useRef, useState, type ReactNode } from 'react';
-import { useMode } from '../../game/modes';
+import { predictionGuidance } from '../../game/modes';
 import { useGame } from '../../game/store';
 import { PREDICTION_KINDS, explain, type Prediction, type PredictionKind } from '../../game/predictions';
-import { LessonModal } from '../tutorial/Tutorial';
 import type { Pt } from './Chart';
 
 const W = 380;
@@ -129,7 +126,7 @@ interface CardProps {
   xMax: number;
   xLabel: string;
   yLabel: string;
-  /** The player's own best-fit prediction (from their data), for the trend line and the "your data says" nudge. */
+  /** An estimate from the player's observations and its optional plotted trend. */
   ownFit?: { value: number; line?: Pt[] } | null;
   /** Starting ± range. */
   sigma0: number;
@@ -143,16 +140,15 @@ interface CardProps {
 
 /** A complete prediction: open question, helper, plot, range, commit; or the pending / revealed state. */
 export function PredictCard(p: CardProps) {
-  const mode = useMode();
-  const cadetGuidanceOff = useGame((s) => s.settings.difficulty === 'cadet' && s.settings.cadetGuidance === false && !s.tutorial.active);
-  const coaching = mode.coaching && !cadetGuidanceOff;
+  const settings = useGame((s) => s.settings);
+  const guidance = predictionGuidance(settings);
+  const estimate = guidance.logEstimate && p.ownFit && Number.isFinite(p.ownFit.value) ? p.ownFit : null;
   const info = PREDICTION_KINDS[p.kind];
   const [entry, setEntry] = useState('');
   const guess = entry.trim() && Number.isFinite(Number(entry)) ? Number(entry) : null;
   const setGuess = (value: number) => setEntry(value.toFixed(info.digits));
   const [sigma, setSigma] = useState(p.sigma0);
-  const [trend, setTrend] = useState(false);
-  const [lesson, setLesson] = useState(false);
+  const [showEstimate, setShowEstimate] = useState(false);
   const fmt = (v: number) => v.toFixed(info.digits);
   const unitText = info.unit === 'day' ? 'days' : info.unit;
 
@@ -168,26 +164,16 @@ export function PredictCard(p: CardProps) {
     );
   }
 
-  const nudge =
-    mode.sanity && coaching && !p.fieldTrial && guess !== null && p.ownFit && Math.abs(guess - p.ownFit.value) > Math.max(3 * sigma, 3 * info.scale)
-      ? p.ownFit.value
-      : null;
-
   return (
     <div className="predict panel-inset stack">
-      <div className="row between">
-        <b>{p.fieldTrial ? 'Set your forecast' : info.title}</b>
-        {!p.fieldTrial && <button className="btn small ghost" onClick={() => setLesson(true)}>
-          How to estimate
-        </button>}
-      </div>
+      <b>{p.fieldTrial ? 'Set your forecast' : info.title}</b>
       {p.last?.result && (
         <div className="hint" style={{ fontSize: 12 }}>
           Last time: {explain(p.last, false)}
         </div>
       )}
       <div style={{ fontSize: 14 }}>{p.question}</div>
-      {coaching && <details className="measurement-help"><summary>Use the log to estimate</summary><p>{p.helper}</p></details>}
+      {guidance.walkthrough && <details className="measurement-help"><summary>Use the log to estimate</summary><p>{p.helper}</p></details>}
       {p.extra}
       {p.pts.length > 0 && (
       <PredictPlot
@@ -198,7 +184,7 @@ export function PredictCard(p: CardProps) {
         guess={guess}
         sigma={sigma}
         onGuess={setGuess}
-        trend={trend && p.ownFit?.line ? p.ownFit.line : null}
+        trend={showEstimate ? estimate?.line ?? null : null}
         xLabel={p.xLabel}
         yLabel={p.yLabel}
       />
@@ -208,12 +194,15 @@ export function PredictCard(p: CardProps) {
           {p.axis === 'y' ? 'Tap or drag on the dashed line to place your guess.' : 'Tap or drag in the future area to place your guess.'}
         </div>
       )}
-      {mode.missions !== 'off' && p.ownFit?.line && (
-        <label className="check-line">
-          <input type="checkbox" checked={trend} onChange={(e) => setTrend(e.target.checked)} />
-          <span>Show the straight line through my readings</span>
-        </label>
-      )}
+      {estimate && <div className="stack">
+        <button type="button" className="btn small ghost" aria-pressed={showEstimate} onClick={() => setShowEstimate(!showEstimate)}>
+          {showEstimate ? 'Hide estimate from my log' : 'Show estimate from my log'}
+        </button>
+        {showEstimate && <div className="muted">
+          Estimated from your log: <b>{info.unit === 'day' ? `day ${fmt(estimate.value)}` : `${fmt(estimate.value)} ${info.unit}`}</b>.
+          {estimate.line && ' The dashed trend extends your recorded positions.'} Choose your own forecast and range.
+        </div>}
+      </div>}
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <div className="field" style={{ flex: 1 }}>
           <label>Forecast ({info.unit === 'day' ? 'day' : info.unit})</label>
@@ -240,22 +229,12 @@ export function PredictCard(p: CardProps) {
           />
         </div>
       </div>
-      {nudge !== null && (
-        <div className="callout warn" style={{ margin: 0 }}>
-          <b>Your data says otherwise</b>
-          Your own readings point to about {info.unit === 'day' ? `day ${fmt(nudge)}` : `${fmt(nudge)} ${info.unit}`}.{' '}
-          <button className="btn small" onClick={() => setGuess(nudge)}>
-            Use my data
-          </button>
-        </div>
-      )}
       <button className="btn primary" disabled={p.disabled || guess === null || (p.kind === 'pendulum' && guess <= 0)} onClick={() => guess !== null && p.onCommit(guess, sigma)}>
         {p.fieldTrial ? 'Log forecast' : 'Commit prediction'}
       </button>
       {!p.fieldTrial && <div className="faint" style={{ fontSize: 12 }}>
         Scored like the sheet: a tight range that turns out right scores most; a confident miss loses points; a huge range earns little.
       </div>}
-      {lesson && <LessonModal id="estimate" onClose={() => setLesson(false)} />}
     </div>
   );
 }

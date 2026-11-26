@@ -6,7 +6,6 @@
 import { DAY, DEG } from '../engine/constants';
 import { moonOffset, starLongitude, targetLongitude } from '../engine/measure';
 import { sfx } from './audio';
-import { modeOf } from './modes';
 import { useGame, type GameState, type Reading, type TimedValue } from './store';
 import { world } from './world';
 import type { StarSystem } from '../engine/types';
@@ -229,7 +228,6 @@ export function resolvePredictions(t: number) {
   }
   const due = s.predictions.filter((p) => !p.fieldTrial && !p.result && p.kind !== 'pendulum' && p.due <= t);
   if (!due.length) return;
-  const coaching = modeOf(s.settings.difficulty).coaching;
   for (const p of due) {
     const truth = truthOf(s, p);
     if (truth === null) {
@@ -238,7 +236,7 @@ export function resolvePredictions(t: number) {
       continue;
     }
     const done = resolveNow(p.id, truth);
-    if (done) useGame.getState().say({ id: `pred-${p.id}`, text: explain(done, coaching), mood: done.result!.z <= 1 ? 'happy' : 'calm' });
+    if (done) useGame.getState().say({ id: `pred-${p.id}`, text: explain(done, false), mood: done.result!.z <= 1 ? 'happy' : 'calm' });
   }
 }
 

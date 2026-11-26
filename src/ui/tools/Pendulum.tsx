@@ -15,7 +15,7 @@ import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { comparePendulumTrial, lastOf, makePrediction, pendingOf } from '../../game/predictions';
 import { hasChallenge } from '../../game/challenges';
-import { useMode } from '../../game/modes';
+import { predictionGuidance } from '../../game/modes';
 import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
 import type { MeasurementEnvironment } from '../../game/measurementEnvironment';
 import { FieldTrialResult, PredictCard } from '../common/Predict';
@@ -616,8 +616,7 @@ function Scale({ trueL, nominal, value, onChange, disabled }: { trueL: number; n
 
 function PendulumPrediction({ applyLength, busy }: { applyLength: (length: number) => void; busy: boolean }) {
   const s = useGame();
-  const mode = useMode();
-  const coaching = mode.coaching && (s.settings.difficulty !== 'cadet' || s.settings.cadetGuidance !== false);
+  const { walkthrough } = predictionGuidance(s.settings);
   const pending = pendingOf(s, 'pendulum'), last = lastOf(s, 'pendulum');
   const baseline = s.readings.filter((r) => r.kept && r.key === 'g' && r.pendulum?.technique?.source === 'manual' &&
     r.pendulum.technique.releaseId && r.pendulum.length > 0 && r.pendulum.period > 0 &&
@@ -646,6 +645,7 @@ function PendulumPrediction({ applyLength, busy }: { applyLength: (length: numbe
         <PredictCard key={length} kind="pendulum" fieldTrial disabled={busy}
           question="Set a forecast, then see how the new swing compares."
           helper="A longer string gives a slower swing. You can estimate the new period by multiplying your recorded period by the square root of the length ratio."
+          ownFit={{ value: baseline.period * Math.sqrt(length / baseline.length) }}
           pts={[]} axis="y" xMax={0} xLabel="" yLabel="" sigma0={0.1} sigmaMax={1}
           pending={null} last={null}
           onCommit={(value, sigma) => {
@@ -655,6 +655,6 @@ function PendulumPrediction({ applyLength, busy }: { applyLength: (length: numbe
           }} />
       </div>
     </details>}
-    {last?.fieldTrial && coaching && <details className="measurement-help"><summary>What can change the timing?</summary><p>Starting and stopping the watch, the swing count, release angle and wind can all change the measured period. Repeat the timing to see how much it varies.</p></details>}
+    {last?.fieldTrial && walkthrough && <details className="measurement-help"><summary>What can change the timing?</summary><p>Starting and stopping the watch, the swing count, release angle and wind can all change the measured period. Repeat the timing to see how much it varies.</p></details>}
   </section>;
 }
