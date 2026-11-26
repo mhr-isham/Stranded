@@ -40,6 +40,14 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
   const windowDays = launchWindow === undefined ? 0 : Math.ceil((launchWindow - t) / DAY);
   const windowCountdown = windowDays <= 1 ? 'Under 1 day' : `${fmt(windowDays, 0)} days`;
 
+  function openModeledWindow() {
+    const current = useGame.getState();
+    const currentModel = navigationModel(current.sheet, variant);
+    if (!currentModel) return;
+    const at = predictedWindows(currentModel, clock.t, lifeSupportEnd(current, sys), 1)[0];
+    if (at !== undefined) onLaunchWindow(at);
+  }
+
   return (
     <>
       <div className="hud">
@@ -145,13 +153,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
           {launchWindow !== undefined && <button type="button" className="panel hud-block btn hud-window"
             title="Estimated from your navigation sheet. Measurement errors can shift the window."
             aria-label={`Estimated launch window: ${windowCountdown.toLowerCase()}. Open launch planner.`}
-            onClick={() => {
-              const current = useGame.getState();
-              const currentModel = navigationModel(current.sheet, variant);
-              if (!currentModel) return;
-              const at = predictedWindows(currentModel, clock.t, lifeSupportEnd(current, sys), 1)[0];
-              if (at !== undefined) onLaunchWindow(at);
-            }}>
+            onClick={openModeledWindow}>
             <span className="meter-label"><span className="hide-phone">Est. launch window</span><span className="show-phone">Est. window</span></span>
             <span className="mono">{windowDays <= 1 ? '< 1 d' : `${fmt(windowDays, 0)} d`}</span>
           </button>}
@@ -168,7 +170,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
           ☰
         </button>
       </div>
-      {!s.tutorial.active && <EventMenu open={eventsOpen} onClose={() => setEventsOpen(false)} now={t} supplyEnd={end} />}
+      {!s.tutorial.active && <EventMenu open={eventsOpen} onClose={() => setEventsOpen(false)} now={t} supplyEnd={end} launchWindow={launchWindow} onOpenLaunch={openModeledWindow} />}
       {menu && (
         <Modal top onClose={() => setMenu(false)}>
           <h2>Expedition</h2>

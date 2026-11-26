@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { clock, subscribeClock } from '../../game/clock';
-import { scheduledEvents, type ScheduledEvent } from '../../game/scheduledEvents';
+import { expeditionTimeline, scheduledEvents, type ScheduledEvent } from '../../game/scheduledEvents';
 import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
@@ -19,8 +19,11 @@ function durationLabel(seconds: number) {
 
 const matches = (a: ScheduledEvent, b: ScheduledEvent) => a.id === b.id && a.at === b.at && a.label === b.label;
 
-export function EventMenu({ open, onClose, now, supplyEnd }: { open: boolean; onClose: () => void; now: number; supplyEnd: number }) {
+export function EventMenu({ open, onClose, now, supplyEnd, launchWindow, onOpenLaunch }: {
+  open: boolean; onClose: () => void; now: number; supplyEnd: number; launchWindow?: number; onOpenLaunch: () => void;
+}) {
   const state = useGame();
+  const [timeline, setTimeline] = useState(false);
   const [selected, setSelected] = useState<ScheduledEvent | null>(null);
   const [active, setActive] = useState<ScheduledEvent | null>(null);
   const cancel = useRef<null | (() => void)>(null);
@@ -70,10 +73,48 @@ export function EventMenu({ open, onClose, now, supplyEnd }: { open: boolean; on
     }, { pauseOnArrival: true });
   }
 
-  return <Modal onClose={onClose}>
+  function close() {
+    setTimeline(false);
+    onClose();
+  }
+
+  function switchView(next: boolean) {
+    setTimeline(next);
+    menu.current?.focus();
+  }
+
+  const timelineEntries = timeline ? expeditionTimeline(state, now, launchWindow) : [];
+  return <Modal onClose={close}>
     <div ref={menu} tabIndex={-1} className="stack event-menu" role="region" aria-label="Scheduled events">
-      <h2>Next event</h2>
+      <h2>{timeline ? 'Expedition timeline' : 'Next event'}</h2>
+      {timeline ? <>
+        <button className="btn small timeline-switch" onClick={() => switchView(false)}>Back to next event</button>
+        <p className="muted timeline-intro">See what’s coming up and decide what to do before you get there.</p>
+        <dl className="timeline-key">
+          <dt>Scheduled</dt><dd>A rover trip or job already underway.</dd>
+          <dt>Saved</dt><dd>An observing time you picked. Check conditions when you arrive.</dd>
+          <dt>Estimated</dt><dd>A launch date from your navigation sheet. It can shift as your measurements change.</dd>
+        </dl>
+        {timelineEntries.length ? <ol className="expedition-timeline" aria-label="Upcoming expedition entries">
+          {timelineEntries.map(entry => <li className="panel-inset timeline-item" key={entry.id}>
+            <div className="row between">
+              <span className="timeline-day">Day {dayNumber(entry.at)} <span className="muted">· {entry.at <= now ? 'Now' : `in ${durationLabel(entry.at - now)}`}</span></span>
+              <span className={`timeline-kind timeline-kind-${entry.kind.toLowerCase()}`}>{entry.kind}</span>
+            </div>
+            <b>{entry.label}</b>
+            <span className="muted timeline-source">{entry.source}</span>
+            {entry.roverBusy && <span className="amber timeline-source">The rover is scheduled to be busy at this time.</span>}
+            {entry.at >= supplyEnd && <span className="amber timeline-source">Beyond current supplies.</span>}
+            <button className="btn small" onClick={() => {
+              if (entry.screen === 'launch') onOpenLaunch();
+              else useGame.getState().go(entry.screen);
+              close();
+            }}>{entry.action}</button>
+          </li>)}
+        </ol> : <div className="panel-inset">Nothing on the timeline yet. Your trips, jobs and observing plans will appear here.</div>}
+      </> : <>
       <div className="muted">Scheduled operations and observing times you saved.</div>
+      <button className="btn small timeline-switch" onClick={() => switchView(true)}>View timeline</button>
       {active && <div className="panel-inset stack" aria-label="Scheduled wait">
         <b>Waiting · {active.label}</b>
         <span>{durationLabel(active.at - now)} remaining</span>
@@ -98,6 +139,7 @@ export function EventMenu({ open, onClose, now, supplyEnd }: { open: boolean; on
         {realtime && <span className="muted">Leave the real-time instrument before using warp.</span>}
         <button className="btn primary" disabled={!canWait} onClick={waitForEvent}>Wait and pause</button>
       </div>}
+      </>}
     </div>
   </Modal>;
 }

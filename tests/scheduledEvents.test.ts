@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { scheduledEvents } from '../src/game/scheduledEvents';
+import { expeditionTimeline, scheduledEvents } from '../src/game/scheduledEvents';
 import type { RoverOuting } from '../src/game/roverOuting';
 import type { GameState } from '../src/game/store';
 
@@ -28,4 +28,20 @@ it('omits completed, expired and invalid schedules', () => {
   state.northTrip.arriveAt = Infinity;
   state.roverOuting.capturedAt = 195;
   expect(scheduledEvents(state, 105)).toEqual([]);
+});
+
+it('orders the modeled departure with known schedules and identifies a rover conflict', () => {
+  const state = schedule();
+  state.rover.arriveAt = 240;
+  const entries = expeditionTimeline(state, 10, 130);
+  expect(entries.map(e => [e.id, e.kind, e.screen])).toEqual([
+    ['surface-task', 'Scheduled', 'map'],
+    ['launch-window', 'Estimated', 'launch'],
+    ['camera-plan', 'Saved', 'rover'],
+    ['camera-rover', 'Scheduled', 'rover'],
+  ]);
+  expect(entries.find(e => e.id === 'camera-plan')?.roverBusy).toBe(true);
+  state.rover.arriveAt = 150;
+  state.surface.task = { kind: 'process', done: 250 };
+  expect(expeditionTimeline(state, 10, NaN).find(e => e.id === 'camera-plan')?.roverBusy).toBe(false);
 });

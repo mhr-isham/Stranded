@@ -812,3 +812,19 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .event-choice[aria-pressed="true"] { border-color: var(--blue); background: rgba(108,196,255,.12); }
 .event-source { display: block; color: var(--muted); font-size: 12px; }
 .event-choice .mono { flex-shrink: 0; color: var(--blue); font-size: 12px; }
+
+.timeline-switch { align-self: flex-start; }
+.timeline-intro { margin: 0; }
+.timeline-key { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; padding: 8px 0; font-size: 12px; }
+.timeline-key dt { color: var(--text); font-weight: 600; }
+.timeline-key dd { margin: 0; color: var(--muted); }
+.expedition-timeline { list-style: none; margin: 0; padding: 0 0 0 10px; border-left: 1px solid var(--panel-border); display: grid; gap: 8px; }
+.timeline-item { display: grid; gap: 3px; padding: 8px 10px; }
+.timeline-item > .btn { justify-self: start; margin-top: 4px; }
+.timeline-day { font: 500 12px var(--mono); }
+.timeline-kind { font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--panel-border); }
+.timeline-kind-saved { color: var(--amber); }
+.timeline-kind-estimated { color: var(--blue); }
+.timeline-source { font-size: 12px; }
+.modal:has(.event-menu) { background: var(--panel-solid); }
+.event-menu:focus { outline: none; }
