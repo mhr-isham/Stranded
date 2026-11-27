@@ -25,7 +25,10 @@ import { fmt } from '../../game/format';
 import { MeasurementSources } from '../common/MeasurementSources';
 import { opticalStatus, opticalWeather } from '../../game/observing';
 import { ObservingStatus } from '../common/ObservingStatus';
-import { checkMissions, currentWorld, targetObservable } from '../../game/sim';
+import { checkMissions, currentWorld, spendTime, targetObservable } from '../../game/sim';
+import { lifeSupportEnd } from '../../game/survival';
+import { captureRelayTag, RELAY_SIGHTING_STEP, RELAY_TAG_FIELD, relayMotion } from '../../game/relayObservation';
+import { RelayWatch } from './RelayWatch';
 import { useGame } from '../../game/store';
 import { paintSky, starRGB } from '../../render/paint';
 import { drawScope, scopeProjector, SEEING } from '../../render/telescope';
@@ -33,7 +36,7 @@ import { makeLandscape } from '../../render/terrain';
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { Chart } from '../common/Chart';
 import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierNote } from '../common/sheetBits';
-import { toast, useGameTime } from '../common/widgets';
+import { toast, useClockState, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { compareStarTrial, lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
 import { FieldTrialResult, ForecastLog } from '../common/ForecastLog';
@@ -83,6 +86,7 @@ export function Observatory() {
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
   const s = useGame();
   const t = useGameTime(5);
+  useClockState();
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
@@ -101,6 +105,8 @@ export function Observatory() {
   const auroraActive = !s.tutorial.active && mode === 'sky' && tab === 'sky' && auroraView(sys, s, land, t, auroraPhase.current).direction;
   const eclipseWatching = watching === 'eclipse';
   const [sel, setSel] = useState<Sel | null>(null);
+  const relayWait = useRef<(() => void) | null>(null);
+  useEffect(() => () => { relayWait.current?.(); relayWait.current = null; }, [mode, tab, sel]);
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
   const [showEcl, setShowEcl] = useState(false);
   const cam = useRef({ az: 180 * DEG, alt: 35 * DEG, fov: 90 * DEG, scale: 1 });
@@ -134,7 +140,7 @@ export function Observatory() {
   }, [mode, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Point the telescope at an object (used by the "point at" buttons and Flight School). */
-  const pointAt = (kind: 'star' | 'target', fovDeg: number, tabId?: Tab) => {
+  const pointAt = (kind: 'star' | 'target' | 'relay', fovDeg: number, tabId?: Tab) => {
     sfx('detent');
     setSel({ kind });
     const off = Math.min(0.12, fovDeg / 12) * DEG;
@@ -184,11 +190,12 @@ export function Observatory() {
     return unit([d[0] - a * e1[0] + b * e2[0], d[1] - a * e1[1] + b * e2[1], d[2] - a * e1[2] + b * e2[2]]);
   };
 
+  const relayKnown = !!s.relayTag || s.logs.includes('relay');
   const selLabel = (sl: Sel | null) => {
     if (!sl) return 'Nothing selected';
     if (sl.kind === 'star') return 'The star (our sun)';
     if (sl.kind === 'target' && s.identified) return `The blue planet · ${skyCode(sys.seed, sl)}`;
-    if (sl.kind === 'relay' && s.logs.includes('relay')) return `The Halcyon relay · ${skyCode(sys.seed, sl)}`;
+    if (sl.kind === 'relay' && relayKnown) return `The Halcyon relay · ${skyCode(sys.seed, sl)}`;
     return skyCode(sys.seed, sl);
   };
 
@@ -279,9 +286,55 @@ export function Observatory() {
     horizon: sel ? skyline(land, toHorizontal(objDir(sel, t), frameNow).az) : 0,
     inField: available,
   });
-  const notebookAllowed = sel?.kind !== 'star' && notebookStatus.ok;
+  const watchRelay = s.chapter === 1 && !s.tutorial.active && sel?.kind === 'relay';
+  const relayAimLimit = Math.min(0.10 * DEG, fov * 0.12);
+  function relayPointingIssue(at: number) {
+    if (sel?.kind !== 'relay') return 'Select the moving light.';
+    if (!relayVisible(at)) return 'The light is below the horizon, in shadow, or lost in daylight.';
+    const condition = sightStatus(sel, at);
+    if (!condition.ok) return condition.reason;
+    if (mode !== 'scope') return 'Follow the light in the telescope to keep a sighting.';
+    const center = pointing(at);
+    if (!center || !inspectable(sel, at) || angleBetween(center, objDir(sel, at)) > relayAimLimit) return 'Bring the light close to the crosshair.';
+    return '';
+  }
+  const relayReason = watchRelay ? relayPointingIssue(t) : '';
+  const relayEvidence = useMemo(() => relayMotion(s.skySightings ?? []), [s.skySightings]);
+  const relayReadIssue = relayReason || (fov > RELAY_TAG_FIELD * DEG ? 'Narrow the field to about 200″ or less.'
+    : !clock.paused && clock.rate > 1 ? 'Pause or slow to 1× to read the signal.' : '');
+  function relayCanWait(at: number) {
+    return !clock.realtime && !Number.isFinite(clock.stopAt)
+      && at + RELAY_SIGHTING_STEP < lifeSupportEnd(useGame.getState(), sys);
+  }
+  function stepRelayWatch() {
+    if (!watchRelay || relayWait.current || useGame.getState().phase !== 'play' || !relayCanWait(clock.t)) return;
+    relayWait.current = spendTime(RELAY_SIGHTING_STEP, () => { relayWait.current = null; }, { pauseOnArrival: true });
+  }
+  function followRelay() {
+    if (!Number.isFinite(clock.stopAt)) {
+      clock.paused = true;
+      clock.emit();
+    }
+    pointAt('relay', 0.45);
+  }
+  function readRelayTag() {
+    const current = useGame.getState();
+    if (!watchRelay || current.relayTag || relayPointingIssue(clock.t) || fov > RELAY_TAG_FIELD * DEG
+      || !clock.paused && clock.rate > 1 || !relayMotion(current.skySightings ?? []).motion) return;
+    const tag = captureRelayTag(clock.t, seeingFactor(current, clock.t));
+    if (!tag) return toast('The glints are too blurred. Try again under steadier seeing.');
+    current.set({ relayTag: tag });
+    sfx('unlock');
+    unlockLog('relay');
+  }
+
+  const notebookAllowed = sel?.kind !== 'star' && notebookStatus.ok && (!watchRelay || !relayReason);
   const logSighting = (note: string) => {
     if (!sel || sel.kind === 'star') return false;
+    if (watchRelay) {
+      const issue = relayPointingIssue(clock.t);
+      if (issue) { toast(issue); return false; }
+    }
     const position = toHorizontal(objDir(sel, clock.t), localFrame(sys, clock.t, sys.site));
     const live = opticalStatus(sys, useGame.getState(), clock.t, 'night-view', { direction: objDir(sel, clock.t), horizon: skyline(land, position.az), inField: inspectable(sel, clock.t) });
     if (!live.ok) { toast(live.reason); return false; }
@@ -289,7 +342,11 @@ export function Observatory() {
     if (!ray) return false;
     const sighting = makeSkySighting(skyKey(sel), skyCode(sys.seed, sel), clock.t, ray, mode === 'scope' ? 'scope' : 'wide', note);
     if (!sighting) return false;
+    if (watchRelay) sighting.relayPrecision = relayAimLimit / DEG + sighting.step;
     const current = useGame.getState(), previous = (current.skySightings ?? []).at(-1);
+    if (watchRelay && (current.skySightings ?? []).some((note) => note.key === 'relay' && note.at === sighting.at && note.relayPrecision !== undefined)) {
+      toast('This instant is already in your watch. Wait for another sighting.'); return false;
+    }
     if (previous && previous.key === sighting.key && previous.at === sighting.at && previous.lon === sighting.lon && previous.lat === sighting.lat && previous.note === sighting.note) { toast('That paused pointing is already in your notebook.'); return false; }
     current.set({ skySightings: [...(current.skySightings ?? []), sighting] });
     toast(`${sighting.code}: sighting logged`); sfx('shutter'); return true;
@@ -456,7 +513,7 @@ export function Observatory() {
               };
               const visible = visibleSkyLights(sys, catalog, clock.t, camera, land);
               if (s.identified && sel?.kind !== 'target' && visible.some((v) => v.ref.kind === 'target')) label(scene.target, 'Blue planet', 'rgba(108,196,255,0.9)');
-              if (labels) for (const light of visible.filter((v) => (!sel || v.key !== skyKey(sel)) && !(s.identified && v.ref.kind === 'target') && !(s.logs.includes('relay') && v.ref.kind === 'relay'))) label(toLocalDir(light.dir, scene.frame), `${light.variation === 'steadier' ? '—' : '≈'} ${light.code}`, 'rgba(218,229,248,.85)');
+              if (labels) for (const light of visible.filter((v) => (!sel || v.key !== skyKey(sel)) && !(s.identified && v.ref.kind === 'target') && !(relayKnown && v.ref.kind === 'relay'))) label(toLocalDir(light.dir, scene.frame), `${light.variation === 'steadier' ? '—' : '≈'} ${light.code}`, 'rgba(218,229,248,.85)');
               // The Halcyon relay: a faint light that moves across the sky in minutes.
               if (relayVisible(clock.t)) {
                 const rd = toLocalDir(relayTopocentric(sys, clock.t, sys.site), scene.frame);
@@ -466,7 +523,7 @@ export function Observatory() {
                   ctx.beginPath();
                   ctx.arc(rp.x, rp.y, 1.4 * dpr, 0, Math.PI * 2);
                   ctx.fill();
-                  if (s.logs.includes('relay') && sel?.kind !== 'relay') label(rd, 'Halcyon relay', 'rgba(181,156,255,0.9)');
+                  if (relayKnown && sel?.kind !== 'relay') label(rd, 'Halcyon relay', 'rgba(181,156,255,0.9)');
                 }
               }
               if (sel && visible.some((v) => v.key === skyKey(sel))) label(toLocalDir(objDir(sel, clock.t), scene.frame), skyCode(sys.seed, sel), 'rgba(255,196,107,0.95)');
@@ -712,9 +769,15 @@ export function Observatory() {
             {sel && available && <div className="muted" style={{ fontSize: 13 }}>Altitude {fmt(altOf(sel) / DEG, 1)}°</div>}
             {sel && <div className="callout tip" role="status">{selectionCue()}</div>}
             <div className="muted" style={{ fontSize: 13 }}>
-              Drag to look around, pinch or scroll to zoom, tap a light to select it. Then open the telescope.
+              {watchRelay && mode === 'scope' ? 'The mount follows the selected light. Use the aim controls to centre it.' : 'Drag to look around, pinch or scroll to zoom, tap a light to select it. Then open the telescope.'}
             </div>
-            {sel?.kind === 'relay' && available && <RelayInfo />}
+            {watchRelay && <RelayWatch scope={mode === 'scope'} canKeep={notebookAllowed} canStep={relayCanWait(t)}
+              canRead={relayEvidence.motion && !relayReadIssue}
+              followLabel={clock.paused || Number.isFinite(clock.stopAt) ? 'Follow in telescope' : 'Pause and follow in telescope'}
+              reason={relayEvidence.motion ? relayReadIssue : relayReason}
+              coaching={rules.coaching && (s.settings.difficulty !== 'cadet' || s.settings.cadetGuidance !== false)}
+              onScope={followRelay} onKeep={() => logSighting('')}
+              onStep={stepRelayWatch} onZoom={() => pointAt('relay', 0.05)} onRead={readRelayTag} />}
             {mode === 'scope' && sel && sel.kind !== 'star' && sel.kind !== 'relay' && !s.identified && (
               <button className="btn primary" disabled={!available} onClick={identify} data-tut="obs-identify">
                 This is the blue planet
@@ -735,7 +798,7 @@ export function Observatory() {
               <input type="checkbox" checked={showEcl} onChange={(e) => setShowEcl(e.target.checked)} /> Show the ecliptic (the path of the star)
             </label>
           </div>
-          <SkyNotebook selectedKey={sel ? skyKey(sel) : undefined} code={sel ? skyCode(sys.seed, sel) : ''} canLog={notebookAllowed} reason={!sel ? 'Select a comparison light to begin.' : sel.kind === 'star' ? 'Use the Year tab for solar-filter star-position observations.' : notebookStatus.reason} onLog={logSighting} />
+          <SkyNotebook selectedKey={sel ? skyKey(sel) : undefined} code={sel ? skyCode(sys.seed, sel) : ''} canLog={notebookAllowed} reason={!sel ? 'Select a comparison light to begin.' : sel.kind === 'star' ? 'Use the Year tab for solar-filter star-position observations.' : relayReason || notebookStatus.reason} onLog={logSighting} />
           </>
         )}
 
@@ -1155,34 +1218,6 @@ function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
         makePrediction({ kind: 'moon', made: clock.t, due: e + 0.05 * DAY, value, sigma });
       }}
     />
-  );
-}
-
-/** A light that moves against the stars in minutes can only be something in orbit around us. */
-function RelayInfo() {
-  const { system: sys } = currentWorld();
-  const s = useGame();
-  const t = useGameTime(2);
-  const f = localFrame(sys, t, sys.site);
-  const a = unit(relayTopocentric(sys, t, sys.site));
-  const b = unit(relayTopocentric(sys, t + 60, sys.site));
-  // Angle moved against the background stars in one minute.
-  const deg = (Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])) * 180) / Math.PI;
-  const alt = toHorizontal(relayTopocentric(sys, t, sys.site), f).alt / DEG;
-  const known = s.logs.includes('relay');
-  return (
-    <div className="stack" style={{ gap: 6 }}>
-      <div className="muted" style={{ fontSize: 13 }}>
-        It moves about <b>{fmt(deg, 2)}°</b> against the stars every minute (altitude {fmt(alt, 0)}°). The star and the planets take hours to move that far.
-      </div>
-      {!known ? (
-        <button className="btn primary" onClick={() => unlockLog('relay')}>
-          Track the moving light
-        </button>
-      ) : (
-        <div className="hint">The Halcyon’s dead relay satellite, in orbit around this planet.</div>
-      )}
-    </div>
   );
 }
 

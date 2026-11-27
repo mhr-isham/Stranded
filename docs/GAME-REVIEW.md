@@ -200,9 +200,9 @@ A broader orbital scan, latitude selection, camp-deployment checklist and landin
 
 ### CH-01 — First Light
 
-**Substantially present:** the full gravity/size/year/parallax/moon/transfer chain, relay object, journal entries and first Vale scene. Shared onboarding/flight gaps still apply. Tracking the relay currently leads to its explanation without requiring the specified period measurement.
+**Relay discovery implemented — 27 November 2026.** First Light keeps the gravity, size, year, parallax, moon and transfer chain, the journal and Vale scene. The optional relay watch now records centred telescope aim against the fixed star chart. Three well-separated sightings in one short arc can establish angular motion larger than the aiming allowance. The watch plots the kept observations in minutes. Players can wait 45 seconds through the normal expedition clock. At higher zoom, a centred observation isolates a modeled coded hull reflector on the unresolved point source. Recovering the tag reveals the registration and earns the existing Halcyon discovery log. The chart supplies no orbital period, range or exact pass schedule, and Free Roam keeps captures without playing the scene.
 
-**Keep:** twinkle → retrograde → blink parallax as the chapter's peaks. **Improve:** let a few timestamped relay positions rule out a fixed star, then infer an orbital range/period before reading its markings. End with an earned view of the target and a physical artifact, not just a results table. ECHO can regain confidence in arithmetic without handing over a measured truth.
+Keep the twinkle, retrograde and blink parallax discoveries. A separate multi-pass orbit investigation and a physical artifact at the destination remain open. Revise the wider story and characters together.
 
 ### CH-02 — The Silent Planet
 
@@ -459,7 +459,7 @@ Suggested thread: moving relay establishes prior visitors; debris and map establ
 
 | Clue | Current gap | Better playable version |
 |---|---|---|
-| Relay satellite | Explanation follows tracking, not measured orbital deduction | Sample positions over time; distinguish fixed stars, a fast local orbiter and a distant planet; identify reflective geometry. |
+| Relay satellite | First Light records a short motion arc and a coded hull reflection before the journal discovery. | Multiple passes and an explicit orbital model would be needed to constrain period and range. |
 | Debris age | A script asserts forty years from decay | Combine present orbit, atmospheric/ballistic assumptions and archived hardware data; produce an age interval, not an implausibly exact date. |
 | Cairn/noon marks | Briefing supplies the interpretation | Let player compare shadow orientations and dates, then recognize a baseline/meridian experiment. June can interpret the material context. |
 | Old star map | Proper-motion age is asserted | Fit epoch against several stars with known motion; include measurement uncertainty and nonmoving references. |

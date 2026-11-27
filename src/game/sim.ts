@@ -245,7 +245,7 @@ function stepTo(t1Wanted: number, dtReal: number, hopping = false) {
     s.say(ECHO.lockedSky);
     if (flareAt(sys, t1)) s.say(ECHO.flare);
   }
-  if (s.missionsDone.includes('year') && !s.logs.includes('relay') && !s.tutorial.active) s.say(ECHO.relayHint);
+  if (s.chapter === 1 && s.missionsDone.includes('year') && !s.relayTag && !s.logs.includes('relay') && !s.tutorial.active) s.say(ECHO.relayHint);
   if (s.identified && !s.names.target && !s.tutorial.active && s.missionsDone.includes('identify')) s.say(ECHO.nameIt);
 
   missionTimer += dtReal;

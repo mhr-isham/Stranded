@@ -18,6 +18,8 @@ export interface SkyLight {
 export interface SkySighting {
   id: string; key: string; code: string; at: number;
   lon: number; lat: number; step: number; instrument: 'wide' | 'scope'; note: string;
+  /** Angular aiming allowance (degrees) for a centred moving-light sighting. */
+  relayPrecision?: number;
 }
 export const skyKey = (ref: SkyRef) => ref.kind === 'catalog' ? `catalog:${ref.i}` : ref.kind;
 /** Stable, neutral labels with no special target ordering or colour dependence. */

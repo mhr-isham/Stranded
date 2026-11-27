@@ -42,10 +42,10 @@ export const LOGS: Record<string, StoryLog> = {
     chapter: 1,
     kind: 'discovery',
     lines: [
-      { who: 'echo', text: 'That is not a star. It crossed a good part of the sky while we watched — it’s in orbit around this planet, a few planet-radii up.' },
-      { who: 'echo', text: 'It only shows in the evening and the morning, when our sky is dark but it still catches the light. Something small and shiny. Something built.' },
-      { who: 'echo', text: 'No transponder answers. But I can read the hull markings at full zoom: H-A-L-C-Y-O-N. A relay satellite. They were here.' },
-      { who: 'note', text: 'Real satellites behave the same way: they are seen just after dusk and before dawn, and they vanish when they pass into the planet’s shadow.' },
+      { who: 'echo', text: 'Look at your three sightings. It moved against the background stars in minutes. That’s the sort of track a nearby orbiter leaves.' },
+      { who: 'echo', text: 'Our sky is dark, but it’s still catching starlight. Look at the narrow-field capture. That patterned glint is a registration tag.' },
+      { who: 'echo', text: 'No transponder answers. Your capture reads H-A-L-C-Y-O-N. Their relay satellite. They were here.' },
+      { who: 'note', text: 'Sunlit satellites can remain visible against a dark sky and fade when they pass into the planet’s shadow.' },
     ],
   },
   vale1: {

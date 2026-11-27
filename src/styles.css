@@ -203,6 +203,13 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .measurement-notes summary, .measurement-help summary { cursor: pointer; color: var(--blue); }
 .measurement-notes > div { margin-top: 5px; }
 .measurement-help p { font-size: 12px; margin: 8px 0 0; }
+.relay-watch { font-size: 13px; }
+.relay-watch p { margin: 0; }
+.relay-track { padding: 6px; border: 1px solid var(--panel-border); border-radius: 8px; background: #081421; }
+.relay-tag { padding: 10px; border-radius: 8px; border: 1px solid #527d98; background: #102437; }
+.relay-tag strong { color: #c4eaff; font-size: 20px; letter-spacing: 0.18em; }
+.relay-signal { display: flex; align-items: flex-end; height: 32px; background: #081421; padding: 2px 4px; gap: 1px; }
+.relay-signal i { min-width: 0; flex: 1; background: #6cc4ff; }
 .sky-explorer, .sky-notebook { font-size: 13px; }
 .sky-explorer .faint, .sky-notebook .faint { font-size: 11px; }
 .sky-pan .btn { flex: 1; min-width: 36px; }
