@@ -248,9 +248,11 @@ The confirmed fix aligns Mira’s observations with ECHO’s memory and plays th
 
 ### CH-09 — Home
 
-**Partial:** Mars/Earth reference constants and inner-target navigation exist; the underlying “real Solar System” is a circular approximation. Descent uses the common thick-atmosphere parameters. Act III incorrectly requires `opposition` although this chapter offers `transit`. Final journal-delivery and Vale lines exist, but the final Navigator dialogue is fixed rather than selectable.
+**Agreed and implemented.** Act III advances on the inner-planet alignment mission, and the solar-camera fit has a quick action for the latest recorded transit. Re-fitting an event replaces nearby marks so they cannot masquerade as another cycle. Mars’s thin atmosphere changes chute braking and powered descent. Launch and hop estimates use the same Mars profile. The final descent uses Earth’s denser profile. Nominal parameters come from NASA’s planetary fact sheets. [NASA Mars Fact Sheet](https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html) [NASA Earth Fact Sheet](https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html)
 
-**Improve:** fix act mapping, model Mars's thin atmosphere, explain reference epochs/approximations and compare against credited values with sensible tolerances. Preserve the last flight as the payoff of accumulated skill. Show Earth gravity affecting familiar objects, let Vale leave her pod and allow the final “Within my error bars” / “Yes” choice without a scoring trap. Deliver Mira's journal as a tangible final artifact. NASA comparison should be meaningful, not a claim of high-fidelity ephemeris simulation.
+The debrief compares estimates and stated ranges with published mean values for Mars and Earth. Mission scores use the simulated system. The comparison explains the circular, coplanar orbits, the simulated arrival phase, and how those choices affect transit timing. [JPL orbital elements](https://ssd.jpl.nasa.gov/planets/approx_pos.html)
+
+The final scene with Vale, the Navigator’s reply, and Mira’s journal as an artifact remain open for the story discussion.
 
 ### CH-10 — Beyond the campaign
 

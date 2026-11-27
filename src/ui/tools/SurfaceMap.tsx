@@ -27,6 +27,7 @@ import {
 import { CanvasView, canvasPoint } from '../common/CanvasView';
 import { drawStarship } from '../../render/ship';
 import { drawRover } from '../../render/rover';
+import { flightAtmosphere } from '../../engine/atmosphere';
 import { hopBudget, hopEstimate, hopParams } from '../../engine/hop';
 import { hasChallenge } from '../../game/challenges';
 import { ToolHeader } from '../common/sheetBits';
@@ -118,11 +119,11 @@ export function SurfaceMap() {
   // A hop as the ship really flies it: the fuel a good pilot uses, and the tank load for flying it by hand.
   const hopInfo = useMemo(() => {
     if (target === null) return null;
-    const p = hopParams(g, mode.landingAssist);
+    const p = hopParams(g, mode.landingAssist, flightAtmosphere(!!sys.features.real));
     const d = Math.abs(target - campX);
     const estimate = hopEstimate(p, d);
     return { est: estimate.cost, seconds: estimate.seconds, budget: hopBudget(p, d) };
-  }, [target, campX, g, mode.landingAssist]);
+  }, [target, campX, g, mode.landingAssist, sys.features.real]);
 
   const hop = () => {
     if (target === null || !hopInfo) return;

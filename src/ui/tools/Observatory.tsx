@@ -1128,7 +1128,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
   const S = picks.length >= 2 && picks.at(-1)! > picks[0] ? (picks.at(-1)! - picks[0]) / (picks.length - 1) : null;
   return (
     <div className="panel panel-pad stack">
-      <b>Blue planet tracker</b>
+      <b>{sysT.features.real ? 'Earth tracker' : 'Blue planet tracker'}</b>
       {inner && (
         <div className="muted" style={{ fontSize: 13 }}>
           This planet orbits inside ours, so it never strays far from the star. The tracker logs its elongation — its angle east (+) or west (−)
@@ -1163,7 +1163,9 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       )}
       {pts.length > 1 && (
         <div className="faint" style={{ fontSize: 12 }}>
-          Chart dates start at zero when the expedition begins. Drag to zoom or tap to place a date cursor. For an outer planet, opposition lies within the backward interval, distinct from its two turning points. Near-circular examples can place it near the middle; an exact symmetry is not guaranteed.
+          Chart dates start at zero. Drag to zoom or tap a date. {inner
+            ? 'Successive alignments of the same type occur about one synodic period apart.'
+            : 'Opposition lies in the backward interval, between its two turning points. With near-circular orbits it is often close to the middle.'}
         </div>
       )}
       {inner && pts.length > 1 && (
@@ -1328,8 +1330,10 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
   const [band, setBand] = useState<[number, number] | null>(null);
   const pts = s.sunLog.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC }));
   const used = band ? pts.filter((p) => p.x >= band[0] && p.x <= band[1]) : [];
-  const fit = used.length >= 3 ? linearFit(used.map((p) => p.x), used.map((p) => p.y)) : null;
-  const mid = fit && fit.slope !== 0 ? -fit.intercept / fit.slope : null;
+  const oneEvent = used.length >= 3 && used.at(-1)!.x - used[0].x <= 3;
+  const fit = oneEvent ? linearFit(used.map((p) => p.x), used.map((p) => p.y)) : null;
+  const cross = fit && fit.slope !== 0 ? -fit.intercept / fit.slope : NaN;
+  const mid = Number.isFinite(cross) && cross >= used[0].x - 1 && cross <= used.at(-1)!.x + 1 ? cross : null;
   // Uncertainty of the zero crossing from the line's scatter (simple propagation).
   const midSigma = fit && mid !== null && used.length > 2
     ? (() => {
@@ -1348,7 +1352,8 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
   const mode = useMode();
   return (
     <div className="panel panel-pad stack">
-      <b>Transit timer</b>
+      <b>{sys.features.real ? 'Earth transit timer' : 'Transit timer'}</b>
+      {sys.features.real && <p className="muted route-comparison-note">In this circular, coplanar model, Earth can cross the Sun at inferior conjunction. Real transits also need Earth and Mars to align in latitude.</p>}
       <div className="muted" style={{ fontSize: 13 }}>
         When the inner planet passes exactly between us and the star, it crosses the star’s face as a small black dot. The solar camera logs where the
         dot is every hour while the star is up.
@@ -1368,6 +1373,7 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
       {pts.length > 1 && (
         <>
           <Chart
+            ariaLabel="Solar-camera transit readings"
             series={[
               { pts, color: '#ffc46b', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
               ...(fit && used.length ? [{ pts: [used[0].x, used[used.length - 1].x, mid ?? used[0].x].sort((a, b) => a - b).map((x) => ({ x, y: fit.intercept + fit.slope * x })), color: 'rgba(108,196,255,0.8)', kind: 'line' as const }] : []),
@@ -1380,6 +1386,9 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
             yFmt={(y) => y.toFixed(0)}
           />
           <div className="faint" style={{ fontSize: 12 }}>Drag across one transit’s logs. The line’s zero crossing is mid-transit.</div>
+          <button className="btn small" onClick={() => { const last = pts.at(-1)!.x; setBand([last - 3, last]); }}>Fit latest transit</button>
+          {band && used.length < 3 && <div className="muted route-comparison-note">A fit needs at least three readings from one transit.</div>}
+          {used.length >= 3 && mid === null && <div className="amber route-comparison-note">Select readings around one solar crossing for a usable fit.</div>}
         </>
       )}
       {mid !== null && (
@@ -1393,7 +1402,9 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
           <button
             className="btn primary small"
             onClick={() => {
-              s.set({ oppPicks: [...s.oppPicks, mid * DAY] });
+              const at = mid * DAY;
+              const saved = useGame.getState().oppPicks;
+              s.set({ oppPicks: [...saved.filter(p => Math.abs(p - at) > 3 * DAY), at] });
               setBand(null);
               sfx('good');
               setTimeout(checkMissions, 0);

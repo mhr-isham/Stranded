@@ -1000,3 +1000,21 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 @media (max-width: 860px) {
   .tool.stellar-watch-active { grid-template-rows: minmax(110px, 34%) minmax(0, 1fr); }
 }
+
+.solar-reference h2, .solar-reference h3 { margin: 0; }
+.solar-reference h2 { font-size: 18px; }
+.solar-reference h3 { font-size: 16px; color: var(--blue); }
+.solar-reference p { margin: 0; font-size: 13px; }
+.solar-reference details p { margin-block: 8px; }
+.solar-reference-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.solar-reference-body { padding: 12px; border-radius: 10px; }
+.solar-reference-rows { margin: 4px 0 0; }
+.solar-reference-row { display: grid; grid-template-columns: 1fr 1.2fr; align-items: start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--panel-border); }
+.solar-reference-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+.solar-reference-row dt { font-size: 13px; min-width: 0; }
+.solar-reference-row small { display: block; color: var(--muted); }
+.solar-reference-row dd { display: grid; gap: 3px; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.solar-reference-row dd b { color: var(--muted); margin-right: 4px; font-weight: 500; }
+.solar-reference-links { gap: 8px 16px; flex-wrap: wrap; font-size: 13px; }
+.solar-reference-links a { color: var(--blue); }
+@media (max-width: 670px) { .solar-reference-grid { grid-template-columns: 1fr; } }

@@ -153,16 +153,23 @@ export function actsFor(chapter: number): Act[] {
     { n: 2, name: 'The stars', missions: ['starPar'],
       learned: ['Nearby stars show a repeating shift against the background as we orbit.'], hook: 'Look for one catalogue location that fits all three stars.' },
   ];
-  if (chapter === 5)
-    return ACTS.map((a) =>
-      a.n === 3
-        ? {
-            ...a,
-            missions: ['transit', 'parallax', 'disk'],
-            learned: ['An inner planet crosses the star’s face at inferior conjunction — a transit.', 'Its distance by parallax is measured in twilight, near greatest elongation.', 'Angle × distance = size.'],
-            hook: 'We know where it is and how big. Now its weight — and its moon is swinging around it.',
-          }
-        : a,
-    );
+  if (chapter === 5 || chapter === 9) {
+    const target = chapter === 9 ? 'Earth' : 'The inner planet';
+    return ACTS.map((a) => {
+      if (a.n === 2) return { ...a,
+        learned: [`${target} appears in twilight and stays close to the star.`, ...a.learned.slice(1, 2),
+          'The tracker records elongation in twilight.'],
+        hook: 'Look for the planet at greatest elongation, or record its passage with the solar camera.' };
+      if (a.n === 3) return { ...a,
+        name: chapter === 9 ? 'Earth' : a.name,
+        missions: ['transit', 'parallax', 'disk'],
+        learned: ['A solar transit can mark inferior conjunction. An inner planet can also pass above or below the star.',
+          'Use two twilight views near greatest elongation to measure the planet’s distance.', 'Angle and distance give size.'],
+        hook: 'Now use the moon’s orbit to estimate the planet’s mass.' };
+      if (a.n === 4) return { ...a,
+        learned: [a.learned[0], 'The interval between like alignments gives the synodic period. Combine it with the local year to find the inner planet’s year.'] };
+      return a;
+    });
+  }
   return ACTS;
 }

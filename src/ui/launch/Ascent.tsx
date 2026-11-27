@@ -2,6 +2,7 @@
 // The orbit you are on is drawn live, with apoapsis and periapsis. Fuel you
 // waste compared with ECHO's profile comes out of the ship's Δv budget.
 
+import { flightAtmosphere } from '../../engine/atmosphere';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { G } from '../../engine/constants';
 import { apsides, ascentStart, autopilot, autopilotDv, inOrbit, stepAscent, type AscentParams } from '../../engine/ascent';
@@ -31,7 +32,7 @@ export function Ascent() {
   const pending = s.pendingLaunch!;
   const params: AscentParams = useMemo(() => {
     const g = (G * sys.home.mass) / sys.home.radius ** 2;
-    return { mu: G * sys.home.mass, R: sys.home.radius, rho0: 1.1, scaleH: 8500, thrust: 2.2 * g, cda: 0.0004, orbitAlt: 200e3 };
+    return { mu: G * sys.home.mass, R: sys.home.radius, ...flightAtmosphere(!!sys.features.real), thrust: 2.2 * g, cda: 0.0004, orbitAlt: 200e3 };
   }, [sys]);
   const baseline = useMemo(() => autopilotDv(params), [params]);
   const st = useRef(ascentStart(params));

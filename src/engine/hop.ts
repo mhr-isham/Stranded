@@ -5,6 +5,7 @@
 // more than the textbook impulsive figure 2√(g·d): gravity eats into every
 // burn, and a fast hop fights drag all the way.
 
+import { flightAtmosphere, type AtmosphereProfile } from './atmosphere';
 import { stepDescent, type DescentParams, type DescentState } from './descent';
 
 export interface HopPlan {
@@ -113,10 +114,9 @@ export function hopEstimate(p: DescentParams, d: number) {
 export const hopBudget = (p: DescentParams, d: number) => 2.5 * hopEstimate(p, d).cost + 120 * p.g;
 
 /** The ship's flight model near the ground (the same as for the landing). */
-export const hopParams = (g: number, assist = true): DescentParams => ({
+export const hopParams = (g: number, assist = true, atmosphere: AtmosphereProfile = flightAtmosphere(false)): DescentParams => ({
   g,
-  rho0: 1.1,
-  scaleH: 8500,
+  ...atmosphere,
   thrust: 2.6 * g,
   bodyCdA: 0.0025,
   chuteCdA: 0.1,

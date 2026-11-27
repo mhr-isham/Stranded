@@ -1,4 +1,5 @@
 import { PacingReportButton } from '../common/PacingReport';
+import { SolarSystemReference } from './SolarSystemReference';
 import { BeaconEclipseWatch } from './BeaconEclipseWatch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUANTITY_INFO, deriveAll, derivedFor, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
@@ -380,15 +381,16 @@ function Debrief() {
           </div>
         )}
 
+        {sys.features.real && <SolarSystemReference rows={rows} />}
         <div className="panel panel-pad" data-tut="results-table">
-          <h2 style={{ fontSize: 18, marginBottom: 8 }}>{sys.features.real ? 'Your numbers vs NASA’s' : 'Your numbers vs the truth'}</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 8 }}>{sys.features.real ? 'Your numbers vs the simulated system' : 'Your numbers vs the truth'}</h2>
           <div className="scroll">
             <table className="log">
               <thead>
                 <tr>
                   <th>Quantity</th>
                   <th style={{ textAlign: 'right' }}>You</th>
-                  <th style={{ textAlign: 'right' }}>Truth</th>
+                  <th style={{ textAlign: 'right' }}>{sys.features.real ? 'Model value' : 'Truth'}</th>
                   <th style={{ textAlign: 'right' }}>Off by</th>
                   {scored && <th style={{ textAlign: 'right' }}>Points</th>}
                 </tr>

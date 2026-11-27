@@ -5,6 +5,7 @@
 // crash. See docs/DESIGN-V2.md §9.1 and docs/STORY.md §5.1.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flightAtmosphere } from '../engine/atmosphere';
 import { DEG } from '../engine/constants';
 import {
   deployChute,
@@ -90,6 +91,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const s = useGame();
   const { system: sys } = currentWorld();
   const mode = modeOf(s.settings.difficulty);
+  const mars = !!sys.features.real && !arrival;
   const manualRequired = arrival && manualFlightRequired(s);
   const reducedMotion = s.settings.flightReducedMotion ?? window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [assistDialog, setAssistDialog] = useState(false);
@@ -105,8 +107,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const params: DescentParams = useMemo(
     () => ({
       g,
-      rho0: 1.1,
-      scaleH: 8500,
+      ...flightAtmosphere(!!sys.features.real, arrival),
       thrust: 2.6 * g,
       bodyCdA: 0.0025,
       chuteCdA: 0.1,
@@ -116,7 +117,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       turnAccel: 1.4,
       assist,
     }),
-    [g, assist],
+    [g, assist, sys.features.real, arrival],
   );
   const stars = useMemo(() => {
     const r = makeRng(sys.seed ^ 0x77);
@@ -156,10 +157,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     });
     const ridges = arrival
       ? [ridge(46, 22, 0.05, 'rgba(120,160,190,0.55)'), ridge(22, 14, 0.12, 'rgba(80,120,110,0.75)')]
-      : [ridge(52, 26, 0.05, 'rgba(150,130,140,0.5)'), ridge(24, 16, 0.12, 'rgba(110,88,70,0.8)')];
-    const clouds = Array.from({ length: 14 }, () => ({ x: r.range(-9000, 9000), y: r.range(1800, 6500), w: r.range(400, 1400) }));
+      : mars ? [ridge(52, 26, 0.05, 'rgba(137,79,51,0.66)'), ridge(24, 16, 0.12, 'rgba(86,52,40,0.85)')]
+        : [ridge(52, 26, 0.05, 'rgba(150,130,140,0.5)'), ridge(24, 16, 0.12, 'rgba(110,88,70,0.8)')];
+    const clouds = Array.from({ length: mars ? 0 : 14 }, () => ({ x: r.range(-9000, 9000), y: r.range(1800, 6500), w: r.range(400, 1400) }));
     return { planet, marks, nebula, ridges, clouds };
-  }, [sys, arrival]);
+  }, [sys, arrival, mars]);
 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
   const later = s.chapter > 1 && !arrival && !hop;
@@ -209,6 +211,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ? 'On the pad. Hold BURN to lift off, lean towards the blue flag, cut the engine and coast — then land near it, gently and upright. You pay for the fuel you burn.'
       : arrival
       ? 'Entry interface at the blue planet. Same rules as before: keep the flight-path angle in the green corridor. The beacon is on flat ground ahead.'
+      : mars
+      ? 'That’s Mars below us. Line up with the green retrograde marker and burn. The thin air will help slow us, then we finish on the engine.'
       : later
       ? 'Fold exit — controlled, this time. Mostly. New star, new planets, and we’re falling toward the nearest one. Turn the nose to the green retrograde marker and burn.'
       : 'Fold exit — irregular. Attitude thrusters are restarting. I can scan the ground below.',
@@ -274,7 +278,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     S.d = deployChute(params, S.d);
     sfx(S.d.chute === 'open' ? 'chute' : 'bad');
     if (S.d.chute === 'torn') setLine('The chute tore — we were going too fast for it. Engines only now.');
-    else setLine('Chute open. It slows us, but not enough to land on its own — you’ll need a last burn near the ground.');
+    else setLine(mars ? 'Chute open. Watch your fall speed. Start braking early and use the engine to settle.'
+      : 'Chute open. It slows us, but you’ll need a last burn near the ground.');
   }
 
   /** A hop pays for what was burned: hop tank first, the rest from the launch fuel. */
@@ -468,7 +473,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         S.shieldDrop = { x: S.d.x, y: S.d.y - 3, vx: S.d.vx * 0.9, vy: S.d.vy - 6, rot: 0 };
         S.shake = 0.5;
         sfx('click');
-        setLine(arrival ? 'Heat shield away. The beacon is on the flat ground I’ve marked. Bring us down gently — this is the last landing of the chapter.' : 'Heat shield away. You have the thrusters: tilt to steer, BURN to slow down. Pick somewhere to set down — I’ve marked what I can see.');
+        setLine(mars ? 'Heat shield away. Deploy the chute to take some speed off, then start your braking burn early. Watch your sideways drift.' : arrival ? 'Heat shield away. The beacon is on the flat ground I’ve marked. Bring us down gently — this is the last landing of the chapter.' : 'Heat shield away. You have the thrusters: tilt to steer, BURN to slow down. Pick somewhere to set down — I’ve marked what I can see.');
       }
     } else if (S.stage === 'descent') {
       const ground = terrain.height(S.d.x);
@@ -541,10 +546,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       }
       const v = Math.hypot(S.d.vx, S.d.vy);
       if (S.d.chute === 'stowed' && dynPressure(params, S.d) < params.chuteMaxQ * 0.8 && h > 1200)
-        say('chute', 'We’re slow enough for the parachute now. It saves fuel — but it won’t land us on its own.');
+        say('chute', mars ? 'Chute pressure is in range. Use it now, then brake with the engine while you still have altitude.'
+          : 'We’re slow enough for the parachute now. It saves fuel — but it won’t land us on its own.');
       if (S.launched && S.d.vy < 0 && h < 1500 && v > 60 && !S.rescued) say('slow', 'The ground is coming up fast — burn to slow down.');
       if (S.launched && S.d.vy < 0 && h < 120 && Math.abs(S.d.vy) < 8 && !S.rescued) say('steady', `Steady… keep the descent under ${assist ? 5 : 4} m/s and the ship upright.`);
-      if (!hop && S.d.fuel < 0.2 * mode.landingDv && S.d.fuel > 0) say('lowfuel', 'Descent tank under 20%. Use the parachute if you still have it.');
+      if (!hop && S.d.fuel < 0.2 * mode.landingDv && S.d.fuel > 0) say('lowfuel', mars ? 'Descent tank under 20%. Keep the ship upright so more thrust can slow your fall.' : 'Descent tank under 20%. Use the parachute if you still have it.');
       if (hop && S.launched && S.d.fuel < 0.25 * (s.hop?.budget ?? 1) && S.d.fuel > 0) say('lowfuelhop', 'Hop fuel under a quarter. Save it for the landing burn.');
       if (S.launched && S.d.y <= ground) {
         // Touchdown: a burst of dust and a jolt, harder for a harder landing.
@@ -652,14 +658,15 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.fillStyle = term;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
-    const atm = ctx.createRadialGradient(cx, cy, R * 0.985, cx, cy, R * 1.05);
+    const rimRadius = R * (mars ? 1.022 : 1.05);
+    const atm = ctx.createRadialGradient(cx, cy, R * 0.985, cx, cy, rimRadius);
     atm.addColorStop(0, 'rgba(120,180,255,0)');
-    atm.addColorStop(0.28, 'rgba(140,200,255,0.55)');
-    atm.addColorStop(0.45, 'rgba(110,160,255,0.22)');
+    atm.addColorStop(mars ? 0.45 : 0.28, mars ? 'rgba(236,155,112,0.38)' : 'rgba(140,200,255,0.55)');
+    atm.addColorStop(mars ? 0.62 : 0.45, mars ? 'rgba(222,120,84,0.16)' : 'rgba(110,160,255,0.22)');
     atm.addColorStop(1, 'rgba(80,120,255,0)');
     ctx.fillStyle = atm;
     ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.05, 0, Math.PI * 2);
+    ctx.arc(cx, cy, rimRadius, 0, Math.PI * 2);
     ctx.fill();
     // The blue planet, a small steady dot.
     ctx.fillStyle = '#9fd0ff';
@@ -744,7 +751,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     const top = arrival ? [8, 16, 40] : [6, 9, 22];
-    const bot = arrival ? [70, 130, 200] : [90, 110, 160];
+    const bot = arrival ? [70, 130, 200] : mars ? [147, 86, 62] : [90, 110, 160];
     const mixc = (a: number[], b: number[], t: number) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
     sky.addColorStop(0, mixc([2, 3, 10], top, 1 - f));
     sky.addColorStop(1, mixc([12, 18, 40], bot, 1 - f));
@@ -761,12 +768,13 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     const hy = h * (0.78 + 0.1 * (1 - f));
     const pcx = w / 2;
     const pcy = hy + Rr;
-    const glowR = ctx.createRadialGradient(pcx, pcy, Rr * 0.99, pcx, pcy, Rr * 1.06);
-    glowR.addColorStop(0, 'rgba(150,200,255,0.6)');
+    const rimRadius = Rr * (mars ? 1.025 : 1.06);
+    const glowR = ctx.createRadialGradient(pcx, pcy, Rr * 0.99, pcx, pcy, rimRadius);
+    glowR.addColorStop(0, mars ? 'rgba(237,158,120,0.34)' : 'rgba(150,200,255,0.6)');
     glowR.addColorStop(1, 'rgba(120,170,255,0)');
     ctx.fillStyle = glowR;
     ctx.beginPath();
-    ctx.arc(pcx, pcy, Rr * 1.06, 0, Math.PI * 2);
+    ctx.arc(pcx, pcy, rimRadius, 0, Math.PI * 2);
     ctx.fill();
     const surf = ctx.createLinearGradient(0, hy, 0, h);
     surf.addColorStop(0, arrival ? '#4f86b0' : scenery.planet[0]);
@@ -865,9 +873,9 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     // Sky: deep blue high up, warm haze near the ground, and a low sun.
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     const hi = Math.min(1, d.y / 10000);
-    sky.addColorStop(0, arrival ? (hi > 0.5 ? '#0f2c5a' : '#2a5ea0') : hi > 0.5 ? '#14224a' : '#29467a');
-    sky.addColorStop(0.6, arrival ? '#7fb0dc' : '#7b8fb0');
-    sky.addColorStop(1, arrival ? '#d7ecf5' : '#e3b585');
+    sky.addColorStop(0, arrival ? (hi > 0.5 ? '#0f2c5a' : '#2a5ea0') : mars ? (hi > 0.5 ? '#292437' : '#614640') : hi > 0.5 ? '#14224a' : '#29467a');
+    sky.addColorStop(0.6, arrival ? '#7fb0dc' : mars ? '#a76e55' : '#7b8fb0');
+    sky.addColorStop(1, arrival ? '#d7ecf5' : mars ? '#e2ae81' : '#e3b585');
     ctx.fillStyle = sky;
     ctx.fillRect(-20, -20, w + 40, h + 40);
     const sunX = w * 0.82;
@@ -924,8 +932,8 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.lineTo(w, h);
     ctx.closePath();
     const tg = ctx.createLinearGradient(0, Y(ground) - 50 * dpr, 0, h);
-    tg.addColorStop(0, arrival ? '#5a7d4f' : '#7b6649');
-    tg.addColorStop(1, arrival ? '#1f2d1c' : '#2c241a');
+    tg.addColorStop(0, arrival ? '#5a7d4f' : mars ? '#a45d3e' : '#7b6649');
+    tg.addColorStop(1, arrival ? '#1f2d1c' : mars ? '#39231c' : '#2c241a');
     ctx.fillStyle = tg;
     ctx.fill();
     ctx.strokeStyle = arrival ? 'rgba(200,240,190,0.35)' : 'rgba(255,215,160,0.35)';
@@ -1132,11 +1140,12 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   return (
     <div className="screen prologue flight-screen" role="region" aria-label="Landing flight" tabIndex={-1}>
       <CanvasView draw={draw} />
-      {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? 'Destination landing' : 'Arrival · opening sequence'}
+      {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? (sys.features.real ? 'Earth landing' : 'Destination landing') : mars ? 'Mars arrival' : 'Arrival · opening sequence'}
         status={flightStatus} controls={controls}
         tools={opening && <button className="btn small" aria-label="Scan landing terrain" aria-expanded={!!scan} ref={scanToggle}
           onClick={scan ? closeScan : openScan}>Scan terrain</button>}>
         <p>Use short steering inputs. During entry, left makes the path shallower and right makes it steeper. During descent, tilt to control drift and burn to slow the fall. A parachute helps only within its pressure limit.</p>
+        {mars && !hop && <p>Mars’s thin atmosphere provides much less drag. The parachute reduces speed. Start the engine burn while you still have height to brake.</p>}
         {hop && <p>After takeoff, simulated flight seconds use supplies. Pausing leaves the flight and supplies where they are.</p>}
         <p>Land nearly upright, with little sideways drift and vertical speed below {assist ? 5 : 4} m/s. The instruments show the current conditions.</p>
       </FlightToolbar>}
@@ -1205,6 +1214,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
             <dd className={Math.abs(hud.hs) > 3 && hud.alt < 200 ? 'amber' : ''}>{hud.hs.toFixed(1)} m/s</dd>
             <dt>Tilt</dt>
             <dd>{hud.tilt.toFixed(0)}°</dd>
+            {mars && !hop && <><dt>Dynamic pressure</dt><dd>{hud.q.toFixed(0)} Pa</dd></>}
             <dt>Below</dt>
             <dd>{hud.site === 'rough' ? 'rough ground' : hud.site}</dd>
             {hop && (
@@ -1244,7 +1254,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
                 onClick={() => {
                   sim.current.echoFly = !echoFly;
                   setEchoFly(!echoFly);
-                  setLine(!echoFly ? 'I have it. Steep climb out of the thick air, coast, turn round, brake, settle.' : 'Your ship, Navigator.');
+                  setLine(!echoFly ? 'I have it. Climb, coast, turn round and brake for touchdown.' : 'Your ship, Navigator.');
                 }}
               >
                 {echoFly ? '🤖 ECHO is flying' : '🤖 Let ECHO fly'}
