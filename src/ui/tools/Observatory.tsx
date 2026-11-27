@@ -36,7 +36,8 @@ import { Formula, ReadingsTable, SendReadings, SendToSheet, ToolHeader, outlierN
 import { toast, useGameTime } from '../common/widgets';
 import { flag, onTutEvent, setAnchor } from '../../game/tutorial';
 import { compareStarTrial, lastOf, makePrediction, nextMoonEast, nextStationary, pendingOf } from '../../game/predictions';
-import { FieldTrialResult, PredictCard } from '../common/Predict';
+import { FieldTrialResult, ForecastLog } from '../common/ForecastLog';
+import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { hasChallenge, seeingFactor } from '../../game/challenges';
 import { SeeingConditions } from '../common/MeasurementNotes';
@@ -903,7 +904,7 @@ function YearPanel({ canLog, reason, onLog, onPoint, locked = false, status }: {
       </button>
       {status ? <ObservingStatus status={status} /> : !canLog && <div className="amber" style={{ fontSize: 13 }}>{reason}</div>}
       {locked && <MeasurementSources instrument="locked-year" />}
-      <div data-tut="year-fit" className="stack">
+      <div id="year-observations" tabIndex={-1} data-tut="year-fit" className="stack">
       <YearPlot analysis={analysis} manual={manual} band={band} onBand={setBand} />
       {pts.length > 0 && <>
         <div className="faint">Drag across the chart to select dates, or use these range fields. Excluded observations remain visible.</div>
@@ -929,13 +930,14 @@ function StarPrediction({ pts, fit, ready }: { pts: { x: number; y: number }[]; 
   const [ahead, setAhead] = useState(7);
   const pending = pendingOf(s, 'star'), last = lastOf(s, 'star');
   const latest = s.predictions.filter((p) => p.kind === 'star').at(-1);
-  if (s.tutorial.active || (!ready && !pending && !latest?.fieldTrial)) return null;
+  if (s.tutorial.active || (!ready && !pending && !latest)) return null;
   const xT = Math.floor(t / DAY) + ahead;
   const own = fit ? { value: fit.intercept + fit.slope * xT, line: [pts[0].x, xT].map((x) => ({ x, y: fit.intercept + fit.slope * x })) } : null;
   return <details className="measurement-help"><summary>Optional · Plan a star sighting{pending?.fieldTrial ? ' · forecast logged' : latest?.missed ? ' · window passed' : latest?.result && latest.fieldTrial ? ' · comparison ready' : ''}</summary>
     <div className="stack">
-      {latest?.missed && <p>The observing window passed. You can pick another date when you have a usable drift record.</p>}
+      {latest?.missed && <p>The observing window passed without a kept sighting. You can pick another date when you have a usable drift record.</p>}
       {last?.fieldTrial && <FieldTrialResult prediction={last} />}
+      <ForecastLog kind="star" exclude={last?.fieldTrial ? last.id : undefined} />
       {pending?.fieldTrial ? <div className="stack">
         <b>Forecast logged</b>
         <div>{fmt(pending.value, 2)}° ± {fmt(pending.sigma, 2)}° · elapsed day {pending.at}</div>
@@ -946,7 +948,7 @@ function StarPrediction({ pts, fit, ready }: { pts: { x: number; y: number }[]; 
         helper="Follow the drift in your recorded positions. Allow more room in your range if the positions scatter or the forecast reaches far beyond your log."
         extra={<div className="row">{[1, 7, 14, 30].map((d) => <button key={d} aria-pressed={ahead === d} className={`btn small ${ahead === d ? 'primary' : ''}`} onClick={() => setAhead(d)}>{d === 1 ? 'Tomorrow' : `In ${d} days`}</button>)}</div>}
         pts={pts} axis="y" xT={xT} xMax={xT + 2} xLabel="elapsed days" yLabel="star longitude (°)"
-        ownFit={own} sigma0={1} sigmaMax={20} pending={pending} last={last?.fieldTrial ? null : last}
+        ownFit={own} sigma0={1} sigmaMax={20} pending={pending}
         onCommit={(value, sigma) => {
           if (xT * DAY <= clock.t || pendingOf(useGame.getState(), 'star')) return;
           makePrediction({ kind: 'star', made: clock.t, due: xT * DAY, value, sigma, at: xT, fieldTrial: true });
@@ -989,7 +991,7 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
       )}
       <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={!!s.settings.skyTrackTrail} onChange={(e) => { s.set({ settings: { ...s.settings, skyTrackTrail: e.target.checked } }); if (e.target.checked) onWide(); }} />Show saved sightings on the wide sky</label>
       {s.settings.skyTrackTrail && <div className="faint">Gold rings are past recorded pointings in the current clear field. Only logs with a saved latitude can be placed here; older longitude-only records stay available in the chart replay. Pan the wide view to inspect them.</div>}
-      <div data-tut="track-chart" className="stack">
+      <div id="tracker-observations" tabIndex={-1} data-tut="track-chart" className="stack">
       {pts.length > 1 && (
         <Chart
           series={[{ pts, color: '#6cc4ff', kind: 'dots' }]}
@@ -1056,12 +1058,12 @@ function TrackerPanel({ onWide }: { onWide: () => void }) {
         </div>
       )}
       <OutingPlanner />
-      {!inner && <><RetroInvestigation /><RetroPrediction pts={pts} /></>}
+      {!inner && <><RetroInvestigation /><ForecastLog kind="retro" /><RetroPrediction pts={pts} /></>}
     </div>
   );
 }
 
-/** "Bracket it": the loop is symmetric about opposition, so the end mirrors the start. */
+/** "Bracket it": near-circular orbits can place opposition near the middle of the loop. */
 function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
   const s = useGame();
   const t = useGameTime(1);
@@ -1097,7 +1099,6 @@ function RetroPrediction({ pts }: { pts: { x: number; y: number }[] }) {
       sigma0={5}
       sigmaMax={40}
       pending={pending}
-      last={last}
       onCommit={(value, sigma) => {
         const st = nextStationary(currentWorld().system, clock.t);
         if (st === null) return;
@@ -1148,7 +1149,6 @@ function MoonPrediction({ pts, fit }: { pts: { x: number; y: number }[]; fit: { 
       sigma0={0.5}
       sigmaMax={5}
       pending={pending}
-      last={null}
       onCommit={(value, sigma) => {
         const e = nextMoonEast(currentWorld().system, clock.t);
         if (e === null) return;

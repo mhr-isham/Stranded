@@ -15,10 +15,10 @@ import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { flag } from '../../game/tutorial';
 import { comparePendulumTrial, lastOf, makePrediction, pendingOf } from '../../game/predictions';
 import { hasChallenge } from '../../game/challenges';
-import { predictionGuidance } from '../../game/modes';
 import { ANOMALIES, windAt, windBiases, windPush } from '../../game/anomalies';
 import type { MeasurementEnvironment } from '../../game/measurementEnvironment';
-import { FieldTrialResult, PredictCard } from '../common/Predict';
+import { FieldTrialResult, ForecastLog } from '../common/ForecastLog';
+import { PredictCard } from '../common/Predict';
 import { ReadingPredictionPractice } from '../tutorial/ReadingPredictionPractice';
 import { toast } from '../common/widgets';
 
@@ -491,7 +491,7 @@ export function Pendulum() {
           </div>
         )}
 
-        <div className="panel panel-pad" data-tut="pend-log">
+        <div id="swing-observations" tabIndex={-1} className="panel panel-pad" data-tut="pend-log">
           <b>Gravity log</b>
           <ReadingsTable k="g" />
           <SendReadings k="g" tut="pend-send" />
@@ -616,7 +616,6 @@ function Scale({ trueL, nominal, value, onChange, disabled }: { trueL: number; n
 
 function PendulumPrediction({ applyLength, busy }: { applyLength: (length: number) => void; busy: boolean }) {
   const s = useGame();
-  const { walkthrough } = predictionGuidance(s.settings);
   const pending = pendingOf(s, 'pendulum'), last = lastOf(s, 'pendulum');
   const baseline = s.readings.filter((r) => r.kept && r.key === 'g' && r.pendulum?.technique?.source === 'manual' &&
     r.pendulum.technique.releaseId && r.pendulum.length > 0 && r.pendulum.period > 0 &&
@@ -624,9 +623,10 @@ function PendulumPrediction({ applyLength, busy }: { applyLength: (length: numbe
   const options = baseline ? [.6, 1, 1.5, 2, 2.5, 3].filter((length) => Math.abs(length / baseline.length - 1) >= .2) : [];
   const [selected, setSelected] = useState<number>();
   const length = selected !== undefined && options.includes(selected) ? selected : options[0];
-  if (s.tutorial.active || (!baseline && !pending && !last?.fieldTrial)) return null;
+  if (s.tutorial.active || (!baseline && !pending && !last)) return null;
   return <section className="panel panel-pad stack" aria-label="Pendulum field trial">
     {last?.fieldTrial && <FieldTrialResult prediction={last} />}
+    <ForecastLog kind="pendulum" exclude={last?.fieldTrial ? last.id : undefined} />
     {pending?.fieldTrial ? <div className="stack">
       <b>Swing trial underway</b>
       <div>Forecast {fmt(pending.value, 3)} ± {fmt(pending.sigma, 3)} s · {fmt(pending.at!, 1)} m setting</div>
@@ -647,7 +647,7 @@ function PendulumPrediction({ applyLength, busy }: { applyLength: (length: numbe
           helper="A longer string gives a slower swing. You can estimate the new period by multiplying your recorded period by the square root of the length ratio."
           ownFit={{ value: baseline.period * Math.sqrt(length / baseline.length) }}
           pts={[]} axis="y" xMax={0} xLabel="" yLabel="" sigma0={0.1} sigmaMax={1}
-          pending={null} last={null}
+          pending={null}
           onCommit={(value, sigma) => {
             if (value <= 0 || pendingOf(useGame.getState(), 'pendulum')) return;
             makePrediction({ kind: 'pendulum', made: clock.t, due: clock.t, value, sigma, at: length, fieldTrial: true });
@@ -655,6 +655,5 @@ function PendulumPrediction({ applyLength, busy }: { applyLength: (length: numbe
           }} />
       </div>
     </details>}
-    {last?.fieldTrial && walkthrough && <details className="measurement-help"><summary>What can change the timing?</summary><p>Starting and stopping the watch, the swing count, release angle and wind can all change the measured period. Repeat the timing to see how much it varies.</p></details>}
   </section>;
 }

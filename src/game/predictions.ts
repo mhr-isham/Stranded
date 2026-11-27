@@ -1,7 +1,6 @@
 // "Call your shot": the player predicts something they will see later, from
-// their own data, with an honest ± range. When the moment comes, ECHO shows
-// what really happened and explains the miss. Only observables are revealed
-// (what an instrument would show), never the hidden numbers on the sheet.
+// their own data, with an honest ± range. Field trials use a kept reading.
+// Scored forecasts use a simulated observable only after the event.
 
 import { DAY, DEG } from '../engine/constants';
 import { moonOffset, starLongitude, targetLongitude } from '../engine/measure';
@@ -176,38 +175,6 @@ function truthOf(s: GameState, p: Prediction): number | null {
   return null;
 }
 
-/** ECHO's explanation of a revealed prediction: what happened and why, never a quiz. */
-export function explain(p: Prediction, coaching: boolean): string {
-  const r = p.result!;
-  const info = PREDICTION_KINDS[p.kind];
-  const f = (v: number) => v.toFixed(info.digits);
-  const off = p.value - r.truth;
-  if (p.fieldTrial) return `You recorded ${f(r.truth)} ${info.unit}. Your forecast was ${f(p.value)} ± ${f(p.sigma)} ${info.unit}. ${r.z <= 1 ? 'The reading landed inside your range.' : 'The reading landed outside your range.'}`;
-  const head =
-    p.kind === 'star'
-      ? `The star stood at ${f(r.truth)}°. You said ${f(p.value)} ± ${f(p.sigma)}°.`
-      : p.kind === 'pendulum'
-        ? `One swing took ${f(r.truth)} s. You said ${f(p.value)} ± ${f(p.sigma)} s.`
-        : `It happened on day ${f(r.truth)}. You said day ${f(p.value)} ± ${f(p.sigma)}.`;
-  const verdict = r.z <= 1 ? 'Inside your range.' : r.z <= 2 ? 'Just outside your range.' : 'Well outside your range.';
-  if (!coaching) return `${head} ${verdict} (${r.points > 0 ? '+' : ''}${r.points} pts)`;
-  let why = '';
-  if (r.z > 1) {
-    if (p.kind === 'star')
-      why =
-        off < 0
-          ? ' The star drifted further than you expected — your drift rate was a little slow, which would also make your year too long.'
-          : ' The star drifted less than you expected — your drift rate was a little fast, which would make your year too short.';
-    else if (p.kind === 'retro')
-      why = off < 0 ? ' You expected it too early. The loop is symmetric around opposition: count the days from when it turned backwards to opposition, then add the same again.' : ' You expected it too late. A retrograde loop is symmetric around opposition — use the turn-around you already saw as a mirror.';
-    else if (p.kind === 'moon')
-      why = off < 0 ? ' Too early. One full swing — east, west, east — is one moon period; measure it peak to peak on your chart.' : ' Too late. Peak to peak on your chart is one moon period; add it to the last peak you saw.';
-    else why = ' Period grows with the square root of length: four times the length is twice the swing time.';
-  } else if (p.sigma > 3 * info.scale) why = ' Right — and you could afford a tighter range next time.';
-  else why = ' A good call, with an honest range.';
-  return `${head} ${verdict}${why} (${r.points > 0 ? '+' : ''}${r.points} pts)`;
-}
-
 /** Resolve a prediction with a known truth (used by immediate predictions like the pendulum). */
 export function resolveNow(id: string, truth: number) {
   const s = useGame.getState();
@@ -236,7 +203,14 @@ export function resolvePredictions(t: number) {
       continue;
     }
     const done = resolveNow(p.id, truth);
-    if (done) useGame.getState().say({ id: `pred-${p.id}`, text: explain(done, false), mood: done.result!.z <= 1 ? 'happy' : 'calm' });
+    if (!done?.result) continue;
+    const inside = done.result.z <= 1;
+    const tool = p.kind === 'moon' ? 'Moon tab' : p.kind === 'retro' ? 'blue planet tracker' : 'Year tab';
+    useGame.getState().say({
+      id: `pred-${p.id}`,
+      text: `Forecast resolved ${inside ? 'inside' : 'outside'} your range. The comparison is in the ${tool} forecast log.`,
+      mood: inside ? 'happy' : 'calm',
+    });
   }
 }
 

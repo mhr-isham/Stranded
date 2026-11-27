@@ -10,6 +10,7 @@ import { currentWorld } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { Chart } from '../common/Chart';
 import { Formula, SendToSheet } from '../common/sheetBits';
+import { ForecastLog } from '../common/ForecastLog';
 import { EvidenceSignal, FitInspection, FitResiduals } from '../common/MeasurementFeedback';
 
 export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (points: { x: number; y: number }[], fit: SineFit | null) => ReactNode }) {
@@ -47,7 +48,7 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
     {!s.identified ? <div className="amber">Identify the blue planet first.</div> :
       <button data-tut="moon-toggle" className={`btn ${s.moonTrackOn ? '' : 'primary'}`} onClick={() => { s.set({ moonTrackOn: !s.moonTrackOn }); s.say(ECHO.moon); }}>{s.moonTrackOn ? 'Moon auto-log: ON' : 'Log the moon’s offset every few hours'}</button>}
     <p className="muted" style={{ margin: 0 }}>The dots record the moon east (+) or west (−) of the planet. Start with a few weeks of observations. The tracker skips frames where the planet obscures the moon or puts it in total shadow.</p>
-    <div className="stack" data-tut="moon-chart">
+    <div id="moon-observations" tabIndex={-1} className="stack" data-tut="moon-chart">
       {a.points.length > 1 && <Chart ariaLabel="Recorded moon offsets and selected orbit fit" series={[
         { pts: a.points, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },
         ...(a.fit ? [{ pts: curve(a.fit), color: '#6cc4ff', kind: 'line' as const }] : []),
@@ -124,6 +125,7 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
       {studies.length >= 2 && <p>Overlapping intervals share observations. Agreement is a useful stability check, not independent confirmation. Different dated angular swings need not match because the planet’s distance changes.</p>}
       {studies.length > 0 && <button className="btn small" onClick={() => { s.set({ moonStudies: [] }); setNotice('Comparison fits cleared; your observations are unchanged.'); }}>Clear comparison fits</button>}
     </div></details>}
+    <ForecastLog kind="moon" />
     {!s.tutorial.active && a.points.length >= 8 && <details><summary>Optional: predict the next eastern peak</summary>{renderPrediction(a.points, manual ? null : chosen)}</details>}
   </div>;
 }

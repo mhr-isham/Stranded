@@ -4,7 +4,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { predictionGuidance } from '../../game/modes';
 import { useGame } from '../../game/store';
-import { PREDICTION_KINDS, explain, type Prediction, type PredictionKind } from '../../game/predictions';
+import { PREDICTION_KINDS, type Prediction, type PredictionKind } from '../../game/predictions';
 import type { Pt } from './Chart';
 
 const W = 380;
@@ -132,7 +132,6 @@ interface CardProps {
   sigma0: number;
   sigmaMax: number;
   pending: Prediction | null;
-  last: Prediction | null;
   onCommit: (value: number, sigma: number) => void;
   /** Extra controls (e.g. choosing the target day). */
   extra?: ReactNode;
@@ -158,7 +157,7 @@ export function PredictCard(p: CardProps) {
         <b>🎯 Your prediction</b>
         <div className="muted" style={{ fontSize: 13 }}>
           {info.unit === 'day' ? `Day ${fmt(p.pending.value)}` : `${fmt(p.pending.value)} ${info.unit}`} ± {fmt(p.pending.sigma)} {unitText}
-          {p.pending.at !== undefined && p.kind === 'star' ? ` on day ${p.pending.at.toFixed(0)}` : ''}. ECHO will tell you how it went when the time comes — keep warping.
+          {p.pending.at !== undefined && p.kind === 'star' ? ` on day ${p.pending.at.toFixed(0)}` : ''}. ECHO will report the outcome when the event resolves.
         </div>
       </div>
     );
@@ -167,11 +166,6 @@ export function PredictCard(p: CardProps) {
   return (
     <div className="predict panel-inset stack">
       <b>{p.fieldTrial ? 'Set your forecast' : info.title}</b>
-      {p.last?.result && (
-        <div className="hint" style={{ fontSize: 12 }}>
-          Last time: {explain(p.last, false)}
-        </div>
-      )}
       <div style={{ fontSize: 14 }}>{p.question}</div>
       {guidance.walkthrough && <details className="measurement-help"><summary>Use the log to estimate</summary><p>{p.helper}</p></details>}
       {p.extra}
@@ -237,22 +231,4 @@ export function PredictCard(p: CardProps) {
       </div>}
     </div>
   );
-}
-
-export function FieldTrialResult({ prediction: p }: { prediction: Prediction }) {
-  if (!p.result) return null;
-  const info = PREDICTION_KINDS[p.kind];
-  const difference = p.result.truth - p.value;
-  const span = Math.max(p.sigma * 1.3, Math.abs(difference) * 1.12);
-  const width = 100 * p.sigma / span;
-  const position = 50 + 50 * (difference / span);
-  return <div className="evidence-signal field-trial-result" role="status">
-    <span className="evidence-emblem" aria-hidden="true">✧</span>
-    <div className="stack">
-      <b>{p.kind === 'pendulum' ? 'Swing trial recorded' : 'Sky forecast compared'}</b>
-      <dl className="kv"><dt>Your forecast</dt><dd>{p.value.toFixed(info.digits)} ± {p.sigma.toFixed(info.digits)} {info.unit}</dd><dt>Your reading</dt><dd>{p.result.truth.toFixed(info.digits)} {info.unit}</dd></dl>
-      <div className="field-trial-range" aria-hidden="true"><span style={{ width: `${width}%` }} /><i style={{ left: `${position}%` }} /></div>
-      <div className="muted">Reading {p.result.z <= 1 ? 'inside' : 'outside'} your forecast range.</div>
-    </div>
-  </div>;
 }

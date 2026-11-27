@@ -39,6 +39,11 @@ with sync_playwright() as p:
         assert page.evaluate('__game.getState().predictions[0].result===undefined')
         page.get_by_role('button', name='Keep reading', exact=True).click()
         expect(trial).to_contain_text('Swing trial recorded')
+        expect(trial).to_contain_text('Outside your forecast range')
+        expect(trial.get_by_text('Check the measured string length', exact=False)).to_be_hidden()
+        trial.get_by_text('Ask ECHO what to check', exact=True).click()
+        trial.get_by_role('button', name='Go to swing readings').click()
+        expect(page.locator('#swing-observations')).to_be_focused()
         assert page.evaluate('''()=>{const s=__game.getState();return s.predictions[0].result.truth===s.readings.at(-1).pendulum.period && s.predictions[0].result.points===0}''')
 
         page.evaluate('''()=>{__clock.t=3*86400;__clock.emit();__game.setState({screen:'observatory',starObs:[]})}''')
@@ -50,7 +55,29 @@ with sync_playwright() as p:
         page.get_by_role('textbox', name='Forecast (°)', exact=True).fill('24')
         page.get_by_role('button', name='Log forecast', exact=True).click()
         expect(page.get_by_text('Forecast logged', exact=True)).to_be_visible()
-        page.evaluate('''async()=>{const {nextDusk}=await import('/src/game/tutorial.ts');const {resolvePredictions}=await import('/src/game/predictions.ts');const day=__game.getState().predictions.at(-1).due;__clock.t=nextDusk(day);resolvePredictions(__clock.t);__clock.emit()}''')
+        page.evaluate('''async () => {
+            const { DAY } = await import('/src/engine/constants.ts');
+            const { toHorizontal, topocentric, localFrame } = await import('/src/engine/sky.ts');
+            const { opticalStatus } = await import('/src/game/observing.ts');
+            const { skyline } = await import('/src/game/skyObservation.ts');
+            const { makeLandscape } = await import('/src/render/terrain.ts');
+            const { currentWorld } = await import('/src/game/sim.ts');
+            const { resolvePredictions } = await import('/src/game/predictions.ts');
+            const state = __game.getState();
+            const day = state.predictions.at(-1).due;
+            const { system } = currentWorld();
+            const land = makeLandscape(system.seed, system.hillHeight);
+            for (let at = day; at < day + DAY; at += 120) {
+                const sun = toHorizontal(topocentric(system, 'star', at, system.site), localFrame(system, at, system.site));
+                if (!opticalStatus(system, state, at, 'solar-year', { horizon: skyline(land, sun.az) }).ok) continue;
+                __clock.t = at;
+                resolvePredictions(at);
+                __clock.emit();
+                return;
+            }
+            throw Error('No usable solar-filter sighting in the forecast window');
+        }''')
+
         assert page.evaluate('__game.getState().predictions.at(-1).result===undefined')
         page.get_by_role('button', name='Point at the star (solar filter)', exact=True).click()
         page.get_by_role('button', name='Log star position', exact=True).click()
