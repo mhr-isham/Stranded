@@ -96,7 +96,7 @@ function ForecastComparison({ prediction: p }: { prediction: Prediction }) {
       <span style={{ width: `${100 * p.sigma / span}%` }} />
       <i style={{ left: `${50 + 50 * (difference / span)}%` }} />
     </div>
-    <div className={inside ? 'good' : 'amber'}>{inside ? 'Inside' : 'Outside'} your forecast range{!p.fieldTrial && ` · ${result.points > 0 ? '+' : ''}${result.points} pts`}</div>
+    <div className={inside ? 'green' : 'amber'}>{inside ? 'Inside' : 'Outside'} your forecast range{!p.fieldTrial && ` · ${result.points > 0 ? '+' : ''}${result.points} pts`}</div>
     {p.fieldTrial
       ? <div className="faint">{result.observedAt !== undefined && `Kept on elapsed day ${(result.observedAt / DAY).toFixed(2)} · `}Unscored field trial</div>
       : <div className="faint">Simulation time used for scoring. Use your chart to check what the instrument captured around the event.</div>}
