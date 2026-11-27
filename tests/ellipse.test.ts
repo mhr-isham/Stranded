@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { DAY, DEG } from '../src/engine/constants';
 import { deriveAll, truthValues, keysFor, type Primaries } from '../src/engine/chain';
 import { keplerState, leadAngle, meanLonForTrue, oppositions } from '../src/engine/ephemeris';
-import { fitOrbit } from '../src/engine/orbitfit';
+import { fitOrbit, orbitLongitudeError } from '../src/engine/orbitfit';
 import { targetLongitude } from '../src/engine/measure';
 import { generateSystem } from '../src/engine/system';
 
 describe('chapter 4: elliptical orbits', () => {
   const sys = generateSystem(5, 'navigator', 4);
+  it('reports signed errors across the zero-longitude seam', () => {
+    expect(orbitLongitudeError(DEG, 359 * DEG) / DEG).toBeCloseTo(2, 10);
+    expect(orbitLongitudeError(359 * DEG, DEG) / DEG).toBeCloseTo(-2, 10);
+    expect(orbitLongitudeError(50 * DEG, 50 * DEG)).toBe(0);
+  });
   it('keplerState hits the requested true longitude', () => {
     const m = meanLonForTrue(0.3, 1.1, 2.5);
     const [r] = keplerState(1, 1, 0.3, 1.1, m);

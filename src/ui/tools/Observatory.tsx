@@ -424,8 +424,8 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
-      <div className="tool-stage" data-tut="obs-stage">
+    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}`}>
+      {tab !== 'orbit' && <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
             tabIndex={0} role="img" aria-label="Wide sky; arrow keys pan and plus or minus zoom"
@@ -719,7 +719,7 @@ export function Observatory() {
           <div className="row"><button className="btn small" aria-label="Move selected wire left" disabled={wire === 'pan'} onClick={() => { adjustWire(-1); sfx('detent'); }}>← Wire</button><button className="btn small" aria-label="Move selected wire right" disabled={wire === 'pan'} onClick={() => { adjustWire(1); sfx('detent'); }}>Wire →</button><select className="input" aria-label="Wire step in arcseconds" value={wireStep} onChange={(e) => setWireStep(Number(e.target.value))}><option value={1}>1″</option><option value={.1}>0.1″</option><option value={.01}>0.01″</option></select></div>
           <div className="row"><button className="btn small" aria-label="Magnify micrometer image" onClick={() => setFovLog((v) => Math.max(Math.log10(.015), v - .1))}>Zoom +</button><button className="btn small" aria-label="Widen micrometer image" onClick={() => setFovLog((v) => Math.min(Math.log10(4), v + .1))}>Zoom −</button><span className="faint">{wire === 'pan' ? 'Image pan selected' : `Wire ${wire} selected`}</span></div>
         </div>}
-      </div>
+      </div>}
 
       <div className="tool-side">
         {auroraWatching ? <AuroraWatch land={land} phase={() => auroraPhase.current}
@@ -735,7 +735,7 @@ export function Observatory() {
             onWiden={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} onClose={closeWatch} /> : <>
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         {tab === 'moon' && <button className="btn small" onClick={() => setMoonChartFocus(!moonChartFocus)}>{moonChartFocus ? 'Show sky beside the chart' : 'Focus on the moon chart'}</button>}
-        {mode === 'scope' && <SeeingConditions />}
+        {mode === 'scope' && tab !== 'orbit' && <SeeingConditions />}
         <div className="panel panel-pad" style={{ padding: 6 }}>
           <div className="row" style={{ gap: 4 }}>
             {TABS.filter((tb) => (tb.id !== 'transit' || sys.features.inner) && (tb.id !== 'orbit' || !!sys.target.e || !!sys.giant) && (tb.id !== 'giant' || !!sys.giant) && (tb.id !== 'stars' || !!sys.features.stars)).map((tb) => (

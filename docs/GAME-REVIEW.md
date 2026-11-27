@@ -218,9 +218,9 @@ The hill and shadow cross-check remains optional. Expanding the drive into navig
 
 ### CH-04 — The Long Ellipse
 
-**Substantial orbital implementation:** eccentric ephemerides, orbit fits, varying distance/speed and nonuniform launch searches. **Partial narrative implementation:** old star map, loss of Mira's crewmate and Ada's intervention are scripted rather than connected investigations. No player age fit of the star map exists.
+**Optional orbit comparison implemented — 27 November 2026.** The Orbit tab first shows the fitted orbit and the regular sheet controls. Compare circle and ellipse overlays both paths in one frame, with a shared date picker and each model’s signed longitude errors against the same saved tracker sightings. Both models are fitted to the player’s logged data. The comparison keeps the dates and worksheet inputs used at fit time, and marks the snapshot when the player has new inputs or sightings. It reports the differences seen in that sample and leaves the interpretation to the player.
 
-**Improve:** overlay a circular model and an ellipse against the player's sightings; let residuals establish why the old method fails. A dated proper-motion map needs catalog directions, rates, epochs and uncertainty. Ada should materially stabilize the pod after a bounded repair decision, without supplying orbital values. Ensure optional hand-fit rules really cover this tool.
+Eccentric ephemerides and nonuniform launch searches are present. The old star map, Mira's crewmate and Ada's intervention remain scripted. A dated star-map investigation and a bounded pod repair can be discussed with the broader story and characters.
 
 ### CH-05 — Inward
 

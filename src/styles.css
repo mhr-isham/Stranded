@@ -224,6 +224,22 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .relay-tag strong { color: #c4eaff; font-size: 20px; letter-spacing: 0.18em; }
 .relay-signal { display: flex; align-items: flex-end; height: 32px; background: #081421; padding: 2px 4px; gap: 1px; }
 .relay-signal i { min-width: 0; flex: 1; background: #6cc4ff; }
+.orbit-workspace { display: grid; gap: 10px; align-items: start; }
+.orbit-model { width: min(100%, 500px); justify-self: center; }
+.orbit-sheet-fields { display: grid; gap: 10px; }
+@media (min-width: 700px) {
+  .orbit-workspace.comparing { grid-template-columns: 1fr 1.14fr; }
+  .orbit-sheet-fields { grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); }
+}
+.orbit-model-figure { margin: 0; }
+.orbit-model-canvas { position: relative; height: clamp(162px, 52vw, 224px); border: 1px solid var(--panel-border); border-radius: 9px; overflow: hidden; }
+.orbit-model-key { gap: 5px 12px; padding-top: 6px; color: var(--muted); font-size: 11px; }
+.orbit-model-key span::before { content: ''; display: inline-block; width: 13px; border-top: 2px solid #9cadc6; margin-right: 5px; vertical-align: middle; }
+.orbit-model-key .orbit-ellipse-key::before { border-color: var(--blue); }
+.orbit-model-key .orbit-circle-key::before { border-color: var(--amber); border-top-style: dashed; }
+.orbit-comparison { min-width: 0; background: #0b1726; }
+.orbit-comparison p, .orbit-error-values, .orbit-summary { margin: 0; }
+.orbit-error-values dd { overflow-wrap: anywhere; }
 .sky-explorer, .sky-notebook { font-size: 13px; }
 .sky-explorer .faint, .sky-notebook .faint { font-size: 11px; }
 .sky-pan .btn { flex: 1; min-width: 36px; }
@@ -685,9 +701,11 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 }
 
 /* Give moon date selection and analysis room on every screen. */
-.tool.moon-analysis-focus { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
+.tool:is(.moon-analysis-focus, .orbit-analysis-focus) { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
 .tool.moon-analysis-focus > .tool-stage { display: none; }
-.tool.moon-analysis-focus > .tool-side { width: min(1100px, 100%); min-height: 0; max-height: none; margin-inline: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 8px 12px calc(90px + var(--safe-bottom)); }
+.tool:is(.moon-analysis-focus, .orbit-analysis-focus) > .tool-side { width: min(1100px, 100%); min-height: 0; max-height: none; margin-inline: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 8px 12px calc(90px + var(--safe-bottom)); }
+
+.tool.orbit-analysis-focus > .tool-side { width: min(900px, 100%); }
 
 /* Two-site shadows: an instrument bench with a legible expedition plan. */
 .shadow-screen { position: absolute; inset: calc(var(--hud-h) + var(--safe-top) + 8px) 0 0; overflow: auto; padding: 12px max(16px, calc((100vw - 1200px) / 2)) calc(100px + var(--safe-bottom)); background: radial-gradient(ellipse at 20% 0, #18314088, transparent 60%), #080e1b; }

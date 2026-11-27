@@ -30,6 +30,8 @@ interface Props {
   xFmt?: (x: number) => string;
   yFmt?: (y: number) => string;
   height?: number | string;
+  /** Keep signed errors on an axis with a labelled zero midpoint. */
+  symmetricY?: boolean;
   /** Optional selection band (data x). */
   band?: [number, number] | null;
   onBand?: (b: [number, number] | null) => void;
@@ -40,7 +42,7 @@ interface Props {
  * Interactive scatter/line chart. Tap to place the cursor; drag to zoom into
  * a range (or select a band). Double-tap resets zoom.
  */
-export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, band, onBand, brushMode = 'zoom' }: Props) {
+export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, symmetricY = false, band, onBand, brushMode = 'zoom' }: Props) {
   const [zoom, setZoom] = useState<[number, number] | null>(null);
   const drag = useRef<null | { x0: number; x1: number; moved: boolean }>(null);
   const lastTap = useRef(0);
@@ -56,6 +58,11 @@ export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor
   let ymin = Math.min(...inView.map((p) => p.y));
   let ymax = Math.max(...inView.map((p) => p.y));
   if (!inView.length) [ymin, ymax] = [0, 1];
+  if (symmetricY) {
+    const extent = Math.max(Math.abs(ymin), Math.abs(ymax), 0.01);
+    ymin = -extent;
+    ymax = extent;
+  }
   const pad = (ymax - ymin) * 0.12 || 1;
   ymin -= pad;
   ymax += pad;

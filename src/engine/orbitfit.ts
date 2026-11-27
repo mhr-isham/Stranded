@@ -37,6 +37,9 @@ export interface OrbitFit {
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
+/** Signed observed-minus-predicted longitude on the shortest arc, in radians. */
+export const orbitLongitudeError = (observed: number, predicted: number) => wrap(observed - predicted);
+
 type X = [number, number, number, number, number]; // P2, k = e cos ϖ, h = e sin ϖ, L0 (blue planet's true longitude at tOpp), λ0 (ours)
 
 function model(x: X, P1: number, tOpp: number) {
@@ -95,7 +98,7 @@ export function fitOrbit(obs: OrbitObs[], P1: number, tOpp: number, P2guess?: nu
   if (obs.length < 8) return null;
   const resid = (x: X) => {
     const m = model(x, P1, tOpp);
-    return obs.map((o) => wrap(o.lon - m.lon(o.t)));
+    return obs.map((o) => orbitLongitudeError(o.lon, m.lon(o.t)));
   };
   const rss = (x: X) => resid(x).reduce((a, r) => a + r * r, 0);
   // Where the blue planet was seen nearest tOpp: both planets point that way at opposition.
