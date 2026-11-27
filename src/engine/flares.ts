@@ -39,6 +39,7 @@ export function flaresOf(sys: StarSystem): Flare[] {
 export function flareAt(sys: StarSystem, t: number): Flare | null {
   if (!sys.features.locked) return null;
   const f = flaresOf(sys);
+  if (!f.length) return null;
   // Binary search on start time.
   let lo = 0;
   let hi = f.length - 1;
@@ -47,8 +48,11 @@ export function flareAt(sys: StarSystem, t: number): Flare | null {
     if (f[m].start <= t) lo = m;
     else hi = m - 1;
   }
-  const x = f[lo];
-  return x && x.start <= t && t < x.end ? x : null;
+  // The newest flare can fade before an earlier overlapping one does.
+  for (let i = lo; i >= 0 && f[i].start > t - 7 * HOUR; i--) {
+    if (f[i].start <= t && t < f[i].end) return f[i];
+  }
+  return null;
 }
 
 /** Flares seen so far (for the flare log and the statistics). */

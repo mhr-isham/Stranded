@@ -230,9 +230,9 @@ Elongation and transit remain distinct from any separate beacon orbit. A beacon 
 
 ### CH-06 — Red Dwarf
 
-**Partial:** red star, locked rotation, yearly stellar motion and stochastic flares exist. A brightness instrument and player flare-rate study are absent. Some optical tools have different glare gates.
+**Flare monitoring implemented.** The optional Sky monitor measures a modeled diffuse sky glow from the locked night-side camp. Players can record bounded sessions while doing other work, then inspect 15-minute traces of the rise and fade. Clouded samples leave gaps. The start count uses pairs of consecutive usable samples, and a bright first sample cannot establish a start. Quiet clear time and the onset count give an optional constant-rate estimate for a future window that starts quiet. The monitor shows a wide count-based 90% range for sparse data, including when a clear session has yet to capture a start. It uses elapsed recordings and does not display an event schedule. The optical tools still use the simulation’s live obstruction.
 
-**Improve:** replace ordinary dawn/dusk expectations with a twilight-zone rhythm and a consistent flare policy. Let the player estimate a rate and uncertainty from a log. Under a Poisson model, elapsed quiet time does not make a flare “due”; forecast probability over an interval, not an exact next flare. Mira's fear and Vale's weakening can give meaning to an uncertain forecast. Do not turn random flare timing into unavoidable observation failure.
+Broader flare policy across tools and the narrative roles of Mira and Vale remain open for discussion.
 
 ### CH-07 — Slingshot
 

@@ -21,6 +21,7 @@ import { lunarExposure, lunarLight } from '../../engine/eclipse';
 import { OccultationWatch, type WatchView } from './OccultationWatch';
 import { phaseReadable, planetPhase } from '../../engine/planetPhase';
 import { phaseElongation, type PhaseView } from '../../game/phaseObservation';
+import { FlareMonitor } from './FlareMonitor';
 import { PhaseWatch } from './PhaseWatch';
 import { GLARE_NOTICE, solarGlareSource } from '../../engine/solarGlare';
 import { apparentMoonDisks } from '../../engine/occultation';
@@ -93,7 +94,9 @@ export function Observatory() {
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
-  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | 'aurora' | 'phase' | null>(null);
+  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | 'aurora' | 'phase' | 'flare' | null>(null);
+  const flareButton = useRef<HTMLButtonElement>(null);
+  const flareWatching = tab === 'sky' && watchOpen === 'flare';
   const phaseButton = useRef<HTMLButtonElement>(null);
   const phaseWatching = tab === 'sky' && watchOpen === 'phase';
   const watchButton = useRef<HTMLButtonElement>(null);
@@ -103,7 +106,7 @@ export function Observatory() {
   const auroraPhase = useRef(0);
   const auroraWatching = tab === 'sky' && watchOpen === 'aurora';
   const meteorWatching = tab === 'sky' && watchOpen === 'meteors';
-  const wideWatch = meteorWatching || auroraWatching;
+  const wideWatch = meteorWatching || auroraWatching || flareWatching;
   const reducedAuroraMotion = !!s.settings.skyReducedFlicker || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const watching = tab === 'moon' && watchOpen;
   const meteorActive = !s.tutorial.active && mode === 'sky' && tab === 'sky' && meteorWatchStatus(sys, s, t).active;
@@ -468,7 +471,7 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching || phaseWatching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}`}>
+    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching || phaseWatching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}${flareWatching ? ' flare-watch-active' : ''}`}>
       {tab !== 'orbit' && <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -787,6 +790,9 @@ export function Observatory() {
           meteorWatching ? <MeteorWatch land={land} pan={panSky} zoom={zoomSky}
           camera={() => ({ az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w: viewSize.current.w, h: viewSize.current.h })}
           close={() => { setWatchOpen(null); requestAnimationFrame(() => meteorButton.current?.focus()); }} /> :
+          flareWatching ? <FlareMonitor onClose={() => {
+            setWatchOpen(null); requestAnimationFrame(() => flareButton.current?.focus());
+          }} /> :
           phaseWatching ? <PhaseWatch read={readPhase} onFrame={() => centrePhase()}
             onClose={() => { setWatchOpen(null); setMode('sky'); setFovLog(Math.log10(2)); requestAnimationFrame(() => phaseButton.current?.focus()); }} /> :
           watching === 'eclipse' ? <EclipseWatch read={readEclipse} centre={() => centreWatch('eclipse')}
@@ -818,6 +824,9 @@ export function Observatory() {
         {tab === 'sky' && (
           <>
           {!s.tutorial.active && <div className="row moon-watch-controls">
+            {sys.features.locked && <button className="btn small" ref={flareButton} onClick={() => {
+              setMode('sky'); setWatchOpen('flare');
+            }}>Open flare monitor</button>}
             {sys.features.inner && s.identified && <button className="btn small" ref={phaseButton} onClick={() => {
               centrePhase(); setWatchOpen('phase');
             }}>Open planet phase watch</button>}

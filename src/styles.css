@@ -928,6 +928,14 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .eclipse-image-status[data-image="shadow"], .eclipse-image-status[data-image="dark"] { border-left-color: #bd8b73; }
 .eclipse-image-status[data-image="blocked"] { border-left-color: #7e8794; }
 
+.flare-monitor { outline: none; }
+.flare-readout { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 8px; background: #182333; border-left: 2px solid var(--amber); }
+.flare-readout strong { grid-row: span 2; color: #ffd6a6; font-size: 23px; }
+.flare-readout .muted, .flare-readout .amber { font-size: 12px; }
+.flare-record { padding-block: 6px; }
+.flare-monitor p, .flare-risk dl { margin: 0; }
+.flare-risk > .stack { margin-top: 8px; }
+
 .phase-watch { outline: none; }
 .phase-status { border-left: 2px solid var(--blue); background: #102134; }
 .phase-watch p { margin: 0; }
@@ -946,6 +954,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 
 @media (max-width: 860px) {
   .tool.wide-sky-watch-active { grid-template-rows: 52% minmax(0, 1fr); }
+  .tool.flare-watch-active { grid-template-rows: minmax(96px, 34%) minmax(0, 1fr); }
   .wide-sky-watch-active > .tool-side { max-height: none; }
 }
 
