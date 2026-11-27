@@ -1,15 +1,17 @@
 import { RadiusCrossCheck } from '../common/RadiusCrossCheck';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { DAY, DEG } from '../../engine/constants';
 import { sfx } from '../../game/audio';
-import { clock } from '../../game/clock';
+import { clock, subscribeClock } from '../../game/clock';
 import { fmt } from '../../game/format';
-import { hasChallenge } from '../../game/challenges';
+import { northSurveyLimitKm, northSurveyPlanKm, northSurveyRoute, northSurveySpeed } from '../../game/northSurvey';
+import { lifeSupportEnd } from '../../game/survival';
+import { NorthSurveyGraphic, NorthSurveyReadout } from './NorthSurvey';
 import { opticalWeather } from '../../game/observing';
 import { currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { hhmm } from '../../game/time';
-import { compareShadows, makeShadowCapture, markedShadow, nextShadowNoon, northLimit, northSite, SHADOW_MAX, SHADOW_STICK, shadowAvailable, shadowSolarClock, shadowView, type ShadowCapture, type ShadowView } from '../../game/shadowObservation';
+import { compareShadows, makeShadowCapture, markedShadow, nextShadowNoon, northLimit, northSite, SHADOW_MAX, SHADOW_STICK, shadowAvailable, shadowView, type ShadowCapture, type ShadowView } from '../../game/shadowObservation';
 import { Formula, SendToSheet } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { LessonModal } from '../tutorial/Tutorial';
@@ -19,7 +21,8 @@ export { northSite } from '../../game/shadowObservation';
 export function Gnomon() {
   const s = useGame(), t = useGameTime(8), { system: sys } = currentWorld();
   const [where, setWhere] = useState<'camp' | 'rover'>('camp');
-  const [km, setKm] = useState(800), [capture, setCapture] = useState<ShadowCapture | null>(null);
+  const [capture, setCapture] = useState<ShadowCapture | null>(null);
+  const stopAt = useSyncExternalStore(subscribeClock, () => clock.stopAt);
   const [mark, setMark] = useState<number | null>(null), [sigma, setSigma] = useState('0.01'), [sigmaKm, setSigmaKm] = useState('1');
   const [correct, setCorrect] = useState(false), [k, setK] = useState(''), [sigmaK, setSigmaK] = useState('');
   const [lesson, setLesson] = useState(false), [waiting, setWaiting] = useState(false), [notice, setNotice] = useState('');
@@ -29,9 +32,11 @@ export function Gnomon() {
     window.addEventListener('blur', release);
     return () => { window.removeEventListener('blur', release); cancel.current?.(); };
   }, []);
-  const available = shadowAvailable(sys), trip = s.northTrip, driving = trip.arriveAt > t;
-  const progress = driving ? Math.max(0, Math.min(1, (t - (trip.departAt ?? t)) / Math.max(1, trip.arriveAt - (trip.departAt ?? t)))) : 1;
-  const distance = driving ? (trip.from ?? 0) + (trip.dist - (trip.from ?? 0)) * progress : trip.dist;
+  const noonCycle = shadowAvailable(sys);
+  const available = noonCycle && northSurveyLimitKm(sys) >= 200;
+  const trip = s.northTrip, km = northSurveyPlanKm(sys, trip);
+  const route = northSurveyRoute(sys, s, t);
+  const { moving: driving, distance } = route;
   const site = where === 'camp' ? sys.site : northSite(sys.site, distance, sys.home.radius);
   const live = shadowView(sys, t, site), view = capture ? capture[where] : live;
   const comparison = compareShadows(s.shadows), pair = comparison.pair, result = comparison.result;
@@ -39,12 +44,16 @@ export function Gnomon() {
   const correctionValid = !correct || k.trim() !== '' && sigmaK.trim() !== '' && Number.isFinite(Number(k)) && Number(k) >= 0 && Number(k) <= .85 && Number.isFinite(Number(sigmaK)) && Number(sigmaK) > 0;
   const markValid = !!capture && mark !== null && mark > 0 && mark <= SHADOW_MAX && Number(sigma) > 0 && Number.isFinite(Number(sigma)) && correctionValid;
   const possible = !driving && trip.dist > 0 && !weather && !flare && makeShadowCapture(sys, t, trip.dist, Number(sigmaKm) * 1000, 'preview');
-  const noon = nextShadowNoon(sys, t);
-  const speed = (s.settings.survival && s.survival.upgrades.includes('rover') ? 700 : 400) * 1000 * (hasChallenge(s, 'rover') ? .5 : 1);
+  const noon = driving ? null : trip.dist > 0 ? route.campNoon : nextShadowNoon(sys, t);
+  const speed = northSurveySpeed(s);
+  const canWait = (due: number | null) => due !== null && !waiting && !clock.realtime && !Number.isFinite(stopAt)
+    && (s.tutorial.active || due < lifeSupportEnd(s, sys));
   const readyCount = capture ? s.shadows.filter((r) => r.capture === capture.id).length : 0;
   const span = Math.min(SHADOW_MAX, Math.max(3, (Number.isFinite(view.length) ? view.length : 5) * 1.35));
   function waitUntil(due: number) {
-    if (waiting || due <= clock.t || !Number.isFinite(due)) return;
+    const current = useGame.getState();
+    if (waiting || due <= clock.t || !Number.isFinite(due) || Number.isFinite(clock.stopAt) || clock.realtime
+      || current.phase !== 'play' || (!current.tutorial.active && due >= lifeSupportEnd(current, sys))) return;
     setWaiting(true); const run = s.runId;
     cancel.current = spendTime(due - clock.t, () => {
       cancel.current = null;
@@ -58,8 +67,9 @@ export function Gnomon() {
     if (current.rover.dist > 0 || current.rover.target > 0 || current.rover.arriveAt > clock.t) return toast('Bring the parallax rover back to camp first.');
     if (current.surface.roverX !== null || current.surface.task && current.surface.task.done > clock.t && current.surface.task.kind !== 'process') return toast('Bring the surface rover home first.');
     if (!Number.isFinite(dist) || dist < 0 || dist > northLimit(sys)) return toast('That route leaves this instrument’s northward survey area. Choose a shorter route.');
-    const start = current.northTrip.dist, duration = Math.abs(dist - start) / speed * DAY;
-    current.set({ northTrip: { dist, from: start, departAt: clock.t, arriveAt: clock.t + duration } });
+    const start = current.northTrip.dist, duration = Math.abs(dist - start) / northSurveySpeed(current) * DAY;
+    if (duration <= 0) return;
+    current.set({ northTrip: { ...current.northTrip, dist, from: start, departAt: clock.t, arriveAt: clock.t + duration } });
     setCapture(null); setMark(null); setNotice(''); sfx('radio');
   }
   function freeze() {
@@ -88,11 +98,15 @@ export function Gnomon() {
   }
   return <main className="shadow-screen" aria-label="Two-site shadow expedition">
     <header className="shadow-heading"><div><span className="meter-label">FIELD SCIENCE · TWO SITES, ONE SUN</span><h1>Noon shadows</h1><p>Measure a whole world with two sticks and a rover.</p></div><button className="btn small" onClick={() => setLesson(true)}>How this works</button></header>
-    {!available ? <div className="panel panel-pad stack"><b>No usable noon cycle at this camp</b><p>This route needs daylight and a repeating local noon. This site does not support the experiment. Your existing measurements are preserved.</p><button className="btn" onClick={() => s.go('hill')}>Open the hill instrument</button></div> : <>
+    {!available ? <div className="panel panel-pad stack"><b>{noonCycle ? 'No usable northward baseline' : 'No usable noon cycle at this camp'}</b><p>This route needs a repeating local noon and room for a northward baseline. The hill instrument is available for a radius measurement.</p><button className="btn" onClick={() => s.go('hill')}>Open the hill instrument</button></div> : <>
       <div className="shadow-steps" aria-label="Experiment progress"><span className={trip.dist > 0 && !driving ? 'done' : 'active'}>1 · Deploy the rover</span><span className={capture ? 'done' : trip.dist > 0 && !driving ? 'active' : ''}>2 · Capture both views</span><span className={result ? 'done' : capture ? 'active' : ''}>3 · Mark and compare</span></div>
       <div className="shadow-layout">
         <section className="stack shadow-workbench" aria-label="Shadow measurement workbench">
-          <div className="panel shadow-route"><ShadowRoute distance={distance} extent={Math.max(trip.from ?? 0, trip.dist, 200e3)} moving={driving} /><div className="row between"><span>Camp meridian · rover {fmt(distance / 1000, 1)} km north</span><span className="chip">{driving ? 'Driving' : trip.dist ? 'On station' : 'At camp'}</span></div></div>
+          <section className="panel panel-pad stack shadow-route" aria-label="Northward survey route">
+            <NorthSurveyGraphic route={route} />
+            {driving ? <p className="faint">{route.returning ? 'Returning to camp.' : 'Rover underway.'} {fmt((trip.arriveAt - t) / DAY, 2)} expedition days left.</p> : null}
+            {!s.tutorial.active && <button className="btn small" onClick={() => s.set({ screen: 'map', surfaceMapView: 'north' })}>Open north survey map</button>}
+          </section>
           <div className="panel shadow-instrument" data-tut="shadow-stage">
             <div className="shadow-view-header"><div><span className={`shadow-dot ${where}`} /> <b>{where === 'camp' ? 'Camp stick' : 'Rover stick'}</b></div><span className="chip">{capture ? 'FROZEN VIEW' : 'LIVE PREVIEW'}</span></div>
             <div className="row shadow-view-tabs" role="group" aria-label="Choose shadow view"><button className={`btn small ${where === 'camp' ? 'primary' : ''}`} onClick={() => choose('camp')}>Camp view</button><button className={`btn small ${where === 'rover' ? 'primary' : ''}`} disabled={!trip.dist && !capture} onClick={() => choose('rover')}>Rover view</button></div>
@@ -124,11 +138,11 @@ export function Gnomon() {
           <RadiusCrossCheck />
         </section>
         <aside className="stack shadow-planning" aria-label="Shadow expedition controls">
-          <section className="panel panel-pad stack" data-tut="shadow-route"><span className="meter-label">1 · NORTHWARD SURVEY</span><b>Give the shadows some distance</b><label className="stack">Rover destination · {km} km north<input aria-label="Northward rover distance in kilometres" type="range" min="200" max={Math.max(200, Math.floor(northLimit(sys) / 50000) * 50)} step="50" value={km} onChange={(e) => setKm(Number(e.target.value))} /></label><label>± baseline error (km)<input className="input" aria-label="Baseline uncertainty in kilometres" type="number" min="0.001" step="0.1" value={sigmaKm} onChange={(e) => setSigmaKm(e.target.value)} /></label><div className="row" style={{ flexWrap: 'wrap', gap: 6 }}><button className="btn" disabled={driving || waiting || Number(sigmaKm) <= 0} onClick={() => drive(km * 1000)}>Drive north</button><button className="btn ghost" disabled={driving || waiting || !trip.dist} onClick={() => drive(0)}>Return rover</button></div>
-            {driving && <><progress aria-label="Northward rover travel progress" max="1" value={progress} /><p>{fmt((trip.arriveAt - t) / DAY, 2)} expedition days to arrival.</p><button className="btn small" disabled={waiting} onClick={() => waitUntil(trip.arriveAt)}>Wait for rover</button></>}
+          <section className="panel panel-pad stack" data-tut="shadow-route"><span className="meter-label">1 · NORTHWARD SURVEY</span><b>Give the shadows some distance</b><label className="stack">Rover destination · {km} km north<input aria-label="Northward rover distance in kilometres" type="range" min="200" max={northSurveyLimitKm(sys)} step="50" value={km} onChange={(e) => s.set({ northTrip: { ...useGame.getState().northTrip, planKm: Number(e.target.value) } })} /></label><label>± baseline error (km)<input className="input" aria-label="Baseline uncertainty in kilometres" type="number" min="0.001" step="0.1" value={sigmaKm} onChange={(e) => setSigmaKm(e.target.value)} /></label><div className="row" style={{ flexWrap: 'wrap', gap: 6 }}><button className="btn" disabled={driving || waiting || km * 1000 === trip.dist || Number(sigmaKm) <= 0} onClick={() => drive(km * 1000)}>Drive north</button><button className="btn ghost" disabled={driving || waiting || !trip.dist} onClick={() => drive(0)}>Return rover</button></div>
+            {driving && <button className="btn small" disabled={!canWait(trip.arriveAt)} onClick={() => waitUntil(trip.arriveAt)}>Wait for rover</button>}
             <details><summary>Plan the route</summary><p>A longer baseline enlarges the angle difference but takes more time. This remote northward survey takes {fmt(speed / 1000, 0)} km per expedition day. It shares the same rover as parallax and surface exploration. Arrival does not take the photographs for you.</p><p>The two 2 m sticks must be vertical and the odometer distance must follow the north–south meridian. The default error fields are editable working assumptions, not certified instrument accuracy. Baseline error is saved with each capture; capture a new pair after changing it.</p></details>
           </section>
-          <section className="panel panel-pad stack" data-tut="shadow-capture"><span className="meter-label">2 · ONE MOMENT, TWO VIEWS</span><b>Catch the local noon</b><div className="shadow-clock">{hhmm(shadowSolarClock(sys, t).hours)} <small>local solar time</small></div><p>The shortest shadow is near noon. Capture pauses expedition time so you can measure both views at your own pace.</p><button className="btn small" disabled={!noon || waiting || driving} onClick={() => noon && waitUntil(noon)}>Wait to next local noon</button><button className="btn primary" disabled={!possible || waiting} onClick={freeze}>{capture ? 'Capture a new pair' : 'Capture both shadow views'}</button>
+          <section className="panel panel-pad stack" data-tut="shadow-capture"><span className="meter-label">2 · ONE MOMENT, TWO VIEWS</span><b>Catch the local noon</b><NorthSurveyReadout route={route} now={t} /><p>The shortest shadow is near noon. Capture pauses expedition time so you can measure both views at your own pace.</p><button className="btn small" disabled={!canWait(noon) || driving} onClick={() => noon && waitUntil(noon)}>{trip.dist > 0 ? 'Wait to next local noon' : 'Wait to next camp noon'}</button><button className="btn primary" disabled={!possible || waiting} onClick={freeze}>{capture ? 'Capture a new pair' : 'Capture both shadow views'}</button>
             <div className="faint">{waiting ? 'Advancing expedition time…' : driving ? 'The rover must arrive before capture.' : !trip.dist ? 'Deploy the rover first.' : flare ? 'Flare glare obscures the instrument; wait for it to pass.' : weather ? 'Cloud blocks the shadow; wait for clear weather.' : !possible ? 'Both views need the Sun 15–89.5° high and a positive baseline uncertainty. Try another noon or season.' : capture ? 'Your frozen views and saved marks keep their original dates and conditions.' : 'Both stations are ready for a paired exposure.'}</div>
             {capture && <button className="btn small ghost" onClick={() => { setCapture(null); setMark(null); setNotice('Live preview restored. Saved marks are unchanged.'); }}>Return to live preview</button>}
           </section>
@@ -139,20 +153,6 @@ export function Gnomon() {
     </>}
     {lesson && <LessonModal id="refraction" onClose={() => setLesson(false)} />}
   </main>;
-}
-
-function ShadowRoute({ distance, extent, moving }: { distance: number; extent: number; moving: boolean }) {
-  const progress = Math.max(0, Math.min(1, distance / extent));
-  return <svg viewBox="0 0 600 150" role="img" aria-label={`Northward survey schematic, rover ${fmt(distance / 1000, 1)} kilometres from camp`}>
-    <defs><linearGradient id="shadow-route-ground" x2="0" y2="1"><stop stopColor="#203c50" /><stop offset="1" stopColor="#142131" /></linearGradient></defs>
-    <path d="M-20 155 Q300 32 620 155" fill="url(#shadow-route-ground)" stroke="#50767d" strokeWidth="2" />
-    <path d="M100 116 Q300 43 500 116" fill="none" stroke="#ffc46b" strokeWidth="2" strokeDasharray="5 6" />
-    {[100, 500].map((x) => <g key={x}><line x1={x} y1="116" x2={x === 100 ? 82 : 518} y2="65" stroke="#cfe7ec" strokeWidth="4" /><circle cx={x} cy="116" r="5" fill={x === 100 ? '#6cc4ff' : '#ffc46b'} /></g>)}
-    <text x="65" y="43" fill="#a9d9ff" fontSize="17">CAMP</text><text x="470" y="43" fill="#ffc46b" fontSize="17">NORTH</text>
-    <g transform={`translate(${100 + 400 * progress},${116 - 36 * Math.sin(progress * Math.PI)})`}><rect x="-14" y="-18" width="28" height="14" rx="4" fill="#ffc46b" /><circle cx="-9" cy="-2" r="4" fill="#bbc9d8" /><circle cx="9" cy="-2" r="4" fill="#bbc9d8" /></g>
-    <text x="300" y="30" textAnchor="middle" fill="#b5c9d4" fontSize="13">{moving ? 'SURVEY IN PROGRESS' : 'SAME MERIDIAN · SHARED NOON'}</text>
-    <text x="300" y="144" textAnchor="middle" fill="#8299b0" fontSize="12">Route schematic · curvature exaggerated</text>
-  </svg>;
 }
 
 function ShadowInstrument({ view, mark, span, obscured, disabled, onKey, onDown, onMove, onEnd }: { view: ShadowView; mark: number | null; span: number; obscured: boolean; disabled: boolean; onKey: (e: React.KeyboardEvent<SVGSVGElement>) => void; onDown: (e: React.PointerEvent<SVGSVGElement>) => void; onMove: (e: React.PointerEvent<SVGSVGElement>) => void; onEnd: (e: React.PointerEvent<SVGSVGElement>) => void }) {

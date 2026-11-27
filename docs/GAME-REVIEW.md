@@ -212,9 +212,9 @@ Keep the aim, fuel cost, navigation scatter, crash risk and player-entered uncer
 
 ### CH-03 — Thick Air
 
-**Present foundations:** refracting horizon, alternative noon-shadow experiment, north–south trip and cairn narrative. **Partial:** the remote rover is a separate travel model; local exploration, weather and site history are not unified.
+**Northward itinerary implemented — 27 November 2026.** The Surface Map’s North survey view links the camp meridian to the planned or deployed station. It shows the same rover position, progress and arrival estimate as the shadow instrument. The station choice is carried between views. Both show the local solar clock and the next noon at each site, projected after arrival while planning or travelling. Noon is shared on the same meridian. The map links directly to the instrument. Local rover controls account for the rover’s survey assignment, and the instrument still requires arrival, usable sunlight and player-marked shadows. The itinerary is separate from the camp strip’s local terrain.
 
-**Assessment:** productive failure works here if the player can diagnose the contradiction before exhausting patience. Show hill readings disagreeing with the shadow route; do not quietly correct away the chapter's lesson. June can identify the cairn's deliberate geometry and inspect ice while the Navigator designs the measurement. Validate local noon and latitude separation after any relocation.
+The hill and shadow cross-check remains optional. Expanding the drive into navigable northward terrain and tying the cairn to crew participation remain open.
 
 ### CH-04 — The Long Ellipse
 

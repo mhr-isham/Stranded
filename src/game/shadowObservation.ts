@@ -34,12 +34,12 @@ export function shadowAvailable(sys: StarSystem) {
   const day = solarDay(sys);
   return !sys.features.locked && Number.isFinite(day) && day > 0 && Number.isFinite(sys.site.lat) && Math.abs(sys.site.lat) < 85 * DEG;
 }
-export function nextShadowNoon(sys: StarSystem, t: number) {
+export function nextShadowNoon(sys: StarSystem, t: number, site = sys.site) {
   if (!shadowAvailable(sys) || !Number.isFinite(t)) return null;
-  const target = Math.floor(shadowSolarClock(sys, t).turns + 1e-8) + 1;
+  const target = Math.floor(shadowSolarClock(sys, t, site).turns + 1e-8) + 1;
   let lo = t, hi = t + solarDay(sys) * 1.6;
-  if (shadowSolarClock(sys, hi).turns < target) return null;
-  for (let i = 0; i < 55; i++) { const mid = (lo + hi) / 2; if (shadowSolarClock(sys, mid).turns < target) lo = mid; else hi = mid; }
+  if (shadowSolarClock(sys, hi, site).turns < target) return null;
+  for (let i = 0; i < 55; i++) { const mid = (lo + hi) / 2; if (shadowSolarClock(sys, mid, site).turns < target) lo = mid; else hi = mid; }
   return (lo + hi) / 2;
 }
 export function northSite(site: Site, dist: number, radius: number): Site {

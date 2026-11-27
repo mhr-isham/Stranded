@@ -10,7 +10,7 @@ import { clock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { useMode } from '../../game/modes';
 import { currentWorld } from '../../game/sim';
-import { useGame } from '../../game/store';
+import { useGame, type GameState } from '../../game/store';
 import { FIND_TEXT, collectFind } from '../../game/finds';
 import {
   ICE_LOAD_DV,
@@ -31,6 +31,13 @@ import { hopBudget, hopEstimate, hopParams } from '../../engine/hop';
 import { hasChallenge } from '../../game/challenges';
 import { ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
+import { northSurveyLimitKm, northSurveyRoute, northSurveyTrip } from '../../game/northSurvey';
+import { shadowAvailable } from '../../game/shadowObservation';
+import { NorthSurveyGraphic, NorthSurveyReadout } from './NorthSurvey';
+
+function roverAway(state: Pick<GameState, 'northTrip' | 'rover'>, now: number) {
+  return northSurveyTrip(state.northTrip, now).away || state.rover.dist > 0 || state.rover.target > 0 || state.rover.arriveAt > now;
+}
 
 export function SurfaceMap() {
   const { system: sys } = currentWorld();
@@ -64,7 +71,10 @@ export function SurfaceMap() {
   const iceCapped = !iceToHop && sf.fuelMade >= iceCap;
   const haulCharge = 2 * (s.camp?.iceKm ?? 0) * 1000;
   // The other rover job (the long trips north and east) uses the same rover.
-  const longTrip = s.northTrip.dist > 0 || s.northTrip.arriveAt > t || s.rover.dist > 0 || s.rover.arriveAt > t;
+  const longTrip = roverAway(s, t);
+  const northAway = northSurveyTrip(s.northTrip, t).away;
+  const canSurvey = !s.tutorial.active && shadowAvailable(sys) && northSurveyLimitKm(sys) >= 200;
+  const survey = canSurvey && s.surfaceMapView === 'north' ? northSurveyRoute(sys, s, t) : null;
 
   /** Where to draw the rover now: moving along during a drive or haul. */
   const roverShownAt = (now: number): number | null => {
@@ -84,13 +94,14 @@ export function SurfaceMap() {
   };
 
   const startTask = (kind: 'drive' | 'tow' | 'haul' | 'process', hours: number, toX?: number) => {
+    if (kind !== 'process' && roverAway(useGame.getState(), clock.t)) return;
     useGame.setState({ surface: { ...sf, hopTank, task: { kind, toX, start: clock.t, done: clock.t + hours * HOUR } } });
     sfx('click');
   };
 
   const drive = () => {
     if (target === null) return;
-    if (longTrip) return toast('The rover is away on the long trip (shadow stick or parallax). Bring it back first.');
+    if (roverAway(useGame.getState(), clock.t)) return toast('The rover is away on the long trip (shadow stick or parallax). Bring it back first.');
     const dist = Math.abs(target - roverX);
     const backHome = Math.abs(target - campX);
     if (dist + backHome > sf.roverBattery && Math.abs(target - campX) > 200) return toast('Not enough charge to get there and back. Recharge at camp first.');
@@ -146,12 +157,17 @@ export function SurfaceMap() {
     startTask('drive', dist / 1000 / kmh + short / 1000, campX);
   };
 
+  const driveManually = () => {
+    if (roverAway(useGame.getState(), clock.t)) return;
+    useGame.setState({ driveTarget: target, screen: 'drive' });
+  };
+
   const collect = collectFind;
 
   return (
-    <div className="tool">
-      <div className="tool-stage" style={{ background: 'linear-gradient(#1b2a4a, #3d4560)' }}>
-        <CanvasView
+    <div className={`tool${survey ? ' surface-map-survey' : ''}`}>
+      <div className="tool-stage" style={{ background: survey ? 'radial-gradient(ellipse at 50% 42%, #15283c, #090f1d 72%)' : 'linear-gradient(#1b2a4a, #3d4560)' }}>
+        {survey ? <div className="surface-survey-stage"><NorthSurveyGraphic route={survey} /></div> : <CanvasView
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture(e.pointerId);
             const v = view.current;
@@ -279,10 +295,20 @@ export function SurfaceMap() {
             ctx.textAlign = 'right';
             ctx.fillText(`${fmt((cx + span / 2) / 1000, 0)} km`, w - 8 * dpr, h - 10 * dpr);
           }}
-        />
+        />}
       </div>
       <div className="tool-side">
-        <ToolHeader title="Surface map" sub="Drag to pan, scroll or pinch to zoom, tap to choose a spot." />
+        <ToolHeader title="Surface map" sub={survey ? 'Follow the rover along the camp meridian.' : 'Drag to pan, scroll or pinch to zoom, tap to choose a spot.'} />
+        {canSurvey && <div className="panel panel-pad row surface-map-views" role="group" aria-label="Surface map view">
+          <button className={`btn small ${!survey ? 'primary' : ''}`} aria-pressed={!survey} onClick={() => s.set({ surfaceMapView: 'camp' })}>Camp strip</button>
+          <button className={`btn small ${survey ? 'primary' : ''}`} aria-pressed={!!survey} onClick={() => s.set({ surfaceMapView: 'north' })}>North survey</button>
+        </div>}
+        {survey ? <section className="panel panel-pad stack" aria-label="North survey itinerary">
+          <h2>North survey</h2>
+          <span className="mono">Camp to north station · {fmt(survey.station / 1000, 1)} km</span>
+          <button className="btn primary" onClick={() => s.go('gnomon')}>Open shadow instrument</button>
+          <NorthSurveyReadout route={survey} now={t} />
+        </section> : <>
         <div className="panel panel-pad stack">
           <dl className="kv">
             <dt>Camp</dt>
@@ -290,7 +316,7 @@ export function SurfaceMap() {
               {s.camp?.site ?? '—'} · hill {fmt(s.camp?.hillKm ?? 0, 1)} km · ice {fmt(s.camp?.iceKm ?? 0, 1)} km
             </dd>
             <dt>Rover</dt>
-            <dd>{sf.roverX === null ? 'at camp' : `${fmt((sf.roverX - campX) / 1000, 1)} km from camp`}</dd>
+            <dd>{northAway ? 'on the north survey' : longTrip ? 'with the parallax camera' : sf.roverX === null ? 'at camp' : `${fmt((sf.roverX - campX) / 1000, 1)} km from camp`}</dd>
             <dt>Rover charge</dt>
             <dd>
               {fmt(sf.roverBattery / 1000, 0)} / {fmt(roverRange(s) / 1000, 0)} km
@@ -311,12 +337,12 @@ export function SurfaceMap() {
               <b style={{ fontSize: 13 }}>Chosen spot: {fmt((target - campX) / 1000, 1)} km from camp</b>
               <button
                 className="btn primary"
-                disabled={busy}
-                onClick={() => useGame.setState({ driveTarget: target, screen: 'drive' })}
+                disabled={busy || longTrip}
+                onClick={driveManually}
               >
                 🕹 Drive the rover there yourself
               </button>
-              <button className="btn" disabled={busy} onClick={drive}>
+              <button className="btn" disabled={busy || longTrip} onClick={drive}>
                 🚙 Let it drive itself ({fmt(Math.abs(target - roverX) / 1000 / kmh, 1)} h)
               </button>
               <button className="btn" style={{ whiteSpace: 'normal', height: 'auto' }} disabled={busy || Math.abs(target - campX) < 500} onClick={hop}>
@@ -326,17 +352,17 @@ export function SurfaceMap() {
             </div>
           )}
           {!busy && (
-            <button className="btn" onClick={() => useGame.setState({ driveTarget: target, screen: 'drive' })}>
+            <button className="btn" disabled={longTrip} onClick={driveManually}>
               🕹 Take the rover for a drive
             </button>
           )}
           {sf.roverX !== null && !busy && (
-            <button className="btn" onClick={tow}>
+            <button className="btn" disabled={longTrip} onClick={tow}>
               ⛺ Tow the camp to the rover (~{fmt(Math.abs(roverX - campX) / 1000 / TOW_KMH / 24, 1)} days, no fuel)
             </button>
           )}
           {sf.roverX !== null && !busy && (
-            <button className="btn ghost" onClick={bringHome}>
+            <button className="btn ghost" disabled={longTrip} onClick={bringHome}>
               Bring the rover home{sf.roverBattery < Math.abs(roverX - campX) ? ' (battery low: it waits for the sun on the way)' : ''}
             </button>
           )}
@@ -389,6 +415,7 @@ export function SurfaceMap() {
           )}
           <div className="faint" style={{ fontSize: 12 }}>Life support keeps running while you work — that is the real price of fuel.</div>
         </div>
+        </>}
       </div>
     </div>
   );

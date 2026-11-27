@@ -263,7 +263,8 @@ export interface GameState {
   /** Dated shadow observations; legacy records retain their original fields. */
   shadows: ShadowReading[];
   /** Chapter 3: the rover's trip due north (m) for the second gnomon. */
-  northTrip: { dist: number; arriveAt: number; from?: number; departAt?: number };
+  northTrip: { dist: number; arriveAt: number; from?: number; departAt?: number; planKm?: number };
+  surfaceMapView: 'camp' | 'north';
   /** Where and how the ship came down in the prologue. */
   camp: CampInfo | null;
   predictions: Prediction[];
@@ -387,6 +388,7 @@ const initial = {
   sunCamOn: false,
   sunLog: [] as TimedValue[],
   northTrip: { dist: 0, arriveAt: 0 },
+  surfaceMapView: 'camp' as const,
   predictions: [] as Prediction[],
   names: {} as SystemNames,
   atlas: [] as AtlasCard[],

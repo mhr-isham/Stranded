@@ -701,8 +701,19 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .shadow-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(270px, 1fr); gap: 18px; align-items: start; }
 .shadow-layout > * { min-width: 0; }
 .shadow-route { padding: 12px 16px; background: linear-gradient(140deg, #142a37, #0b1625); }
-.shadow-route svg { display: block; width: 100%; max-height: 180px; }
-.shadow-route .row { flex-wrap: wrap; gap: 6px; color: #b5cad4; font-size: 12px; }
+.shadow-route .btn { align-self: flex-start; }
+.shadow-route p { margin: 0; }
+.north-survey-graphic { position: relative; overflow: hidden; border: 1px solid #39566d; border-radius: 10px; height: 126px; }
+.north-survey-readout { font-size: 13px; }
+.north-survey-readout .kv, .north-survey-readout p { margin: 0; }
+.north-survey-readout progress { width: 100%; accent-color: var(--blue); }
+.surface-map-views { gap: 6px; }
+.surface-survey-stage { position: absolute; inset: calc(var(--hud-h) + var(--safe-top) + 10px) 12px 10px; display: grid; place-items: center; }
+.surface-survey-stage .north-survey-graphic { width: min(100%, 740px); height: min(220px, 100%); }
+@media (max-width: 860px) {
+  .surface-map-survey { grid-template-rows: minmax(174px, 31%) minmax(0, 1fr); }
+  .surface-map-survey .tool-side { max-height: none; }
+}
 .shadow-instrument { overflow: hidden; background: #101d2a; }
 .shadow-view-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px 8px; }
 .shadow-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6cc4ff; margin-right: 6px; }
@@ -718,8 +729,6 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .shadow-instruction { margin: 12px 16px 16px; color: #a0b5c6; font-size: 12px; line-height: 1.6; }
 .shadow-planning p, .shadow-workbench p { font-size: 13px; line-height: 1.65; margin: 5px 0; }
 .shadow-planning label { display: grid; gap: 6px; font-size: 13px; }
-.shadow-clock { color: #ffd9a1; font: 28px var(--mono); }
-.shadow-clock small { font: 12px var(--font); color: #a0b5c6; }
 .shadow-pair-values { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 16px; border: 1px solid #5fa4b32b; border-radius: 10px; background: #142331; }
 .shadow-pair-values > div { display: grid; gap: 5px; }
 .shadow-pair-values strong { font: 24px var(--mono); color: #cbeeff; }
