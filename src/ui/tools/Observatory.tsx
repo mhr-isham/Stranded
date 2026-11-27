@@ -10,12 +10,13 @@ import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
 import { starLongitude } from '../../engine/measure';
-import { unit, type Vec3 } from '../../engine/vec';
+import { angleBetween, unit, type Vec3 } from '../../engine/vec';
 import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
 import { MoonAnalysisPanel } from './MoonAnalysis';
 import { OccultationWatch, type WatchView } from './OccultationWatch';
+import { GLARE_NOTICE, solarGlareSource } from '../../engine/solarGlare';
 import { apparentMoonDisks } from '../../engine/occultation';
 import { fmt } from '../../game/format';
 import { MeasurementSources } from '../common/MeasurementSources';
@@ -174,14 +175,17 @@ export function Observatory() {
   const frameNow = localFrame(sys, t, sys.site);
   const altOf = (sl: Sel) => toHorizontal(objDir(sl, t), frameNow).alt;
   const filter = sel?.kind === 'star';
+  const sightStatus = (sl: Sel, at: number, dir = objDir(sl, at)) => {
+    const position = toHorizontal(dir, localFrame(sys, at, sys.site));
+    return opticalStatus(sys, useGame.getState(), at, sl.kind === 'star' ? 'filtered-view' : sl.kind === 'catalog' ? 'night-view' : 'view',
+      { direction: dir, horizon: skyline(land, position.az) });
+  };
   const inspectable = (sl: Sel | null, at: number) => {
     if (!sl) return false;
-    const frame = localFrame(sys, at, sys.site), dir = objDir(sl, at), position = toHorizontal(dir, frame);
-    if (!opticalStatus(sys, useGame.getState(), at, sl.kind === 'catalog' ? 'night-view' : 'view', { direction: dir, horizon: skyline(land, position.az) }).ok) return false;
+    const dir = objDir(sl, at);
+    if (!sightStatus(sl, at, dir).ok) return false;
     if (sl.kind === 'relay' && !relayVisible(at)) return false;
     if (mode === 'sky') return visibleSkyLights(sys, catalog, at, { ...cam.current, w: viewSize.current.w, h: viewSize.current.h }, land).some((light) => light.key === skyKey(sl));
-    const sun = toHorizontal(topocentric(sys, 'star', at, sys.site), frame).alt / DEG;
-    if (sl.kind === 'catalog' && sun >= -1.6) return false;
     const center = pointing(at);
     if (!center) return false;
     const p = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }).project(dir);
@@ -261,6 +265,10 @@ export function Observatory() {
   }, []);
 
   const selectionCue = () => {
+    if (sel && mode === 'scope') {
+      const status = sightStatus(sel, t);
+      if (status.code === 'solar-glare' || status.ok && (status.solarGlare ?? 0) >= GLARE_NOTICE) return status.reason;
+    }
     if (!sel || !available) return 'The selected light is outside the observable field or obscured.';
     const variation = sel.kind === 'catalog' ? 'Brightness variation is visible (also provided as a text cue).' : 'Brightness is comparatively steady.';
     if (mode === 'sky') { const light = skyLights.find((v) => v.key === skyKey(sel)); return `${light?.tint ?? 'Selected light'} · ${light?.variation ?? ''}.`; }
@@ -476,7 +484,8 @@ export function Observatory() {
               const { planet: tgtV, moon: moonV, planetRadius: targetRadius, moonRadius, light } = apparentMoonDisks(sys, tt);
               const sunV = topocentric(sys, 'star', tt, sys.site);
               const f = localFrame(sys, tt, sys.site);
-              const sunAlt = toHorizontal(sunV, f).alt / DEG;
+              const sunAltitude = toHorizontal(sunV, f).alt;
+              const sunRadius = Math.asin(sys.star.radius / Math.hypot(...sunV));
               const ts = now / 1000;
               const P = drawScope(
                 ctx,
@@ -484,14 +493,15 @@ export function Observatory() {
                 {
                   seed: sys.seed,
                   sunDir: unit(sunV),
-                  sunRadius: Math.asin(sys.star.radius / Math.hypot(...sunV)),
+                  sunRadius,
+                  glareSource: filter ? undefined : solarGlareSource(sunV, sunRadius, sys.star.luminosity, sunAltitude),
                   starColor: starRGB(sys),
                   targetDir: unit(tgtV),
                   targetRadius,
                   moonDir: sys.features.moon ? unit(moonV) : null,
                   moonRadius,
                   moonLight: light,
-                  skyBrightness: Math.max(0, Math.min(1, (sunAlt + 10) / 14)),
+                  skyBrightness: Math.max(0, Math.min(1, (sunAltitude / DEG + 10) / 14)),
                   seeing: SEEING * seeingFactor(useGame.getState(), tt),
                   realTime: now,
                   brightStars: catalog,
@@ -1132,7 +1142,7 @@ function TransitPanel({ onPoint, onTracker }: { onPoint: () => void; onTracker: 
   const S = picks.length >= 2 ? (picks[picks.length - 1] - picks[0]) / (picks.length - 1) : null;
   const sv = topocentric(sys, 'star', t, sys.site);
   const tv = topocentric(sys, 'target', t, sys.site);
-  const now = Math.abs(eclLon(tv) - eclLon(sv)) < Math.asin(sys.star.radius / Math.hypot(...sv)) && Math.hypot(...tv) < Math.hypot(...sv);
+  const now = angleBetween(tv, sv) < Math.asin(sys.star.radius / Math.hypot(...sv)) && Math.hypot(...tv) < Math.hypot(...sv);
   const mode = useMode();
   return (
     <div className="panel panel-pad stack">

@@ -2,6 +2,7 @@
 // (ecliptic east to the left, ecliptic north up).
 
 import { ARCSEC, DEG, TAU } from '../engine/constants';
+import { solarGlare, type SolarGlareSource } from '../engine/solarGlare';
 import { hash32, mulberry32 } from '../engine/rng';
 import { cross, dot, unit, type Vec3 } from '../engine/vec';
 import { css, mix, type RGB } from './color';
@@ -91,6 +92,7 @@ export function deepStars(seed: number, center: Vec3, radius: number): DeepStar[
 export interface ScopeScene {
   seed: number;
   sunDir: Vec3;
+  glareSource?: SolarGlareSource;
   sunRadius: number; // angular radius (rad)
   starColor: RGB;
   targetDir: Vec3 | null;
@@ -155,27 +157,23 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
     }
   }
 
-  // The star (only safe with the filter; without it, glare floods the view).
   const sp = P.project(sc.sunDir);
-  if (sp) {
+  if (sc.filter && sp) {
     const r = sc.sunRadius * P.k;
-    if (sc.filter) drawFilteredStar(ctx, sp.x, sp.y, r, sc.seed);
-    else if (sp.x > -r * 4 && sp.x < w + r * 4 && sp.y > -r * 4 && sp.y < h + r * 4) {
-      ctx.restore();
-      ctx.fillStyle = 'rgba(255,255,255,0.97)';
-      ctx.fillRect(0, 0, w, h);
-      return P;
-    }
-  }
-
-  // A transit: the planet's silhouette against the filtered star.
-  if (sc.filter && sc.targetInFront && sc.targetDir) {
-    const p = P.project(sc.targetDir);
-    if (p) {
+    drawFilteredStar(ctx, sp.x, sp.y, r, sc.seed);
+    // Clip the foreground silhouette at the stellar limb. The far-side
+    // conjunction has no silhouette.
+    const planet = sc.targetInFront && sc.targetDir && P.project(sc.targetDir);
+    if (planet) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, r, 0, TAU);
+      ctx.clip();
       ctx.fillStyle = '#050403';
       ctx.beginPath();
-      ctx.arc(p.x, p.y, Math.max(1.6 * dpr, sc.targetRadius * P.k), 0, Math.PI * 2);
+      ctx.arc(planet.x, planet.y, sc.targetRadius * P.k, 0, TAU);
       ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -219,6 +217,9 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
       ctx.fillRect(p.x - r * 2, p.y - r * 2, r * 4, r * 4);
     }
   }
+  if (!sc.filter && sc.glareSource && sc.glareSource.exposure > 0) {
+    drawSolarGlare(ctx, P, sc.glareSource, sc.starColor, w, h);
+  }
   ctx.restore();
 
   // Optical vignette.
@@ -228,6 +229,35 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
   return P;
+}
+
+function drawSolarGlare(ctx: CanvasRenderingContext2D, projection: ScopeProjector, source: SolarGlareSource, color: RGB, w: number, h: number) {
+  const star = projection.project(source.direction);
+  const diagonal = Math.hypot(w, h);
+  const veil = mix([255, 245, 229], color, .24);
+  const opacity = (x: number, y: number) => .94 * solarGlare(source, projection.unproject(x, y));
+  if (star && Math.hypot(star.x - w / 2, star.y - h / 2) < 2 * diagonal) {
+    const reach = diagonal + Math.hypot(star.x - w / 2, star.y - h / 2);
+    const halo = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, reach);
+    for (const stop of [0, .04, .10, .20, .36, .58, .80, 1]) halo.addColorStop(stop, css(veil, opacity(star.x + stop * reach, star.y)));
+    ctx.fillStyle = halo;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    // An offscreen star can still veil a narrow field.
+    const level = opacity(w / 2, h / 2);
+    if (level < .008) return;
+    ctx.fillStyle = css(veil, level);
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (star) {
+    const r = source.radius * projection.k;
+    if (star.x + r >= 0 && star.x - r <= w && star.y + r >= 0 && star.y - r <= h) {
+      ctx.fillStyle = css(mix(veil, [255, 255, 255], .82), Math.min(1, .85 + source.exposure));
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, r, 0, TAU);
+      ctx.fill();
+    }
+  }
 }
 
 function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seeingPx: number, now: number, dpr: number, day: number, giant = false) {

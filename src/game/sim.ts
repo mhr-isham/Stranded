@@ -8,7 +8,7 @@ import { apparentMoonDisks } from '../engine/occultation';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude, targetSkyLimits } from '../engine/measure';
 import { eclLon, topocentric } from '../engine/sky';
-import { norm } from '../engine/vec';
+import { angleBetween, norm } from '../engine/vec';
 import { hash32 } from '../engine/rng';
 import { clock } from './clock';
 import { ECHO } from './echo';
@@ -177,13 +177,12 @@ function stepTo(t1Wanted: number, dtReal: number, hopping = false) {
       const t = k * 3600;
       const sv = topocentric(sys, 'star', t, sys.site);
       const tv = topocentric(sys, 'target', t, sys.site);
-      if (norm(tv) > norm(sv)) continue;
+      if (norm(tv) >= norm(sv) || angleBetween(tv, sv) > Math.asin(sys.star.radius / norm(sv))) continue;
       const status = opticalStatus(sys, s, t, 'solar-camera');
       if (!status.ok) continue;
       let off = eclLon(tv) - eclLon(sv);
       if (off > Math.PI) off -= 2 * Math.PI;
       if (off < -Math.PI) off += 2 * Math.PI;
-      if (Math.abs(off) > Math.asin(sys.star.radius / norm(sv))) continue;
       // Seeing blurs the limb and the dot: about ±4″ per reading.
       const u1 = (hash32(sys.seed, k, 0x5e) + 1) / 4294967297;
       const u2 = hash32(sys.seed, k, 0x5f) / 4294967296;
