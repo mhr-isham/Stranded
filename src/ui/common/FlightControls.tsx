@@ -72,8 +72,8 @@ export function FlightButton({ label, action, controls, icon, shortcut, burn = f
   </button>;
 }
 
-export function FlightToolbar({ title, status, controls, children }: {
-  title: string; status: string; controls: ReturnType<typeof useFlightControls>; children: ReactNode;
+export function FlightToolbar({ title, status, controls, tools, children }: {
+  title: string; status: string; controls: ReturnType<typeof useFlightControls>; tools?: ReactNode; children: ReactNode;
 }) {
   const s = useGame();
   const [help, setHelp] = useState(false);
@@ -82,6 +82,7 @@ export function FlightToolbar({ title, status, controls, children }: {
     <header className="flight-toolbar panel">
       <div><span className="meter-label">{title}</span><span className="flight-status">{status}</span></div>
       <div className="row">
+        {tools}
         <button className="btn small" onClick={() => controls.paused ? resume() : controls.pause(true)} aria-label={controls.paused ? 'Resume flight' : 'Pause flight'}>{controls.paused ? '▶ Resume' : 'Ⅱ Pause'}</button>
         <button className="btn small ghost" onClick={() => { controls.pause(true); setHelp(true); }}>Controls</button>
       </div>

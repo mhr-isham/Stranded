@@ -36,7 +36,9 @@ import { hopEstimate, hopPilot, type HopPhase } from '../engine/hop';
 import { beginPlay } from './Intro';
 import { unlockLog } from '../game/story';
 import { chapterOf } from '../game/campaign';
-import { STRIP } from '../game/surface';
+import { campDistances, STRIP } from '../game/surface';
+import { surveyLandingSites, type LandingSite } from '../engine/landingScan';
+import { LandingScan, landingSiteName } from './common/LandingScan';
 
 type Stage = 'tumble' | 'stabilize' | 'deorbit' | 'entry' | 'descent' | 'landed';
 
@@ -161,6 +163,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
 
   // Later chapters arrive by a (mostly) controlled fold: no tumble.
   const later = s.chapter > 1 && !arrival && !hop;
+  const opening = !later && !arrival && !hop && !s.settings.flightPractice;
+  const [scan, setScan] = useState<{ fromX: number; sites: LandingSite[] } | null>(null);
+  const [waypoint, setWaypoint] = useState<LandingSite | null>(null);
+  const scanToggle = useRef<HTMLButtonElement>(null);
+  const scanPanel = useRef<HTMLElement>(null);
   const hopTo = hop ? (s.hop?.toX ?? 0) : 0;
   const hopFrom = hop ? (s.hop?.fromX ?? s.camp?.x ?? 0) : 0;
   const [echoFly, setEchoFly] = useState(false);
@@ -204,9 +211,21 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ? 'Entry interface at the blue planet. Same rules as before: keep the flight-path angle in the green corridor. The beacon is on flat ground ahead.'
       : later
       ? 'Fold exit — controlled, this time. Mostly. New star, new planets, and we’re falling toward the nearest one. Turn the nose to the green retrograde marker and burn.'
-      : 'Fold exit — irregular. Spin rate high. Navigation… not found.',
+      : 'Fold exit — irregular. Attitude thrusters are restarting. I can scan the ground below.',
   );
   const [hud, setHud] = useState({ alt: 0, vs: 0, hs: 0, tilt: 0, fuel: 1, chute: 'stowed' as DescentState['chute'], site: 'rough' as SiteKind, q: 0, x: 1, heat: 0, gamma: 0 });
+
+  const closeScan = () => {
+    setScan(null);
+    scanToggle.current?.focus({ preventScroll: true });
+  };
+  const openScan = () => {
+    const ship = sim.current.d;
+    setScan({ fromX: ship.x, sites: surveyLandingSites(params, ship, terrain, flightSensitivity(s.settings.flightSensitivity)) });
+  };
+  useEffect(() => {
+    if (scan) scanPanel.current?.focus({ preventScroll: true });
+  }, [scan]);
 
   const say = (id: string, text: string) => {
     if (sim.current.said.has(id)) return;
@@ -328,15 +347,10 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
   const campAt = (x0: number, landing: CampInfo['landing']): CampInfo => {
     // A hop can overshoot the mapped strip; the camp stays on it.
     const x = Math.max(-STRIP + 100, Math.min(STRIP - 100, x0));
-    const ice = terrain.features.find((q) => q.kind === 'ice')!;
-    return {
-      site: siteAt(terrain, x),
-      landing,
-      x,
-      hillKm: Math.abs(x - terrain.hillX) / 1000,
-      iceKm: x < ice.x0 ? (ice.x0 - x) / 1000 : x > ice.x1 ? (x - ice.x1) / 1000 : 0,
-    };
+    return { ...campDistances(terrain, x), landing, x };
   };
+
+  const landedCamp = stage === 'landed' && sim.current.result ? campAt(sim.current.d.x, sim.current.result.touch) : null;
 
   function update(dt: number) {
     if (controls.paused || assistDialog) return;
@@ -1012,10 +1026,11 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
       ctx.arc(X(p.x), Y(p.y), (3 + (1.5 - p.life) * 5) * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
-    // The hop's destination flag, or an arrow towards it when it is off screen.
-    if (hop) {
-      const fx = X(hopTo);
-      const fy = Y(terrain.height(hopTo));
+    // The surface waypoint is drawn in world coordinates and points off-screen as needed.
+    const marker = hop ? hopTo : waypoint?.x;
+    if (marker !== undefined && S.stage === 'descent') {
+      const fx = X(marker);
+      const fy = Y(terrain.height(marker));
       if (fx > -20 && fx < w + 20) {
         const ph = Math.max(40 * dpr, 12 / mpp);
         ctx.strokeStyle = '#e8eefc';
@@ -1025,7 +1040,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         ctx.lineTo(fx, fy - ph);
         ctx.stroke();
         ctx.fillStyle = '#6cc4ff';
-        const wv = Math.sin(now / 200) * 3 * dpr;
+        const wv = reducedMotion ? 0 : Math.sin(now / 200) * 3 * dpr;
         ctx.beginPath();
         ctx.moveTo(fx, fy - ph);
         ctx.lineTo(fx + ph * 0.5, fy - ph * 0.85 + wv);
@@ -1043,7 +1058,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         ctx.fill();
         ctx.font = `${12 * dpr}px Inter, sans-serif`;
         ctx.textAlign = right ? 'right' : 'left';
-        ctx.fillText(`flag ${fmtKm(Math.abs(hopTo - d.x))}`, ax + (right ? -6 : 6) * dpr, ay - 16 * dpr);
+        ctx.fillText(`${hop ? 'flag' : 'waypoint'} ${fmtKm(Math.abs(marker - d.x))}`, ax + (right ? -6 : 6) * dpr, ay - 16 * dpr);
       }
     }
     // Parachute: a striped canopy that breathes.
@@ -1108,10 +1123,19 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
     ctx.restore();
   }
 
+  const waypointRange = waypoint === null ? null : waypoint.x - sim.current.d.x;
+  const flightStage = stage === 'tumble' && opening ? 'Attitude thrusters restarting' : stage;
+  const flightStatus = s.settings.flightPractice ? 'Practice · unscored'
+    : manualRequired && s.piloting.assisted.length ? 'Assisted · unscored'
+    : manualRequired ? 'Manual flight required' : flightStage;
+
   return (
     <div className="screen prologue flight-screen" role="region" aria-label="Landing flight" tabIndex={-1}>
       <CanvasView draw={draw} />
-      {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? 'Destination landing' : 'Arrival · opening sequence'} status={s.settings.flightPractice ? 'Practice · unscored' : manualRequired && s.piloting.assisted.length ? 'Assisted · unscored' : manualRequired ? 'Manual flight required' : stage} controls={controls}>
+      {stage !== 'landed' && <FlightToolbar title={hop ? 'Surface hop' : arrival ? 'Destination landing' : 'Arrival · opening sequence'}
+        status={flightStatus} controls={controls}
+        tools={opening && <button className="btn small" aria-label="Scan landing terrain" aria-expanded={!!scan} ref={scanToggle}
+          onClick={scan ? closeScan : openScan}>Scan terrain</button>}>
         <p>Use short steering inputs. During entry, left makes the path shallower and right makes it steeper. During descent, tilt to control drift and burn to slow the fall. A parachute helps only within its pressure limit.</p>
         {hop && <p>After takeoff, simulated flight seconds use supplies. Pausing leaves the flight and supplies where they are.</p>}
         <p>Land nearly upright, with little sideways drift and vertical speed below {assist ? 5 : 4} m/s. The instruments show the current conditions.</p>
@@ -1127,6 +1151,14 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
           {s.settings.flightPractice ? 'Exit practice' : manualRequired ? 'ECHO landing' : 'Skip'}
         </button>
       )}
+
+      {opening && stage !== 'landed' && waypoint && waypointRange !== null && <div className="landing-waypoint panel" aria-label="Landing waypoint">
+        <span aria-hidden="true">◇</span> <b>{landingSiteName(waypoint.kind)}</b>
+        <span>{Math.abs(waypointRange) < 20 ? 'Below' : `${waypointRange < 0 ? 'Left' : 'Right'} · ${fmtKm(Math.abs(waypointRange))}`}</span>
+      </div>}
+      {opening && stage !== 'landed' && scan && <LandingScan terrain={terrain} sites={scan.sites} fromX={scan.fromX}
+        waypoint={waypoint} panel={scanPanel} onClose={closeScan}
+        onSelect={(site) => { setWaypoint(site); closeScan(); if (site) sfx('log'); }} />}
 
       {stage === 'tumble' && <div className="prologue-alert">CONTROLS NOT RESPONDING</div>}
 
@@ -1227,14 +1259,18 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
         <div className="prologue-keys faint hide-phone">← → or A D rotate · ↑ W or Space burn{stage === 'descent' && !hop ? ' · P parachute' : ''}</div>
       )}
 
-      {stage === 'landed' && sim.current.result && (
+      {landedCamp && sim.current.result && (
         <div className="title-wrap">
           <div className="intro-card panel">
             <div className="meter-label">Touchdown</div>
             <h2>
               {sim.current.result.touch === 'clean' ? 'A clean landing' : sim.current.result.touch === 'rough' ? 'A hard landing' : 'ECHO landed us'}
             </h2>
-            <div style={{ margin: '6px 0' }}>{arrival ? (sim.current.result.site === 'flat' ? 'Right beside the beacon.' : 'A walk from the beacon, but down safely.') : SITE_TEXT[sim.current.result.site]}</div>
+            <div style={{ margin: '6px 0' }}>{arrival ? (sim.current.result.site === 'flat' ? 'Right beside the beacon.' : 'A walk from the beacon, but down safely.') : SITE_TEXT[opening ? landedCamp.site : sim.current.result.site]}</div>
+            {opening && <dl className="kv touchdown-distances" aria-label="Camp distances">
+              <dt>Water ice</dt><dd>{landedCamp.iceKm < 0.05 ? 'At camp' : fmtKm(landedCamp.iceKm * 1000)}</dd>
+              <dt>Survey hill</dt><dd>{fmtKm(landedCamp.hillKm * 1000)}</dd>
+            </dl>}
             <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
               {sim.current.result.touch === 'clean'
                 ? arrival
@@ -1249,7 +1285,7 @@ export function Prologue({ arrival = false, hop = false }: { arrival?: boolean; 
               <button
                 className="btn primary"
                 onClick={() =>
-                  finish(campAt(sim.current.d.x, sim.current.result!.touch === 'rescued' ? 'rescued' : sim.current.result!.touch))
+                  finish(landedCamp)
                 }
               >
                 {s.settings.flightPractice ? 'Finish practice' : 'Continue'}

@@ -396,6 +396,30 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .prologue-controls .big { min-width: 120px; min-height: 64px; }
 .prologue-keys { position: absolute; bottom: calc(92px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); font-size: 12px; }
 
+.landing-scan {
+  position: absolute; z-index: 11; top: calc(143px + var(--safe-top)); left: 50%;
+  transform: translateX(-50%); width: min(506px, calc(100% - 20px)); padding: 12px;
+  max-height: calc(100dvh - 260px - var(--safe-top) - var(--safe-bottom)); overflow: auto; touch-action: pan-y;
+  border-color: #537fa0; background: #0a192af7; box-shadow: 0 12px 38px #0008;
+}
+.landing-scan p { margin: 0; font-size: 12px; }
+.landing-scan-profile { position: relative; flex: none; height: 76px; border: 1px solid #45657b; border-radius: 8px; overflow: hidden; background: #0a1424; }
+.landing-scan-sites { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
+.landing-site { display: grid; align-content: start; gap: 4px; min-height: 66px; padding: 6px; text-align: left; font-size: 12px; white-space: normal; }
+.landing-site span { color: #b6cadb; font-size: 11px; }
+.landing-site[aria-pressed="true"] { background: #234056; }
+.landing-waypoint {
+  position: absolute; z-index: 6; left: 12px; top: calc(142px + var(--safe-top)); padding: 5px 9px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; font-size: 11px; background: #0a192af7;
+}
+.landing-waypoint span:first-child { color: var(--blue); }
+.touchdown-distances { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px; }
+@media (max-height: 520px) {
+  .landing-scan { top: calc(119px + var(--safe-top)); max-height: calc(100dvh - 218px - var(--safe-top) - var(--safe-bottom)); gap: 4px; padding: 7px; }
+  .landing-scan-profile { height: 34px; }
+  .landing-waypoint { top: auto; bottom: calc(104px + var(--safe-bottom)); left: auto; right: 8px; }
+}
+
 /* Shared flight deck: actual telemetry, large hold targets and visible input state. */
 .flight-screen { touch-action: none; }
 .flight-toolbar { position: absolute; top: calc(10px + var(--safe-top)); left: 12px; right: 12px; z-index: 12; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-color: #426b8d; background: rgba(7,19,36,.94); }

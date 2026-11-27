@@ -194,11 +194,9 @@ Evidence: [chapter features](../src/engine/chapters.ts), [campaign](../src/game/
 
 ### CH-00 — Prologue: Fall
 
-**Partial.** Tumble, delayed control, spin arrest, retrograde burn, entry, parachute and descent exist. The ship becomes the local camp. Separate descent fuel and emergency rescue protect the opening. A pre-deorbit orbital scan, genuine latitude selection, optional camp-deployment checklist and immediate landing medal are absent.
+**Opening scan implemented — 27 November 2026.** During thruster recovery and the rest of Chapter 1’s opening descent, players can inspect a terrain profile and mark one candidate pad. The survey tests sample approaches against the same descent, fuel, parachute, slope and touchdown model. It lists the plain, ice basin and foothills when a sampled approach supports them. Availability varies with the system, flight state and mode. A scan is a snapshot. Reopen it to survey the current approach. Selecting a pad adds a directional waypoint and a flag in the descent view. It leaves steering and throttle in the player’s hands. The touchdown card shows the actual camp’s terrain and distances to water ice and the survey hill, using the same position as surface travel. The existing skip, assisted recovery, tutorials and destination flight rules still apply.
 
-**Assessment:** strong physical hook, but ten seconds of deliberately ignored input can look broken. Display the failure clearly, allow replay skip and offer immediate agency after the opening beat. Within the first minutes, show the steady blue light and a human reason to reach it. Do not follow a full landing with a second long exposition sequence.
-
-**Better implementation:** a short scan presents flat ground, hill and ice with meaningful consequences; the optional checklist deploys panels, unloads rover, visits near ice and starts processing. It must not require that novice players learn the complete economy before their first sky discovery.
+A broader orbital scan, latitude selection, camp-deployment checklist and landing medal remain open. Discuss the opening’s story and the first sky discovery with the broader story and characters.
 
 ### CH-01 — First Light
 
