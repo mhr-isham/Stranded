@@ -3,34 +3,29 @@
 // its radio Doppler speed — far away and at closest approach — and its radar
 // altitude. Energy: v_peak² − v∞² = 2GM₂/r_peri.
 
-import { useState } from 'react';
-import { DAY, HOUR } from '../../engine/constants';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { deriveAll } from '../../engine/chain';
-import { flybySpeedAt, PROBE_COST, probeTransitDays } from '../../engine/probe';
-import { hash32 } from '../../engine/rng';
+import { PROBE_COST, probeTransitDays } from '../../engine/probe';
 import { sfx } from '../../game/audio';
-import { clock } from '../../game/clock';
+import { clock, subscribeClock } from '../../game/clock';
 import { fmt } from '../../game/format';
 import { useMode } from '../../game/modes';
 import { launchProbe } from '../../game/probeState';
-import { currentVariant, currentWorld } from '../../game/sim';
+import { currentVariant, currentWorld, spendTime } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { Chart } from '../common/Chart';
 import { Formula, SanityWarning, SendToSheet, ToolHeader } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { MeasurementSources } from '../common/MeasurementSources';
+import { lifeSupportEnd } from '../../game/survival';
+import { PROBE_NOISE, receivedProbeAltitude, receivedProbeSamples } from '../../game/probeListening';
+import { ProbeListening, probeDate } from './ProbeListening';
 
 const MAX_PROBES = 2;
 
 /** Signed log scale for the chart: hours near the peak stay wide, days far out still fit. */
 const slog = (h: number) => Math.sign(h) * Math.log10(1 + Math.abs(h));
-const NOISE = 0.0015; // relative scatter of one Doppler speed sample
-
-function gauss(seed: number, i: number) {
-  const u1 = (hash32(seed, i, 0xd1) + 1) / 4294967297;
-  const u2 = hash32(seed, i, 0xd2) / 4294967296;
-  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-}
+const hoursAt = (x: number) => Math.sign(x) * (10 ** Math.abs(x) - 1);
 
 export function ProbeBay() {
   const { system: sys } = currentWorld();
@@ -39,67 +34,73 @@ export function ProbeBay() {
   const mode = useMode();
   const R2 = deriveAll(s.sheet, currentVariant()).R2;
   const [aimR, setAimR] = useState(2.5); // in units of your R₂
-  const [band, setBand] = useState<[number, number] | null>(null);
-  const p = s.probe;
-  // A probe lost on the planet doesn't use up a slot (it still costs its fuel).
+  const [selection, setSelection] = useState<{ flight: number; band: [number, number] } | null>(null);
+  const [shownFlight, setShownFlight] = useState('current');
+  const latest = s.probe;
+  const records = (s.probeLog ?? []).filter((flight) => flight.launchedAt !== latest?.launchedAt);
+  const p = records.find((flight) => String(flight.launchedAt) === shownFlight) ?? latest;
+  const band = p && selection?.flight === p.launchedAt ? selection.band : null;
   const crashedCount = (s.probeLog ?? []).filter((q) => q.crashed && q.arriveAt <= t).length;
   const launched = s.probesLaunched - crashedCount;
-  const arrived = p && t >= p.arriveAt;
+  const inFlight = !!latest && t < latest.arriveAt;
+  const stopAt = useSyncExternalStore(subscribeClock, () => clock.stopAt);
+  const lost = !!p?.crashed && t >= p.arriveAt;
+  const nextWindow = lost ? undefined : p?.windows?.filter((w) => w.start > t).sort((a, b) => a.start - b.start)[0];
+  const canWait = !!nextWindow && !Number.isFinite(stopAt) && !clock.realtime && nextWindow.start < lifeSupportEnd(s, sys);
 
   const launch = () => {
-    if (!R2) return toast('Measure the blue planet’s radius R₂ first — the aim is in planet radii.');
-    const aim = aimR * R2.value;
-    useGame.setState({ ...launchProbe(sys, s, aim, clock.t), probesLaunched: s.probesLaunched + 1 });
+    const current = useGame.getState();
+    if (current.probe && clock.t < current.probe.arriveAt) return;
+    const losses = (current.probeLog ?? []).filter((q) => q.crashed && q.arriveAt <= clock.t).length;
+    if (current.probesLaunched - losses >= MAX_PROBES) return;
+    if (!R2 || !Number.isFinite(R2.value) || R2.value <= 0) return toast('Measure the blue planet’s radius R₂ first.');
+    useGame.setState({ ...launchProbe(sys, current, aimR * R2.value, clock.t), probesLaunched: current.probesLaunched + 1 });
+    setShownFlight('current');
+    setSelection(null);
     sfx('launch');
     sfx('radio');
     toast(`Probe away — ${fmt(probeTransitDays(sys), 0)} days to the blue planet.`);
   };
 
-  // Doppler samples every 12 h from 30 days out, every 20 minutes within 36 h, and every
-  // 2 minutes within 3 h of closest approach. Far out the speed is nearly v∞ (still a
-  // little high: the planet's pull reaches a long way).
-  const far = Array.from({ length: 57 }, (_, i) => 720 - 12 * i); // 720 … 48 h
-  const times = [
-    ...far.map((h) => -h),
-    ...Array.from({ length: 100 }, (_, i) => -36 + i / 3),
-    ...Array.from({ length: 181 }, (_, i) => -3 + i / 30),
-    ...Array.from({ length: 100 }, (_, i) => 3 + (i + 1) / 3),
-    ...far.slice().reverse(),
-  ];
-  const samples = p && arrived && !p.crashed
-    ? times.map((hrs, i) => {
-        const v = flybySpeedAt(sys, { vInf: p.vInf, rPeri: p.rPeri, vPeak: p.vPeak, deflection: 0, crashed: false }, hrs * HOUR);
-        return { x: slog(hrs), y: (v * (1 + NOISE * gauss(Math.round(p.launchedAt), i))) / 1000 };
-      })
-    : [];
+  function waitToNextWindow() {
+    const current = useGame.getState();
+    const at = nextWindow?.start;
+    if (at === undefined || at <= clock.t || Number.isFinite(clock.stopAt) || clock.realtime
+      || current.phase !== 'play' || at >= lifeSupportEnd(current, sys)) return;
+    spendTime(at - clock.t, () => {
+      if (useGame.getState().phase === 'play' && clock.t >= at) toast('Listening window reached');
+    }, { pauseOnArrival: true });
+  }
+
+  const samples = useMemo(() => p ? receivedProbeSamples(sys, p, t).map((q) => ({ x: slog(q.hours), y: q.speed / 1000 })) : [], [sys, p, t]);
   const sel = band ? samples.filter((q) => q.x >= band[0] && q.x <= band[1]) : [];
   const mean = sel.length ? sel.reduce((a, q) => a + q.y, 0) / sel.length : null;
-  // Uncertainty: the scatter of the mean, but no less than the slope still left in the
-  // stretch (an honest bound on how far its average sits above the true v∞).
+  // Use scatter and the observed trend within this band as a local guide.
+  // Even a flat-looking band may sit above the asymptotic speed.
   const se =
     sel.length > 1 && mean !== null
       ? Math.max(Math.sqrt(sel.reduce((a, q) => a + (q.y - mean) ** 2, 0) / (sel.length - 1) / sel.length), mean - Math.min(...sel.map((q) => q.y)))
       : undefined;
   const peak = sel.length ? Math.max(...sel.map((q) => q.y)) : null;
-  // Radar altimeter: height above the cloud tops at closest approach, ±10 km.
-  const altKm = p && !p.crashed ? (p.rPeri - sys.target.radius) / 1000 + 10 * gauss(Math.round(p.launchedAt), 999) : null;
+  const alt = p ? receivedProbeAltitude(sys, p, t) : null;
+  const altKm = alt === null ? null : alt / 1000;
 
   return (
-    <div className="tool">
+    <div className="tool probe-bay">
       <div className="tool-stage" style={{ background: 'radial-gradient(ellipse at 50% 40%, #142040 0%, #05070f 70%)' }}>
-        <div style={{ position: 'absolute', inset: 'calc(80px + var(--safe-top)) 16px 100px 16px', display: 'grid', placeItems: 'center' }}>
+        <div className="probe-chart-region">
           {samples.length > 0 ? (
             <div style={{ width: '100%', maxWidth: 760 }}>
               <Chart
                 ariaLabel="Recorded probe Doppler samples"
                 series={[{ pts: samples, color: '#6cc4ff', kind: 'dots', faded: (q) => !!band && (q.x < band[0] || q.x > band[1]) }]}
-                xLabel="hours from closest approach (log scale)"
-                xFmt={(x) => fmt(Math.sign(x) * (10 ** Math.abs(x) - 1), 0)}
+                xLabel={p?.windows ? "hours from planned pass (log scale)" : "hours from closest approach (log scale)"}
+                xFmt={(x) => fmt(hoursAt(x), Math.abs(hoursAt(x)) < 1 ? 2 : 0)}
                 yLabel="probe speed (km/s)"
                 band={band}
-                onBand={setBand}
+                onBand={(next) => setSelection(next && p ? { flight: p.launchedAt, band: next } : null)}
                 brushMode="band"
-                height={300}
+                height="var(--probe-chart-height, 300px)"
                 yFmt={(y) => y.toFixed(2)}
               />
               <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>
@@ -109,10 +110,10 @@ export function ProbeBay() {
           ) : (
             <div className="muted" style={{ textAlign: 'center', maxWidth: 420 }}>
               {!p
-                ? 'The probe sits on its rail beside the ship. Its radio will report its speed all the way through the flyby.'
-                : p.crashed && arrived
+                ? 'Launch the probe to open its receiver and begin listening.'
+                : lost
                   ? 'Signal lost at closest approach. The probe hit the planet — it was aimed too close.'
-                  : `Probe in flight. Closest approach on day ${fmt(p.arriveAt / DAY, 1)}.`}
+                  : `Waiting for telemetry. Planned pass: ${probeDate(p.arriveAt)}.`}
             </div>
           )}
         </div>
@@ -126,7 +127,7 @@ export function ProbeBay() {
           </div>
           <div className="row">
             <span style={{ fontSize: 13 }}>Closest approach</span>
-            <input type="range" min={1.3} max={6} step={0.05} value={aimR} onChange={(e) => setAimR(Number(e.target.value))} style={{ flex: 1 }} disabled={!!p && !arrived} />
+            <input type="range" aria-label="Probe aim in planet radii" min={1.3} max={6} step={0.05} value={aimR} onChange={(e) => setAimR(Number(e.target.value))} style={{ flex: 1 }} disabled={inFlight} />
             <span className="mono">{fmt(aimR, 2)} R₂</span>
           </div>
           {R2 ? (
@@ -138,17 +139,24 @@ export function ProbeBay() {
           )}
           <SanityWarning
             msgs={[
-              aimR < 1.25 && 'Very close: with ±6% navigation scatter and the error in your R₂, the probe may hit the planet.',
+              aimR <= 1.4 && 'Very close: with ±6% navigation scatter and the error in your R₂, the probe may hit the planet.',
               aimR > 4 && 'Far away: the speed-up will be small, so the mass will be imprecise.',
             ]}
           />
           {mode.coaching && <div className="hint">Closer gives a bigger speed-up and a better mass, but risks a crash. Around 2–3 planet radii is a good start.</div>}
-          <button className="btn primary" disabled={!R2 || launched >= MAX_PROBES || (!!p && !arrived)} onClick={launch}>
+          <button className="btn primary" disabled={!R2 || launched >= MAX_PROBES || inFlight} onClick={launch}>
             Launch probe
           </button>
         </div>
 
-        {p && arrived && !p.crashed && (
+        {records.length > 0 && <label className="field">Flight record<select className="input" value={shownFlight} onChange={(event) => setShownFlight(event.target.value)}>
+          <option value="current">Latest probe</option>
+          {records.map((flight) => <option key={flight.launchedAt} value={String(flight.launchedAt)}>Launched {probeDate(flight.launchedAt)}</option>)}
+        </select></label>}
+        {p && <ProbeListening key={p.launchedAt} probe={p} now={t} count={samples.length}
+          nextWindow={nextWindow} canWait={canWait} onWait={waitToNextWindow} />}
+
+        {(samples.length > 0 || altKm !== null) && (
           <div className="panel panel-pad stack">
             <b>2 · Read the flyby</b>
             <MeasurementSources instrument="probe" />
@@ -163,26 +171,28 @@ export function ProbeBay() {
                   <dd>{fmt(peak!, 4)} km/s</dd>
                 </dl>
                 <b style={{ fontSize: 13 }}>Far-away speed v∞ (use the average of a flat stretch)</b>
-                <SendToSheet k="vInf" value={mean * 1000} spread={se !== undefined ? se * 1000 : undefined} />
+                <SendToSheet k="vInf" value={mean * 1000} spread={se !== undefined ? se * 1000 : undefined} spreadLabel="Guide from scatter and drift in this band" />
                 <b style={{ fontSize: 13 }}>Peak speed vₚ (use the top of the peak)</b>
-                <SendToSheet k="vPeak" value={peak! * 1000} spread={NOISE * peak! * 1000} />
+                <SendToSheet k="vPeak" value={peak! * 1000} spread={PROBE_NOISE * peak! * 1000} spreadLabel="Modeled scatter of a single speed reading" />
               </>
             ) : (
               <div className="faint" style={{ fontSize: 13 }}>Select part of the chart.</div>
             )}
-            <b style={{ marginTop: 6 }}>3 · Radar altimeter</b>
-            <div className="muted" style={{ fontSize: 13 }}>
-              At closest approach the probe was <b>{fmt(altKm!, 0)} ± 10 km</b> above the cloud tops. Add the planet’s radius to get rₚ from its centre.
-            </div>
-            {R2 && altKm !== null && (
-              <>
-                <div className="faint" style={{ fontSize: 12 }}>
-                  rₚ = your R₂ + altitude = {fmt(R2.value / 1000, 0)} + {fmt(altKm, 0)} = {fmt(R2.value / 1000 + altKm, 0)} km (error ≈ ±
-                  {fmt(Math.hypot(R2.sigma / 1000, 10), 0)} km)
-                </div>
-                <SendToSheet k="rPeri" value={R2.value + altKm * 1000} spread={Math.hypot(R2.sigma, 10e3)} />
-              </>
-            )}
+            {altKm !== null && <>
+              <b style={{ marginTop: 6 }}>3 · Radar altimeter</b>
+              <div className="muted" style={{ fontSize: 13 }}>
+                At closest approach the probe was <b>{fmt(altKm, 0)} ± 10 km</b> above the cloud tops. Add the planet’s radius to get rₚ from its centre.
+              </div>
+              {R2 && (
+                <>
+                  <div className="faint" style={{ fontSize: 12 }}>
+                    rₚ = your R₂ + altitude = {fmt(R2.value / 1000, 0)} + {fmt(altKm, 0)} = {fmt(R2.value / 1000 + altKm, 0)} km (error ≈ ±
+                    {fmt(Math.hypot(R2.sigma / 1000, 10), 0)} km)
+                  </div>
+                  <SendToSheet k="rPeri" value={R2.value + altKm * 1000} spread={Math.hypot(R2.sigma, 10e3)} />
+                </>
+              )}
+            </>}
             <Formula>M₂ = rₚ (vₚ² − v∞²) / (2G)</Formula>
           </div>
         )}

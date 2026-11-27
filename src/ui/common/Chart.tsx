@@ -29,7 +29,7 @@ interface Props {
   yLabel: string;
   xFmt?: (x: number) => string;
   yFmt?: (y: number) => string;
-  height?: number;
+  height?: number | string;
   /** Optional selection band (data x). */
   band?: [number, number] | null;
   onBand?: (b: [number, number] | null) => void;

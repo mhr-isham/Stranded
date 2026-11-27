@@ -181,6 +181,20 @@ input[type='range'] { width: 100%; accent-color: var(--blue); height: 28px; }
 .tool-stage { position: relative; overflow: hidden; }
 .tool-side { overflow: auto; margin-top: calc(var(--hud-h) + var(--safe-top)); padding: 0 10px calc(90px + var(--safe-bottom)) 0; display: flex; flex-direction: column; gap: 10px; }
 .tool-side .panel h2 { font-size: 18px; margin-bottom: 6px; }
+.probe-chart-region {
+  position: absolute; inset: calc(80px + var(--safe-top)) 16px 100px; display: grid; place-items: center;
+}
+.probe-listening { font-size: 13px; }
+.probe-next, .probe-window-list, .probe-window-form { margin-top: 6px; }
+.probe-next { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.probe-window { display: grid; gap: 4px; }
+.probe-window .btn { justify-self: start; }
+.probe-window-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.probe-window-fields .input { min-width: 0; width: 100%; }
+@media (max-width: 860px) {
+  .probe-bay { --probe-chart-height: clamp(100px, calc(54dvh - 130px), 240px); }
+  .probe-chart-region { inset: calc(var(--hud-h) + var(--safe-top) + 8px) 8px 8px; }
+}
 .tool-title { position: absolute; left: 12px; top: calc(var(--hud-h) + var(--safe-top)); z-index: 6; }
 .readout { font-family: var(--mono); font-size: 28px; font-weight: 600; letter-spacing: 0.02em; }
 .readout.small { font-size: 18px; }

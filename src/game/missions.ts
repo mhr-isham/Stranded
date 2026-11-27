@@ -149,7 +149,7 @@ const CH2: Mission[] = [
     id: 'probeRead',
     title: 'Weigh it with the probe',
     short: 'Measure v∞, vₚ and rₚ from the flyby.',
-    goal: 'After the flyby, read the probe’s far-away speed and its peak speed from the Doppler chart, and its closest approach from the altimeter. Send all three to the sheet.',
+    goal: 'Listen during cruise and the close pass. Use the received Doppler readings for far-away and near-peak speed, and the encounter altimeter for closest approach. Send all three to the sheet.',
     why: 'Falling things speed up: the heavier the planet, the bigger the speed-up. vₚ² − v∞² = 2GM₂/rₚ.',
     screen: 'probe',
     done: (s) => !!s.sheet.vInf && !!s.sheet.vPeak && !!s.sheet.rPeri,

@@ -87,7 +87,7 @@ with sync_playwright() as p:
         # A real saved pass, generated through the existing launch helper. No
         # manual observation accuracy or spacecraft-control accuracy is implied.
         setup(page,2,'probe')
-        page.evaluate('''async()=>{const {currentWorld}=await import('/src/game/sim.ts');const {launchProbe}=await import('/src/game/probeState.ts');const s=__game.getState(),sys=currentWorld().system;const patch=launchProbe(sys,s,sys.target.radius*3,100);__game.setState({...patch,probesLaunched:1});__clock.t=patch.probe.arriveAt+100;__clock.emit();}''')
+        page.evaluate('''async()=>{const {currentWorld}=await import('/src/game/sim.ts');const {launchProbe}=await import('/src/game/probeState.ts');const s=__game.getState(),sys=currentWorld().system;const patch=launchProbe(sys,s,sys.target.radius*3,100);__game.setState({...patch,probesLaunched:1});__clock.t=patch.probe.arriveAt+4*3600;__clock.emit();}''')
         chart='Recorded probe Doppler samples';expect(page.get_by_role('img',name=chart)).to_be_visible()
         original=raw(page,'probe');image=pixels(page,chart)
         notes=page.get_by_label('Measurement sources',exact=True);assert notes.get_attribute('open') is None

@@ -206,9 +206,9 @@ Keep the twinkle, retrograde and blink parallax discoveries. A separate multi-pa
 
 ### CH-02 — The Silent Planet
 
-**Partial:** a moonless target, paid probes, aim/collision risk, Doppler curve, altitude and mass inference exist. The complete synthetic flyby record becomes available after arrival, rather than a player-selected nightly tracking campaign. Cadet automatic aiming, optical tracking nights, predicted-versus-observed probe-path reveal and orbital-decay dating clue are not complete.
+**Scheduled probe listening implemented — 27 November 2026.** Launching a probe schedules a cruise baseline, inbound readings and a denser close-pass window against the flight plan. Readings become available as the expedition clock reaches each sample, including while the player is away from the bay. Optional manual windows use offsets and cadence. Only future windows can be removed or scheduled, and duplicate timestamps count once. A known window can be selected as a wait target, subject to the usual clock and supply limits. The chart and range controls use the received data, and the radar altitude arrives at a successful encounter. Crashes keep the earlier telemetry. Prior probes can be revisited. Older saves retain their original automatic receiver. The model treats Doppler reception as immediate and supplies reconstructed planet-relative speed.
 
-**Keep:** mass from a flyby is more active and distinctive than a density guess. **Improve:** choose a small observation schedule, collect real-time samples at those dates, fit mass with uncertainty and show how a closer pass improves signal while increasing collision risk. Provide a nonfatal practice module. Make the recovered image initiate a debris-age investigation; atmospheric drag dating must include model uncertainty, not imply decay alone gives an exact launch date. Resolve “one last probe” dialogue versus the playable stock/retry rules.
+Keep the aim, fuel cost, navigation scatter, crash risk and player-entered uncertainty. Optical tracking, predicted-path comparison, a nonfatal practice scenario and the debris-age investigation remain open. Discuss the stock dialogue with the broader story pass.
 
 ### CH-03 — Thick Air
 

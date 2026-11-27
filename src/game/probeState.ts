@@ -7,6 +7,7 @@ import { flyby, PROBE_COST, probeTransitDays } from '../engine/probe';
 import { hash32 } from '../engine/rng';
 import type { StarSystem } from '../engine/types';
 import type { GameState } from './store';
+import { presetProbeWindows, type ProbeWindow } from './probeListening';
 
 export interface ProbeState {
   /** Requested closest approach from the planet's centre (m). */
@@ -17,6 +18,8 @@ export interface ProbeState {
   rPeri: number;
   vPeak: number;
   crashed: boolean;
+  /** Absent in saves from the original automatic receiver. */
+  windows?: ProbeWindow[];
 }
 
 /** Launch: the probe's real closest approach scatters by ~6% around the aim. */
@@ -27,14 +30,16 @@ export function launchProbe(sys: StarSystem, s: GameState, aim: number, now: num
   const rPeri = aim * (1 + 0.06 * gauss);
   const vInf = sys.hohmann.vInfArrive * 1.35;
   const f = flyby(sys, vInf, rPeri);
+  const arriveAt = now + probeTransitDays(sys) * DAY;
   const probe: ProbeState = {
     aim,
     launchedAt: now,
-    arriveAt: now + probeTransitDays(sys) * DAY,
+    arriveAt,
     vInf,
     rPeri,
     vPeak: f.vPeak,
     crashed: f.crashed,
+    windows: presetProbeWindows(now, arriveAt),
   };
   return { probe, probeLog: [...(s.probeLog ?? []), probe], penaltyDv: s.penaltyDv + PROBE_COST };
 }

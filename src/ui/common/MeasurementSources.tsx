@@ -3,7 +3,7 @@ export function MeasurementSources({ instrument }: { instrument: 'probe' | 'star
   return <details className="measurement-help" aria-label="Measurement sources">
     <summary>Where can these readings differ?</summary>
     {instrument === 'probe' ? <>
-      <p>The probe's speeds follow a simulated flyby. Its receiver adds simplified simulated Doppler scatter, and its radar altitude has a simulated uncertainty. These are instrument models, not measurements of your aiming or reaction time.</p>
+      <p>The probe's speeds follow a simulated flyby. The model provides reconstructed planet-relative speed with simplified simulated Doppler scatter. It treats radio reception as immediate, and the radar altitude has a simulated uncertainty. These are instrument models, not measurements of your aiming or reaction time.</p>
       <p>Your chosen pass and the probe's navigation scatter affect the actual trajectory. Selecting another part of its speed curve changes your estimate, not the received samples. Reopening the chart, changing your worksheet or reloading this expedition keeps this pass's samples and radar reading.</p>
       <p>Repeatedly viewing one pass is not new evidence. Scatter within a selected stretch does not cover every shared calibration error or the curve's remaining trend. The displayed ± allowances are not guaranteed bounds.</p>
     </> : instrument === 'stars' ? <>
