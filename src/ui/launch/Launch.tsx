@@ -735,17 +735,17 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
           labelAt('Arrival', X(r2a), Y(r2a), 10 * dpr);
         }
         // Planets at departure and now.
-        const planet = (v: Vec3, c: string, r: number, label: string) => {
+        const planet = (v: Vec3, c: string, r: number, label: string, labelY = -6) => {
           ctx.fillStyle = c;
           ctx.beginPath();
           ctx.arc(X(v), Y(v), r * dpr, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = 'rgba(230,238,252,0.85)';
           ctx.font = `600 ${11 * dpr}px Inter, sans-serif`;
-          if (label) labelAt(label, X(v), Y(v) - 6 * dpr, 9 * dpr);
+          if (label) labelAt(label, X(v), Y(v) + labelY * dpr, 9 * dpr);
         };
-        planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, model.giant ? 'Home at departure' : 'home @ departure');
-        planet(targetState(model, td)[0], '#6cc4ff', 6, model.giant ? 'Blue planet at departure' : 'blue @ departure');
+        planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, model.giant ? 'Home' : 'home @ departure');
+        planet(targetState(model, td)[0], '#6cc4ff', 6, model.giant ? 'Blue planet' : 'blue @ departure', model.giant ? 15 : -6);
         ctx.globalAlpha = 0.45;
         planet(posAt(model.a1, model.P1, model, t), '#ffb26b', 4, 'now');
         planet(targetState(model, t)[0], '#6cc4ff', 4, '');
