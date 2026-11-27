@@ -1,6 +1,8 @@
 // Draws the wide-angle sky: atmosphere, stars, the star, the blue planet and
 // the landscape. Designed to stay cheap enough for phones at 60 fps.
 
+import type { MeteorTrail } from '../engine/meteors';
+import { drawMeteorTrails } from './meteorTrails';
 import { DEG } from '../engine/constants';
 import type { CatalogStar } from '../engine/sky';
 import { css, limitingMag, mix, skyColors, type RGB } from './color';
@@ -20,6 +22,7 @@ export interface SkyOptions {
   mars?: boolean;
   dpr: number;
   reduceFlicker?: boolean;
+  meteors?: readonly MeteorTrail[];
 }
 
 export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene, catalog: CatalogStar[], land: Landscape | null, o: SkyOptions): Projector {
@@ -168,6 +171,7 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
     ctx.fill();
   }
 
+  if (o.meteors?.length) drawMeteorTrails(ctx, P, o.meteors, o.dpr);
   if (land && o.showGround !== false) drawLandscape(ctx, P, cam, land, col.ground, col.horizon, sunAlt);
   return P;
 }

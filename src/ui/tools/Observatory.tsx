@@ -49,6 +49,8 @@ import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
 import { makeSkySighting, skyCode, skyDirection, skyKey, skyline, visibleSkyLights, type SkyRef } from '../../game/skyObservation';
+import { MeteorWatch } from './MeteorWatch';
+import { meteorWatchStatus, visibleMeteorTrails } from '../../game/meteorWatch';
 import { SkyExplorer, SkyNotebook } from './SkyExplorer';
 import { analyzeYear } from '../../game/yearObservations';
 import { YearPlot, YearFitDetails } from './YearAnalysis';
@@ -79,10 +81,13 @@ export function Observatory() {
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
-  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | null>(null);
+  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | null>(null);
   const watchButton = useRef<HTMLButtonElement>(null);
   const eclipseButton = useRef<HTMLButtonElement>(null);
+  const meteorButton = useRef<HTMLButtonElement>(null);
+  const meteorWatching = tab === 'sky' && watchOpen === 'meteors';
   const watching = tab === 'moon' && watchOpen;
+  const meteorActive = !s.tutorial.active && mode === 'sky' && tab === 'sky' && meteorWatchStatus(sys, s, t).active;
   const eclipseWatching = watching === 'eclipse';
   const [sel, setSel] = useState<Sel | null>(null);
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
@@ -351,7 +356,7 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
+    <div className={`tool ${meteorWatching ? 'moon-watch-active meteor-watch-active' : watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
       <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -395,7 +400,9 @@ export function Observatory() {
               viewSize.current = { w, h, dpr };
               setInstrument('scope', now - lastMotion.current < 120 ? 0.6 : 0);
               const camera = { az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w, h };
-              const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { showEcliptic: showEcl, reduceFlicker: !!s.settings.skyReducedFlicker });
+              const at = clock.t;
+              const meteors = s.tutorial.active ? [] : visibleMeteorTrails(sys, useGame.getState(), at);
+              const { scene, P } = paintSky(ctx, camera, sys, catalog, land, at, now, dpr, { showEcliptic: showEcl && !meteorWatching, reduceFlicker: !!s.settings.skyReducedFlicker, meteors });
               if (obscured(clock.t)) {
                 ctx.fillStyle = flareAt(sys, clock.t) ? 'rgba(40,8,12,.92)' : 'rgba(54,61,73,.97)'; ctx.fillRect(0, 0, w, h);
                 ctx.fillStyle = '#e2e8f3'; ctx.textAlign = 'center'; ctx.font = `600 ${14 * dpr}px Inter`;
@@ -409,6 +416,7 @@ export function Observatory() {
               }
               cam.current.scale = P.scale;
               // Historical two-coordinate measurements, fixed against the star chart.
+              if (meteorWatching) { cam.current.scale = P.scale; return; }
               if (s.settings.skyTrackTrail && tab === 'track') {
                 ctx.strokeStyle = '#ffc46b'; ctx.lineWidth = 1.2 * dpr;
                 for (const measurement of s.track.filter((o) => o.at <= clock.t)) {
@@ -611,7 +619,7 @@ export function Observatory() {
             }}
           />
         )}
-        {tab !== 'micro' && !watching && (
+        {tab !== 'micro' && !watching && !meteorWatching && (
         <div style={{ position: 'absolute', right: 10, top: 'calc(var(--hud-h) + var(--safe-top))', zIndex: 6 }} className="row">
           <button className={`btn ${mode === 'sky' ? 'primary' : ''}`} onClick={() => setMode('sky')}>
             Wide sky
@@ -644,7 +652,10 @@ export function Observatory() {
       </div>
 
       <div className="tool-side">
-        {watching === 'eclipse' ? <EclipseWatch read={readEclipse} centre={() => centreWatch('eclipse')}
+        {meteorWatching ? <MeteorWatch land={land} pan={panSky} zoom={zoomSky}
+          camera={() => ({ az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w: viewSize.current.w, h: viewSize.current.h })}
+          close={() => { setWatchOpen(null); requestAnimationFrame(() => meteorButton.current?.focus()); }} /> :
+          watching === 'eclipse' ? <EclipseWatch read={readEclipse} centre={() => centreWatch('eclipse')}
           widen={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} close={closeWatch} /> :
           watching === 'occultation' ? <OccultationWatch read={readWatch} onCentre={() => centreWatch('occultation')}
             onWiden={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} onClose={closeWatch} /> : <>
@@ -672,6 +683,10 @@ export function Observatory() {
 
         {tab === 'sky' && (
           <>
+          {!s.tutorial.active && <div className="row moon-watch-controls">
+            <button className="btn small" ref={meteorButton} onClick={() => { setMode('sky'); setWatchOpen('meteors'); }}>Open meteor watch</button>
+            {meteorActive && <span className="meteor-sky-cue">Meteor shower active</span>}
+          </div>}
           <SkyExplorer lights={skyLights} selected={sel} known={s.identified} wide={mode === 'sky'} az={cam.current.az} alt={cam.current.alt} field={cam.current.fov} labels={labels} onLabels={() => setLabels(!labels)} pan={panSky} zoom={zoomSky} select={selectLight} focus={focusWide} coaching={rules.coaching} />
           <div className="panel panel-pad stack" aria-label="Selected light observations">
             <b>{selLabel(sel)}</b>

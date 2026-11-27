@@ -1,3 +1,4 @@
+import type { MeteorPhoto } from './meteorWatch';
 import type { OccultationRecord } from './occultationWatch';
 import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
@@ -160,6 +161,7 @@ export interface GameState {
   sheet: Partial<Record<PrimaryKey, Estimate>>;
   starObs: TimedValue[]; // star longitude against background stars (rad)
   skySightings: SkySighting[];
+  meteorPhotos: MeteorPhoto[];
   constellationSketches: ConstellationSketch[];
   pendulumMilestones: string[];
   sharpEyeAwards?: SharpEyeAwards;
@@ -307,6 +309,7 @@ const initial = {
   sheet: {},
   starObs: [],
   skySightings: [] as SkySighting[],
+  meteorPhotos: [] as MeteorPhoto[],
   constellationSketches: [] as ConstellationSketch[],
   pendulumMilestones: [] as string[],
   sharpEyeAwards: {} as SharpEyeAwards,

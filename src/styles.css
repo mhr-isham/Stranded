@@ -851,3 +851,15 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .eclipse-image-status[data-image="dim"] { border-left-color: #c6a978; }
 .eclipse-image-status[data-image="shadow"], .eclipse-image-status[data-image="dark"] { border-left-color: #bd8b73; }
 .eclipse-image-status[data-image="blocked"] { border-left-color: #7e8794; }
+
+.meteor-conditions { border-left: 2px solid #78869a; }
+.meteor-active, .meteor-sky-cue { color: #b2d9f3; }
+.meteor-active { border-left-color: #8bc4e6; }
+.meteor-photo { padding-top: 8px; }
+.meteor-photo h2:focus { outline: none; }
+.meteor-photo canvas { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; border-radius: 9px; background: #050a13; }
+
+@media (max-width: 860px) {
+  .tool.meteor-watch-active { grid-template-rows: 52% minmax(0, 1fr); }
+  .meteor-watch-active > .tool-side { max-height: none; }
+}
