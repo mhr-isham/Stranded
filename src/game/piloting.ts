@@ -22,8 +22,8 @@ export function completeManualFlight(leg: FlightLeg) {
 }
 
 /** The result gate also protects alternate paths that reach a debrief without flight proof. */
-export function assistedFlight(s: Pick<GameState, 'settings' | 'tutorial' | 'piloting' | 'phase' | 'outcome'>) {
-  return manualFlightRequired(s) && (
+export function assistedFlight(s: Pick<GameState, 'settings' | 'tutorial' | 'piloting' | 'phase' | 'outcome' | 'foldJump'>) {
+  return !s.foldJump && manualFlightRequired(s) && (
     !!s.piloting?.assisted.length ||
     (s.phase === 'results' && s.outcome?.result.outcome === 'success' && (s.piloting?.ascent !== 'manual' || s.piloting?.landing !== 'manual'))
   );

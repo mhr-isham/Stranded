@@ -52,7 +52,7 @@ export type Screen =
   | 'launch'
   | 'workshop'
   | 'codex';
-export type Phase = 'title' | 'prologue' | 'intro' | 'play' | 'ascent' | 'flight' | 'landing' | 'hop' | 'results';
+export type Phase = 'title' | 'prologue' | 'intro' | 'play' | 'ascent' | 'flight' | 'landing' | 'hop' | 'fold' | 'results';
 
 export interface Reading {
   id: string;
@@ -191,6 +191,7 @@ export interface GameState {
   /** Chapter 8: logged offsets of the three nearby stars, and the confirmed navigation fix. */
   starPar: { i: number; at: number; v: number; source?: 'tracker'; environment?: MeasurementEnvironment }[];
   navFix: string | null;
+  foldJump: { location: string; at: number } | null;
   identified: boolean;
   oppPicks: number[]; // times the player marked as oppositions
   rover: { dist: number; target: number; departAt: number; arriveAt: number };
@@ -343,6 +344,7 @@ const initial = {
   oppPicksG: [] as number[],
   starPar: [] as GameState['starPar'],
   navFix: null as string | null,
+  foldJump: null as GameState['foldJump'],
   identified: false,
   oppPicks: [] as number[],
   rover: { dist: 0, target: 0, departAt: 0, arriveAt: 0 },

@@ -147,21 +147,12 @@ export function actsFor(chapter: number): Act[] {
             ? { ...a, learned: ['A gravity assist swaps speed with a planet: we leave the giant faster, relative to the star, than we arrived.'] }
             : a,
     );
-  if (chapter === 8)
-    return ACTS.map((a) =>
-      a.n === 4
-        ? {
-            ...a,
-            name: 'The stars',
-            missions: ['moon', 'synodic', 'starPar', 'fix'],
-            learned: [
-              'Near stars wobble once a year against the far background: our orbit is the baseline. d = a₁ / tan p.',
-              'Stars also drift on their own — proper motion — a straight line under the wobble.',
-              'Three distances to known stars fix where we are.',
-            ],
-          }
-        : a,
-    );
+  if (chapter === 8) return [
+    { n: 1, name: 'The local orbit', missions: ['year', 'identify', 'track', 'opposition', 'parallax', 'synodic'],
+      learned: ['Your local orbit gives stellar parallax a distance scale.'], hook: 'Compare the stellar survey with Mira’s catalogue.' },
+    { n: 2, name: 'The stars', missions: ['starPar'],
+      learned: ['Nearby stars show a repeating shift against the background as we orbit.'], hook: 'Look for one catalogue location that fits all three stars.' },
+  ];
   if (chapter === 5)
     return ACTS.map((a) =>
       a.n === 3

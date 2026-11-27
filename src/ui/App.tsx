@@ -15,6 +15,7 @@ import { Prologue } from './Prologue';
 import { Ascent } from './launch/Ascent';
 import { StoryHost } from './StoryScene';
 import { Results } from './launch/Results';
+import { FoldTransit } from './launch/FoldNavigation';
 import { Flight } from './launch/Flight';
 import { Title } from './Title';
 import { Tutorial } from './tutorial/Tutorial';
@@ -96,6 +97,7 @@ export default function App() {
       {phase === 'play' && <Game key={runId} />}
       {phase === 'ascent' && <Ascent key={`${runId}-ascent`} />}
       {phase === 'flight' && <Flight />}
+      {phase === 'fold' && <FoldTransit key={runId} />}
       {phase === 'landing' && <Prologue key={`${runId}-landing`} arrival />}
       {phase === 'hop' && <Prologue key={`${runId}-hop`} hop />}
       {phase === 'results' && <Results />}

@@ -54,6 +54,7 @@ import { toLocal as toLocalDir } from '../../render/scene';
 import { unlockLog } from '../../game/story';
 import { OrbitPanel } from './OrbitPanel';
 import { GiantPanel } from './GiantPanel';
+import { nearStarsOf } from '../../engine/nearstars';
 import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
@@ -83,7 +84,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'moon', label: 'Moon' },
 ];
 
-export function Observatory() {
+export function Observatory({ startOnStars = false }: { startOnStars?: boolean }) {
   useEffect(() => stopInstrument, []);
   const lastMotion = useRef(-Infinity);
   const { system: sys, catalog } = currentWorld();
@@ -92,7 +93,7 @@ export function Observatory() {
   const t = useGameTime(5);
   useClockState();
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
-  const [tab, setTab] = useState<Tab>('sky');
+  const [tab, setTab] = useState<Tab>(startOnStars ? 'stars' : 'sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
   const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | 'aurora' | 'phase' | 'flare' | null>(null);
   const flareButton = useRef<HTMLButtonElement>(null);
@@ -119,6 +120,17 @@ export function Observatory() {
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
   const [showEcl, setShowEcl] = useState(false);
   const cam = useRef({ az: 180 * DEG, alt: 35 * DEG, fov: 90 * DEG, scale: 1 });
+  const [stellarIndex, setStellarIndex] = useState(0);
+  const nearby = nearStarsOf(sys);
+  const pointStar = (index: number) => {
+    const star = nearby[index];
+    if (!star) return;
+    const horizontal = toHorizontal(catalog[star.index].dir, localFrame(sys, clock.t, sys.site));
+    cam.current.az = horizontal.az;
+    cam.current.alt = Math.max(5 * DEG, Math.min(80 * DEG, horizontal.alt));
+    cam.current.fov = 70 * DEG;
+    setMode('sky');
+  };
   const ptr = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<null | { az: number; alt: number; fov: number; x: number; y: number; dist: number }>(null);
   const aim = useRef({ a: 0, b: 0 }); // player's pointing offset from the object (rad)
@@ -471,7 +483,7 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching || phaseWatching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}${flareWatching ? ' flare-watch-active' : ''}`}>
+    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching || phaseWatching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}${flareWatching || tab === 'stars' ? ' flare-watch-active' : ''}${tab === 'stars' ? ' wide-sky-watch-active stellar-watch-active' : ''}`}>
       {tab !== 'orbit' && <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -558,6 +570,10 @@ export function Observatory() {
                 ctx.textAlign = 'left';
                 ctx.fillText(text, p.x + 16 * dpr, p.y + 4 * dpr);
               };
+              if (tab === 'stars' && nearby[stellarIndex] && scene.sun[2] < Math.sin(-12 * DEG)) {
+                const star = nearby[stellarIndex];
+                label(toLocalDir(catalog[star.index].dir, scene.frame), star.name, '#76dccc');
+              }
               const visible = visibleSkyLights(sys, catalog, clock.t, camera, land);
               if (s.identified && sel?.kind !== 'target' && visible.some((v) => v.ref.kind === 'target')) label(scene.target, 'Blue planet', 'rgba(108,196,255,0.9)');
               if (labels) for (const light of visible.filter((v) => (!sel || v.key !== skyKey(sel)) && !(s.identified && v.ref.kind === 'target') && !(relayKnown && v.ref.kind === 'relay'))) label(toLocalDir(light.dir, scene.frame), `${light.variation === 'steadier' ? '—' : '≈'} ${light.code}`, 'rgba(218,229,248,.85)');
@@ -811,6 +827,7 @@ export function Observatory() {
                 className={`btn small ${tab === tb.id ? 'primary' : 'ghost'}`}
                 onClick={() => {
                   setTab(tb.id);
+                  if (tb.id === 'stars') pointStar(stellarIndex);
                   if (tb.id === 'micro') { calip.current = { ...calip.current, x1: -Math.tan(fov / 10), x2: Math.tan(fov / 10) }; chooseWire('A'); }
                 }}
                 style={{ flex: 1 }}
@@ -983,7 +1000,7 @@ export function Observatory() {
 
         {tab === 'orbit' && <OrbitPanel />}
         {tab === 'giant' && <GiantPanel />}
-        {tab === 'stars' && <StarsPanel />}
+        {tab === 'stars' && <StarsPanel selected={stellarIndex} point={pointStar} choose={index => { setStellarIndex(index); pointStar(index); }} />}
         {tab === 'moon' && <>
           {s.identified && sys.features.moon && !s.tutorial.active && <div className="row moon-watch-controls">
             <button ref={watchButton} className="btn" onClick={() => { centreWatch('occultation'); setWatchOpen('occultation'); }}>Open occultation watch</button>

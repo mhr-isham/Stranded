@@ -1,198 +1,145 @@
-// Chapter 8: where are we? Three nearby stars wobble against the far
-// background once a year; the wobble gives their distances, with our own
-// orbit as the baseline. Three distances, matched against the Halcyon's
-// catalogue, give a navigation fix.
-
-import { useState } from 'react';
-import { ARCSEC, DAY } from '../../engine/constants';
-import { deriveAll } from '../../engine/chain';
-import { variantOf } from '../../engine/chapters';
-import { catalogueOf, fitParallax, LIGHT_YEAR, matchCatalogue, nearStarsOf, parallaxOffset } from '../../engine/nearstars';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ARCSEC, DAY, HOUR } from '../../engine/constants';
+import { nearStarsOf, parallaxOffset } from '../../engine/nearstars';
 import { clock } from '../../game/clock';
 import { sfx } from '../../game/audio';
+import { confirmStellarFix } from '../../game/foldNavigation';
 import { fmt } from '../../game/format';
-import { checkMissions, currentWorld } from '../../game/sim';
+import { modeOf } from '../../game/modes';
+import { opticalStatus } from '../../game/observing';
+import { currentWorld, spendTime } from '../../game/sim';
+import { discriminatingStar, stellarEvidence } from '../../game/stellarFix';
 import { useGame } from '../../game/store';
+import { lifeSupportEnd } from '../../game/survival';
 import { Chart } from '../common/Chart';
-import { Formula, SendToSheet } from '../common/sheetBits';
+import { Formula } from '../common/sheetBits';
 import { toast, useGameTime } from '../common/widgets';
 import { MeasurementSources } from '../common/MeasurementSources';
-import { opticalStatus } from '../../game/observing';
 import { ObservingStatus } from '../common/ObservingStatus';
 
-const KEYS = ['pStarA', 'pStarB', 'pStarC'] as const;
-
-export function StarsPanel() {
+export function StarsPanel({ selected, choose, point }: { selected: number; choose: (index: number) => void; point: (index: number) => void }) {
   const s = useGame();
   const t = useGameTime(4);
   const { system: sys, catalog } = currentWorld();
   const stars = nearStarsOf(sys);
-  const [sel, setSel] = useState(0);
-  const st = stars[sel];
+  const [place, setPlace] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const [waiting, setWaiting] = useState(false);
+  const cancelWait = useRef<(() => void) | null>(null);
+  useEffect(() => () => cancelWait.current?.(), []);
+  const evidence = useMemo(() => stellarEvidence(s, sys), [s.starPar, s.sheet, sys]);
+  const st = stars[selected];
   if (!st) return null;
-  const status = opticalStatus(sys, s, t, 'nearby-star', { direction: catalog[st.index].dir });
-  const obs = s.starPar.filter((o) => o.i === sel);
+
+  const direction = catalog[st.index].dir;
+  const status = opticalStatus(sys, s, t, 'nearby-star', { direction });
+  const { epochs, span, fit } = evidence.stars[selected];
+  const observedToday = epochs.some(o => Math.floor(o.t / DAY) === Math.floor(t / DAY));
   const P1 = s.sheet.P1?.value;
-  const fit = P1 ? fitParallax(obs.map((o) => ({ t: o.at, v: o.v })), P1) : null;
-  const d = deriveAll(s.sheet, variantOf(sys.features));
-  const a1 = d.a1;
+  const fitted = evidence.stars.filter(star => star.fit).length;
+  const allowCoaching = modeOf(s.settings.difficulty).coaching
+    && (s.settings.difficulty !== 'cadet' || s.settings.cadetGuidance !== false)
+    && (!s.settings.freeRoam || s.settings.freeRoamGuidance);
+  const refine = allowCoaching ? discriminatingStar(evidence) : null;
 
   const log = () => {
-    const current = useGame.getState(), { system, catalog: currentCatalog } = currentWorld();
-    const star = nearStarsOf(system)[sel];
-    if (!star) return;
-    const now = clock.t, live = opticalStatus(system, current, now, 'nearby-star', { direction: currentCatalog[star.index].dir });
+    const current = useGame.getState();
+    const now = clock.t;
+    const live = opticalStatus(sys, current, now, 'nearby-star', { direction });
     if (!live.ok) return toast(live.reason);
-    // A careful reading at high power: about 0.01″, worse on rough nights.
-    const noise = (Math.random() + Math.random() + Math.random() - 1.5) * 0.02 * ARCSEC * live.seeing;
-    const v = Math.round((parallaxOffset(system, star, now) + noise) / (0.001 * ARCSEC)) * 0.001 * ARCSEC;
-    current.set({ starPar: [...current.starPar, { i: sel, at: now, v, source: 'tracker', environment: { instrument: 'telescope', at: now, rawValue: v, seeing: { factor: live.seeing, frozen: false } } }] });
-    toast(`${st.name}: ${fmt(v / ARCSEC, 3)}″ logged`);
+    if (current.starPar.some(o => o.i === selected && Math.floor(o.at / DAY) === Math.floor(now / DAY))) return toast('This star already has a position for today.');
+    const noise = (Math.random() + Math.random() + Math.random() - 1.5) * .02 * ARCSEC * live.seeing;
+    const v = Math.round((parallaxOffset(sys, st, now) + noise) / (.001 * ARCSEC)) * .001 * ARCSEC;
+    current.set({ starPar: [...current.starPar, { i: selected, at: now, v, source: 'tracker',
+      environment: { instrument: 'telescope', at: now, rawValue: v, seeing: { factor: live.seeing, frozen: false } } }] });
+    setMessage('');
+    point(selected);
     sfx('shutter');
   };
 
-  // Distances from the sheet's parallaxes and our orbit radius.
-  const ly = KEYS.map((k) => (s.sheet[k] && a1 ? a1.value / Math.tan(s.sheet[k]!.value) / LIGHT_YEAR : null));
-  const sg = KEYS.map((k, i) =>
-    s.sheet[k] && a1 && ly[i] !== null ? ly[i]! * Math.hypot(s.sheet[k]!.sigma / s.sheet[k]!.value, a1.sigma / a1.value) : null,
-  );
-  const cat = catalogueOf(sys);
-  const match = matchCatalogue(cat, ly, sg);
-  const oks = match.filter((m) => m.ok);
+  const wait = (days: number) => {
+    const s = useGame.getState();
+    const now = clock.t;
+    const start = Math.max(now + HOUR, days ? now + days * DAY : Math.floor(now / DAY) * DAY + (observedToday ? DAY : 0));
+    const end = Math.min(start + 150 * DAY, lifeSupportEnd(s, sys, now) - HOUR);
+    let at = start;
+    while (at < end && !opticalStatus(sys, s, at, 'nearby-star', { direction }).ok) at += HOUR;
+    if (at >= end) return toast('No clear view found before the search limit or supplies deadline.');
+    setWaiting(true);
+    cancelWait.current = spendTime(at - now, () => {
+      cancelWait.current = null;
+      setWaiting(false);
+      point(selected);
+    }, { pauseOnArrival: true });
+  };
 
-  return (
-    <div className="stack">
-      <div className="panel panel-pad stack">
-        <b>Where are we?</b>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Mira’s star map names three nearby stars. Seen from a moving planet, a near star wobbles to and fro against the far background once a year.
-          Log each one every few weeks for most of a year, and fit the wobble with your year P₁.
-        </div>
+  const summary = !evidence.ready ? 'Three usable stellar fits and an orbit size are needed.'
+    : evidence.matches.length === 1 ? 'One catalogue entry fits the measurements.'
+      : evidence.matches.length === 0 ? 'The current ranges do not fit any catalogue entry.'
+        : `${evidence.matches.length} locations still fit. More evidence is needed.`;
+
+  return <div className="stack">
+    <section className="panel panel-pad stack" aria-label="Stellar survey">
+      <div className="row between"><b>Stellar survey</b><span className="muted">{fitted}/3 fitted</span></div>
+      <p className="stellar-note">Catch how each star shifts against the background across your planet’s year.</p>
+      <div className="stellar-targets" role="group" aria-label="Survey targets">
+        {stars.map((star, i) => <button type="button" key={star.name} className={`btn small ${selected === i ? 'primary' : ''}`}
+          aria-pressed={selected === i} disabled={waiting} onClick={() => choose(i)}>{star.name}</button>)}
+      </div>
+      <div className="row between">
+        <button className="btn primary" disabled={!status.ok || observedToday || waiting} onClick={log}>Log {st.name}’s position</button>
+        <button className="btn small" disabled={waiting} onClick={() => point(selected)}>Centre in sky</button>
+      </div>
+      <ObservingStatus status={status} />
+      {waiting ? <button className="btn small" onClick={() => {
+        cancelWait.current?.(); cancelWait.current = null; setWaiting(false);
+      }}>Stop waiting</button> : <div className="row">
+        <button className="btn small" onClick={() => wait(0)}>Next clear view</button>
+        <button className="btn small" onClick={() => wait(21)}>View in 3+ weeks</button>
+      </div>}
+      <div className="stellar-note">{epochs.length} observing {epochs.length === 1 ? 'day' : 'days'} · {fmt(span / DAY, 0)} days covered{observedToday ? ' · Today logged' : ''}</div>
+      {epochs.length > 0 && <Chart ariaLabel={`Recorded ${st.name} positions`} series={[
+        { pts: epochs.map(o => ({ x: o.t / DAY + 1, y: o.v / ARCSEC })), color: '#ffe6b8', kind: 'dots' },
+        ...(fit ? [{ pts: Array.from({ length: 121 }, (_, i) => {
+          const x = epochs[0].t + span * i / 120;
+          return { x: x / DAY + 1, y: fit.model(x) / ARCSEC };
+        }), color: '#76dccc', kind: 'line' as const }] : []),
+      ]} xLabel="expedition day" yLabel="offset (″)" yFmt={y => y.toFixed(3)} />}
+      {fit && <div className="stellar-fit"><span>Measured parallax</span><b>{fmt(fit.parallax / ARCSEC, 4)}″ ± {fmt(fit.sigma / ARCSEC, 4)}″</b></div>}
+      {!P1 && <div className="amber stellar-note">Log your planet’s year on the sheet to fit the wobble.</div>}
+      <details className="measurement-help">
+        <summary>Observation log and method</summary>
+        <p>Use at least six observing days across more than half a home orbit. Spreading the readings out helps separate the repeating shift from the star’s steady drift.</p>
+        {fit && <p>Estimated steady drift · {fmt(fit.pm * 365.25 * DAY / ARCSEC, 3)}″ per Earth year</p>}
+        <Formula>d = a₁ / tan p</Formula>
         <MeasurementSources instrument="stars" />
-        <div className="row" style={{ gap: 6 }}>
-          {stars.map((x, i) => (
-            <button key={x.name} className={`btn small ${sel === i ? 'primary' : ''}`} onClick={() => setSel(i)} style={{ flex: 1 }}>
-              {x.name} {s.sheet[KEYS[i]] ? '✓' : ''}
-            </button>
-          ))}
-        </div>
-        <button className="btn primary" disabled={!status.ok} onClick={log}>
-          Log {st.name}’s position
-        </button>
-        <ObservingStatus status={status} />
-        {obs.length > 0 && (
-          <Chart
-            ariaLabel="Recorded nearby-star positions"
-            series={[
-              { pts: obs.map((o) => ({ x: o.at / DAY, y: o.v / ARCSEC })), color: '#ffe6b8', kind: 'dots' },
-              ...(fit && obs.length
-                ? [
-                    {
-                      pts: Array.from({ length: 200 }, (_, i) => {
-                        const x = obs[0].at + ((obs[obs.length - 1].at - obs[0].at) * i) / 199;
-                        return { x: x / DAY, y: fit.model(x) / ARCSEC };
-                      }),
-                      color: '#6cc4ff',
-                      kind: 'line' as const,
-                    },
-                  ]
-                : []),
-            ]}
-            xLabel="day"
-            yLabel="offset (″)"
-            yFmt={(y) => y.toFixed(3)}
-          />
-        )}
-        {obs.length > 0 && <details className="measurement-help"><summary>Recorded position log</summary><table className="log"><thead><tr><th>Day</th><th>Offset (″)</th><th>Source / image</th></tr></thead><tbody>{obs.map((o, i) => <tr key={`${o.at}:${i}`}><td>{fmt(o.at / DAY, 3)}</td><td>{fmt(o.v / ARCSEC, 3)}</td><td>{o.source === 'tracker' ? 'Position scan' : 'Source not recorded'} · {o.environment?.seeing ? o.environment.seeing.factor > 1.5 ? 'Turbulent' : 'Steadier' : 'Conditions not recorded'}</td></tr>)}</tbody></table></details>}
-        {!P1 && obs.length > 0 && <div className="hint">Put your year P₁ on the sheet: the wobble repeats once per year.</div>}
-        {fit && obs.length >= 6 && (
-          <>
-            <dl className="kv">
-              <dt>Parallax p</dt>
-              <dd className="blue">
-                {fmt(fit.parallax / ARCSEC, 4)}″ ± {fmt(fit.sigma / ARCSEC, 4)}″
-              </dd>
-              <dt>Its own drift (proper motion)</dt>
-              <dd>{fmt((fit.pm / ARCSEC) * 365.25 * DAY, 3)}″ per 365 days</dd>
-              {a1 && (
-                <>
-                  <dt>Distance d = a₁ / tan p</dt>
-                  <dd className="blue">{fmt(a1.value / Math.tan(fit.parallax) / LIGHT_YEAR, 2)} light-years</dd>
-                </>
-              )}
-            </dl>
-            <Formula>d = a₁ / tan p</Formula>
-            <SendToSheet k={KEYS[sel]} value={fit.parallax} spread={fit.sigma} />
-          </>
-        )}
+        {epochs.length > 0 && <table className="log"><thead><tr><th>Expedition day</th><th>Offset (″)</th></tr></thead>
+          <tbody>{epochs.map(o => <tr key={o.t}><td>{fmt(o.t / DAY + 1, 2)}</td><td>{fmt(o.v / ARCSEC, 3)}</td></tr>)}</tbody></table>}
+      </details>
+    </section>
+    <section className="panel panel-pad stack" aria-label="Mira’s catalogue">
+      <div className="row between"><b>Mira’s catalogue</b><span className="muted">Light-years</span></div>
+      <div className="stellar-catalogue" role="group" aria-label="Choose a catalogue location">
+        <div className="stellar-row stellar-row-head"><span>Location</span>{stars.map(star => <span key={star.name}>{star.name}</span>)}</div>
+        <div className="stellar-row stellar-your-range"><b>Your range</b>{evidence.stars.map((star, i) => <span key={i}>{star.distance
+          ? Number.isFinite(star.distance.high) ? `${fmt(star.distance.low, 2)}–${fmt(star.distance.high, 2)}` : `≥ ${fmt(star.distance.low, 2)}` : '—'}</span>)}</div>
+        {evidence.catalogue.map(row => <button className="btn stellar-row" key={row.label} aria-pressed={place === row.label} onClick={() => {
+          setPlace(row.label); setMessage('');
+        }}><b>{row.label}</b>{row.ly.map((value, i) => <span key={i}>{fmt(value, 2)}</span>)}</button>)}
       </div>
-
-      <div className="panel panel-pad stack">
-        <b>Navigation fix</b>
-        <div className="muted" style={{ fontSize: 13 }}>
-          The Halcyon’s catalogue lists four places these three stars can be seen from, each with its own distances. Only one should match yours — within
-          your error bars.
-        </div>
-        <table className="log">
-          <thead>
-            <tr>
-              <th>Place</th>
-              {stars.map((x) => (
-                <th key={x.name} className="num">
-                  {x.name}
-                </th>
-              ))}
-              <th className="num">fit</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="blue">You</td>
-              {ly.map((v, i) => (
-                <td key={i} className="num blue">
-                  {v === null ? '—' : `${fmt(v, 1)}±${fmt(sg[i]!, 1)}`}
-                </td>
-              ))}
-              <td />
-            </tr>
-            {cat.map((c, ci) => (
-              <tr key={c.label}>
-                <td>{c.label}</td>
-                {c.ly.map((v, i) => (
-                  <td key={i} className="num">
-                    {fmt(v, 1)}
-                  </td>
-                ))}
-                <td className={`num ${match[ci].ok ? 'green' : 'faint'}`}>{match[ci].n === 3 ? (match[ci].ok ? '✓' : '✗') : ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {ly.every((v) => v !== null) && (
-          <div style={{ fontSize: 13 }}>
-            {oks.length === 1 ? (
-              <span className="green">Exactly one place fits: {oks[0].label}.</span>
-            ) : oks.length === 0 ? (
-              <span className="amber">No place fits. One of your parallaxes, or its error bar, is off.</span>
-            ) : (
-              <span className="amber">{oks.length} places fit — your error bars are too wide to tell them apart. Log more nights.</span>
-            )}
-          </div>
-        )}
-        {oks.length === 1 && s.navFix !== oks[0].label && (
-          <button
-            className="btn primary"
-            onClick={() => {
-              s.set({ navFix: oks[0].label });
-              sfx('good');
-              setTimeout(checkMissions, 0);
-            }}
-          >
-            Confirm the fix: {oks[0].label}
-          </button>
-        )}
-        {s.navFix && <div className="green">Fix confirmed: {s.navFix}.</div>}
-      </div>
-    </div>
-  );
+      <p className={`stellar-note ${evidence.ready && evidence.matches.length !== 1 ? 'amber' : ''}`}>{summary}</p>
+      {!evidence.orbit && <p className="stellar-note">For orbit size, record your year, the blue planet’s synodic period, an opposition date and a dated parallax distance on the sheet.</p>}
+      {refine !== null && <div className="callout tip stellar-note">
+        <b>ECHO</b> · A sighting of {stars[refine].name} from a new part of the orbit could help separate the remaining places.
+        {selected !== refine && <button className="btn small" disabled={waiting} onClick={() => choose(refine)}>Select {stars[refine].name}</button>}
+      </div>}
+      <details className="measurement-help"><summary>How the fit is checked</summary>
+        <p>The ranges use two estimated standard errors for parallax and orbit size. All three stars must fit using the same orbit size. The catalogue lists candidate locations with their expected distances.</p>
+      </details>
+      <button className="btn primary" disabled={!place || !evidence.ready || evidence.matches.length !== 1 || waiting} onClick={() => {
+        if (place) setMessage(confirmStellarFix(place) ?? '');
+      }}>Confirm location fix</button>
+      {message && <p className="amber stellar-note" role="status">{message}</p>}
+    </section>
+  </div>;
 }

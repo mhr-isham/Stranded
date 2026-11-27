@@ -28,7 +28,7 @@ export function evaluateAchievements(s: GameState, sys: StarSystem, outcome: str
     return r?.sc ? r.sc.z * r.sc.relSigma : Infinity;
   };
   const ok = outcome === 'success';
-  if (ok) got.push('landed');
+  if (ok && !s.foldJump) got.push('landed');
   if (rel('R1') < 0.01) got.push('eratosthenes');
   if (rel('g') < 0.005) got.push('galileo');
   if (rel('Mstar') < 0.03) got.push('kepler');

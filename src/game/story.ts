@@ -245,7 +245,7 @@ export const LOGS: Record<string, StoryLog> = {
       { who: 'echo', text: 'The coils Tomas rebuilt held for one jump. They did not hold it straight. I do not know where we are.' },
       { who: 'vale', text: '…ECHO. Tell me the truth. What are you?' },
       { who: 'echo', text: 'Ask me again when I know where we are, Commander. I think the two answers are in the same place.' },
-      { who: 'echo', text: 'Mira’s last star map names three nearby stars: Kestrel, Wren, Osprey. Measure how far each one is, Navigator, and the Halcyon’s catalogue will tell us where we stand.' },
+      { who: 'echo', text: 'Mira’s last star map names three nearby stars: Kestrel, Wren, Osprey. Measure how far each one is, Navigator. Match them to the Halcyon’s catalogue and we can give the fold drive an origin.' },
       { who: 'note', text: 'Optional: the Flight School module “The distances of the stars” is in the Codex.' },
     ],
   },
@@ -254,7 +254,7 @@ export const LOGS: Record<string, StoryLog> = {
     chapter: 8,
     kind: 'scene',
     lines: [
-      { who: 'echo', text: 'Orbit confirmed. The beacon below is the Halcyon’s last one. It has a data port. It has my name on it.' },
+      { who: 'echo', text: 'That’s it. The origin you found lines up with Mira’s last chart. The observations in her log are in my memory, too. I recorded them.' },
       { who: 'echo', text: 'I remember now. I was the Halcyon’s navigation computer. Mira Sato taught me to quote my error bars. When their air ran out, she copied what she could of me into the beacon network and set it to wake for the next ship that came this way.' },
       { who: 'echo', text: 'Your ship. Your fold drive misfired because the beacon’s signal pulled it. I am sorry. I was very lonely, and I did not know I was doing it.' },
       { who: 'vale', text: '…Can you take us home?' },

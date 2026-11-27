@@ -979,3 +979,24 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .modal.pacing-report-dialog { background: #0a111d; }
 .pacing-table { overflow-x: auto; }
 .pacing-table th, .pacing-table td { white-space: nowrap; }
+
+.stellar-note { margin: 0; color: var(--muted); font-size: 13px; }
+.stellar-note.amber { color: var(--amber); }
+.stellar-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.stellar-fit { display: flex; justify-content: space-between; gap: 6px; color: #76dccc; font-size: 13px; }
+.stellar-catalogue { display: grid; gap: 4px; }
+.stellar-row { display: grid; grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); align-items: center; gap: 5px; padding: 7px 6px; text-align: right; font-size: 12px; }
+.stellar-row > :first-child { text-align: left; }
+.stellar-row > span { overflow-wrap: anywhere; }
+.stellar-row.btn { width: 100%; white-space: normal; }
+.stellar-row[aria-pressed="true"] { background: #174064; border-color: #76dccc; }
+.stellar-row-head { color: var(--muted); font-size: 11px; }
+.stellar-your-range { color: #76dccc; }
+.fold-navigation { background: radial-gradient(ellipse at 50% 22%, #15284f, #070c19 68%); padding: calc(78px + var(--safe-top)) 14px calc(95px + var(--safe-bottom)); }
+.fold-console { max-width: 520px; margin: 9vh auto 0; }
+.fold-location { display: grid; gap: 8px; padding: 18px; border-radius: 10px; border: 1px solid #76dccc45; background: #76dccc0b; }
+.fold-location strong { color: #76dccc; font-size: clamp(18px, 4vw, 28px); }
+.fold-transit-readout { position: absolute; inset: auto 12px calc(44px + var(--safe-bottom)); margin: 0 auto; width: min(320px, calc(100% - 24px)); text-align: center; }
+@media (max-width: 860px) {
+  .tool.stellar-watch-active { grid-template-rows: minmax(110px, 34%) minmax(0, 1fr); }
+}

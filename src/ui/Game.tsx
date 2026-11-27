@@ -12,6 +12,7 @@ import { Hill } from './tools/Hill';
 import { Observatory } from './tools/Observatory';
 import { Rover } from './tools/Rover';
 import { Sheet } from './sheet/Sheet';
+import { FoldNavigation } from './launch/FoldNavigation';
 import { Launch } from './launch/Launch';
 import { Workshop } from './tools/Workshop';
 import { Codex } from './Codex';
@@ -34,11 +35,13 @@ export function Game() {
   const screen = useGame((s) => s.screen);
   const go = useGame((s) => s.go);
   const tutorial = useGame((s) => s.tutorial.active);
+  const stellar = useGame(s => s.chapter === 8);
+  const [openStars, setOpenStars] = useState(false);
   const [launchWindow, setLaunchWindow] = useState<number | null>(null);
 
   useEffect(() => {
     const g = useGame.getState();
-    if (!g.settings.freeRoam || g.settings.freeRoamGuidance) g.say(isCadetExpedition(g) ? ECHO.welcomeCadet : g.settings.difficulty === 'navigator' && !g.settings.freeRoam ? ECHO.welcomeNavigator : modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
+    if (!stellar && (!g.settings.freeRoam || g.settings.freeRoamGuidance)) g.say(isCadetExpedition(g) ? ECHO.welcomeCadet : g.settings.difficulty === 'navigator' && !g.settings.freeRoam ? ECHO.welcomeNavigator : modeOf(g.settings.difficulty).coaching ? ECHO.welcome : ECHO.welcomeQuiet);
     checkMissions();
   }, []);
 
@@ -47,10 +50,11 @@ export function Game() {
       {screen === 'hub' && <Hub />}
       {screen === 'pendulum' && <Pendulum />}
       {screen === 'hill' && <Hill />}
-      {screen === 'observatory' && <Observatory />}
+      {screen === 'observatory' && <Observatory startOnStars={openStars} />}
       {screen === 'rover' && <Rover />}
       {screen === 'sheet' && <Sheet />}
-      {screen === 'launch' && <Launch launchWindow={launchWindow} clearLaunchWindow={setLaunchWindow} />}
+      {screen === 'launch' && (stellar ? <FoldNavigation openStars={() => { setOpenStars(true); go('observatory'); }} />
+        : <Launch launchWindow={launchWindow} clearLaunchWindow={setLaunchWindow} />)}
       {screen === 'workshop' && <Workshop />}
       {screen === 'codex' && <Codex />}
       {screen === 'probe' && <ProbeBay />}
@@ -61,9 +65,9 @@ export function Game() {
       {screen === 'hub' && !tutorial && <MissionPanel />}
       <nav className="nav panel" data-tut="nav">
         {NAV.map((n) => (
-          <button key={n.screen} data-tut={`nav-${n.label.toLowerCase()}`} className={`btn ghost ${screen === n.screen ? 'active' : ''}`} onClick={() => go(n.screen)}>
+          <button key={n.screen} data-tut={`nav-${n.label.toLowerCase()}`} className={`btn ghost ${screen === n.screen ? 'active' : ''}`} onClick={() => { if (n.screen === 'observatory') setOpenStars(stellar); go(n.screen); }}>
             <span className="ico">{n.ico}</span>
-            {n.label}
+            {stellar && n.screen === 'launch' ? 'Fold' : n.label}
           </button>
         ))}
       </nav>

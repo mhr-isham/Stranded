@@ -242,11 +242,9 @@ Spent-stage reconstruction and Tomas's broader engineering role remain open for 
 
 ### CH-08 — Lost Among Stars
 
-**Partial with a confirmed bypass:** nearby-star parallax observations and catalogue matching exist, but a successful ordinary transfer can be planned without `pStarA/B/C` or `navFix`. The story premise says there is no normal target flight, whereas the implementation still ends at a beacon planet.
+**Agreed and implemented.** The chapter ends with a stellar fix and fold jump. The observatory uses recorded positions from different parts of the home orbit to estimate parallax and proper motion for three stars. Mira’s catalogue shows the resulting distance ranges and all candidate locations. A location needs evidence from all three stars and must fit one shared orbit size. The player chooses the entry. Guided modes can suggest a star whose next observation may separate the remaining candidates.
 
-**Decision needed:** use stellar fixing to aim the fold drive and end the chapter at a real location solution, or keep the target flight but require a justified fix before authorizing the jump. Gating on three entered numbers alone is insufficient: require observation provenance and a uniquely supported catalogue candidate. Do not force an exact answer when uncertainty supports multiple locations.
-
-**Emotional role:** the player demonstrates where they are before confronting ECHO with evidence. The reveal should answer an investigation the player has pursued, not arrive automatically in a cache monologue.
+The confirmed fix aligns Mira’s observations with ECHO’s memory and plays the reveal. The Fold console rechecks the evidence before the jump, and completing the jump opens the next campaign chapter. The blue planet can still anchor the measurement of the local orbit.
 
 ### CH-09 — Home
 

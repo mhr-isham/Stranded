@@ -66,14 +66,15 @@ export function parallaxOffset(sys: StarSystem, s: NearStar, t: number) {
 }
 
 /** The Halcyon's catalogue: four candidate places, each with distances (ly) to the three stars. One is right. */
-export function catalogueOf(sys: StarSystem): { label: string; ly: number[]; truth: boolean }[] {
+export interface CataloguePlace { label: string; ly: number[] }
+
+export function catalogueOf(sys: StarSystem): CataloguePlace[] {
   const stars = nearStarsOf(sys);
   const u = (i: number, k: number) => unitHash(sys.seed, i, k);
   const truthAt = Math.floor(u(0, 0xca7) * 4);
   const labels = ['Sector 7 · Ashfall', 'Sector 9 · Lantern', 'Sector 12 · Tern Reach', 'Sector 4 · Cinder'];
   return labels.map((label, c) => ({
     label,
-    truth: c === truthAt,
     ly: stars.map((s, i) => {
       const d = s.dist / LIGHT_YEAR;
       if (c === truthAt) return d;
@@ -96,9 +97,9 @@ export interface ParallaxFit {
  * Fit offset(t) = A sin(2πt/P₁) + B cos(2πt/P₁) + C + μt by least squares,
  * using the player's own year. The parallax is √(A² + B²).
  */
-export function fitParallax(obs: { t: number; v: number }[], P1: number): ParallaxFit | null {
+export function fitParallax(obs: readonly { t: number; v: number }[], P1: number, noiseFloor = 0): ParallaxFit | null {
   const n = obs.length;
-  if (n < 6) return null;
+  if (n < 6 || !Number.isFinite(P1) || P1 <= 0) return null;
   const f = (t: number) => [Math.sin((TAU * t) / P1), Math.cos((TAU * t) / P1), 1, t / YEAR_S];
   const M = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
   const b = [0, 0, 0, 0];
@@ -117,7 +118,7 @@ export function fitParallax(obs: { t: number; v: number }[], P1: number): Parall
     const x = f(o.t);
     rss += (o.v - x.reduce((s, v, i) => s + v * c[i], 0)) ** 2;
   }
-  const s2 = rss / Math.max(1, n - 4);
+  const s2 = Math.max(noiseFloor ** 2, rss / (n - 4));
   const A = c[0];
   const B = c[1];
   const p = Math.hypot(A, B);
@@ -146,18 +147,4 @@ function invert4(A: number[][]): number[][] | null {
     }
   }
   return M.map((r) => r.slice(n));
-}
-
-/** Which catalogue places fit the measured distances (χ² with the player's own error bars). */
-export function matchCatalogue(cat: { label: string; ly: number[] }[], ly: (number | null)[], sigma: (number | null)[]) {
-  return cat.map((c) => {
-    let chi2 = 0;
-    let n = 0;
-    c.ly.forEach((d, i) => {
-      if (ly[i] === null || !sigma[i]) return;
-      chi2 += ((ly[i]! - d) / sigma[i]!) ** 2;
-      n++;
-    });
-    return { label: c.label, chi2, n, ok: n === 3 && chi2 < 11.3 };
-  });
 }

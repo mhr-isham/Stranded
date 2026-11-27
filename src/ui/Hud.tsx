@@ -2,6 +2,7 @@ import { PacingReportButton } from './common/PacingReport';
 import { useMemo, useState } from 'react';
 import { DAY } from '../engine/constants';
 import { variantOf } from '../engine/chapters';
+import { stellarEvidence } from '../game/stellarFix';
 import { routeWindows } from '../engine/planner';
 import { WARPS, clock, setWarp, togglePause } from '../game/clock';
 import { checkMissions, currentWorld } from '../game/sim';
@@ -37,11 +38,12 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
   const flare = flareAt(sys, t);
   const variant = variantOf(sys.features);
   const model = useMemo(() => navigationModel(s.sheet, variant), [s.sheet, variant]);
-  const launchWindow = !s.tutorial.active && model ? routeWindows(model, t, end, 1)[0] : undefined;
+  const launchWindow = !s.tutorial.active && !sys.features.stars && model ? routeWindows(model, t, end, 1)[0] : undefined;
   const windowDays = launchWindow === undefined ? 0 : Math.ceil((launchWindow - t) / DAY);
   const windowCountdown = windowDays <= 1 ? 'Under 1 day' : `${fmt(windowDays, 0)} days`;
 
   function openModeledWindow() {
+    if (sys.features.stars) return;
     const current = useGame.getState();
     const currentModel = navigationModel(current.sheet, variant);
     if (!currentModel) return;
@@ -320,28 +322,35 @@ function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: nu
   const [open, setOpen] = useState(false);
   const variant = variantOf(system.features);
   const progress = navigationProgress(s.sheet, variant);
-  const flight = open ? flightReadiness(s.sheet, system, budget, t, end) : null;
+  const survey = useMemo(() => system.features.stars ? stellarEvidence(s, system) : null, [s.sheet, s.starPar, system]);
+  const flight = open && !survey ? flightReadiness(s.sheet, system, budget, t, end) : null;
   const weakest = open && mode.missions !== 'off' && !progress.invalid.length ? weakestValue(s.sheet, variant) : null;
-  const count = `${progress.logged} of ${progress.total} navigation values logged`;
+  const logged = survey ? survey.stars.filter(star => star.fit).length : progress.logged;
+  const total = survey ? 3 : progress.total;
+  const count = survey ? `${logged} of 3 stellar fits` : `${logged} of ${total} navigation values logged`;
   return (
     <>
       <button className="panel hud-block btn hud-ready" onClick={() => setOpen(true)} title={count} aria-label={`Mission readiness: ${count}`}>
         <div className="hide-phone">
-          <div className="meter-label">Nav log</div>
+          <div className="meter-label">{survey ? "Stellar survey" : "Nav log"}</div>
           <div className="meter" style={{ width: 70 }}>
-            <i style={{ width: `${100 * progress.logged / progress.total}%`, background: 'var(--blue)' }} />
+            <i style={{ width: `${100 * logged / total}%`, background: 'var(--blue)' }} />
           </div>
         </div>
         <span className="mono" style={{ fontSize: 13 }}>
           <span className="show-phone" aria-hidden="true">🎯 </span>
-          {progress.logged}/{progress.total}
+          {logged}/{total}
         </span>
       </button>
-      {open && flight && (
+      {open && (flight || survey) && (
         <Modal onClose={() => setOpen(false)}>
           <h2>Mission readiness</h2>
           <div className="stack" style={{ marginBlock: 12 }}>
-            <section className="panel panel-pad stack" aria-label="Navigation log">
+            {survey ? <section className="panel panel-pad stack" aria-label="Stellar survey progress">
+              <b>{count}</b>
+              <span>{s.navFix && survey.matches.length === 1 && survey.matches[0].label === s.navFix
+                ? 'Location confirmed. The fold drive is ready.' : 'Compare your observations with Mira’s catalogue in Sky → Stars.'}</span>
+            </section> : flight && <><section className="panel panel-pad stack" aria-label="Navigation log">
               <b>Navigation log</b>
               <span>{count}</span>
               {progress.missing.length > 0 && <span className="muted">{progress.missing.length} still needed on the progress sheet.</span>}
@@ -365,7 +374,7 @@ function ReadinessBlock({ t, end, budget }: { t: number; end: number; budget: nu
                   <p>These trials use the ranges on your sheet, assuming independent errors between inputs. They cover automatic transfer and capture. Check the arrival deadline and any manual flight separately.</p>
                 </details>
               </>}
-            </section>
+            </section></>}
           </div>
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn primary" onClick={() => setOpen(false)}>OK</button>

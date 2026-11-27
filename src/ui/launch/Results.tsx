@@ -86,7 +86,7 @@ function EchoQuote({ text }: { text: string }) {
 export function Results() {
   const s = useGame();
   const mode = modeOf(s.settings.difficulty);
-  const kind = s.outcome?.result.outcome ?? 'expired';
+  const kind = s.foldJump ? 'success' : s.outcome?.result.outcome ?? 'expired';
   const canRewind = !s.settings.freeRoam && !s.tutorial.active && kind !== 'success' && (kind !== 'expired' || !!s.outcome?.cruise) && !s.debriefSeen && s.rewindsUsed < mode.rewinds && hasPrelaunch();
   if (!canRewind) return <Debrief />;
   const info = outcomeMessage(kind, !!s.outcome?.cruise);
@@ -132,8 +132,14 @@ function Debrief() {
   const mode = modeOf(s.settings.difficulty);
   const { system: sys } = currentWorld();
   const outcome = s.outcome;
-  const kind = outcome?.result.outcome ?? 'expired';
-  const info = outcomeMessage(kind, !!outcome?.cruise);
+  const fold = s.foldJump;
+  const kind = fold ? 'success' : outcome?.result.outcome ?? 'expired';
+  const waitingForFold = s.chapter === 8 && !outcome;
+  const info = fold ? { title: 'Fold complete', cls: 'blue', text: `The Kestrel jumped from ${fold.location} using your stellar fix.`,
+    echo: 'I can place Mira’s final chart now. I remember where it leads.' } : waitingForFold ? {
+    title: 'Supplies exhausted', cls: 'red', text: 'Camp supplies ran out before the Kestrel could jump.',
+    echo: 'I’ve saved the survey. The ship is switching to emergency power.',
+  } : outcomeMessage(kind, !!outcome?.cruise);
   const sheet: Primaries = outcome?.sheet ?? s.sheet;
   const variant = variantOf(sys.features);
   const truth = truthValues(sys, sheet, probeTruth(s));
@@ -146,7 +152,7 @@ function Debrief() {
   const measurementPoints = rows.reduce((a, r) => a + (r.sc?.points ?? 0), 0);
   const fuelLeftFraction = outcome ? outcome.result.fuelLeft / sys.fuelDv : 0;
   const end = lifeSupportEnd(s, sys);
-  const daysLeftFraction = outcome ? (outcome.cruise?.departureMargin ?? (end - outcome.plan.departTime) / end) : 0;
+  const daysLeftFraction = fold ? Math.max(0, (end - fold.at) / end) : outcome ? (outcome.cruise?.departureMargin ?? (end - outcome.plan.departTime) / end) : 0;
   const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - (scored ? sharpEyePoints(s) : 0), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
   const [eclipseOpen, setEclipseOpen] = useState(false);
@@ -219,7 +225,9 @@ function Debrief() {
       .filter((r) => r.sc)
       .map((r) => (r.sc!.inside ? (r.sc!.relSigma < 0.01 ? '🟦' : '🟩') : r.sc!.z < 2 ? '🟨' : '🟥'))
       .join('');
-    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} · Sharp Eye ${SHARP_EYE_POLICY} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\nfuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? dayNumber(outcome.plan.departTime) : '—'}`;
+    const departureNote = fold ? `stellar fix · ${fold.location} · jumped day ${dayNumber(fold.at)}`
+      : `fuel left ${fmt(Math.max(0, fuelLeftFraction) * 100, 1)}% · launched day ${outcome ? dayNumber(outcome.plan.departTime) : '—'}`;
+    const text = `STRANDED · system #${s.seed} · ${chapterOf(s.chapter).title} · ruleset ${s.settings.rulesetVersion ?? 1} · Sharp Eye ${SHARP_EYE_POLICY} (${mode.name}${s.settings.survival ? ', survival' : ''}${s.rewindsUsed ? `, ${s.rewindsUsed} rewind` : ''})\n${info.title} · ${assisted ? 'assisted journey · unscored' : `grade ${grade.letter} · ${grade.total} pts`}\n${emoji}\n${departureNote}`;
     // Say "copied" only if it was; otherwise offer the text to copy by hand.
     const fallback = () => window.prompt('Copy your result:', text);
     if (!navigator.clipboard) return void fallback();
@@ -264,10 +272,12 @@ function Debrief() {
               <dt>Measurement points</dt>
               <dd>{measurementPoints}</dd>
               </>}
-              <dt>Fuel left</dt>
-              <dd>{outcome ? `${fmt(outcome.result.fuelLeft / 1000, 3)} km/s` : '—'}</dd>
-              <dt>Course corrections</dt>
-              <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
+              {fold ? <><dt>Jump day</dt><dd>{dayNumber(fold.at)}</dd></> : !waitingForFold && <>
+                <dt>Fuel left</dt>
+                <dd>{outcome ? `${fmt(outcome.result.fuelLeft / 1000, 3)} km/s` : '—'}</dd>
+                <dt>Course corrections</dt>
+                <dd>{outcome ? `${fmt(outcome.result.correctionCost, 0)} m/s` : '—'}</dd>
+              </>}
               {scored && <><dt>Hints used</dt><dd>{s.hintsUsed}</dd></>}
               {scoredForecasts.length > 0 && (
                 <>
@@ -312,7 +322,7 @@ function Debrief() {
             {!s.settings.freeRoam && <button className="btn primary" onClick={share}>
               {copied ? 'Copied!' : assisted ? 'Share assisted journey' : 'Share result'}
             </button>}
-            {s.settings.freeRoam && <button className="btn primary" onClick={() => useGame.setState({ phase: 'play', screen: 'hub', outcome: null })}>
+            {s.settings.freeRoam && <button className="btn primary" onClick={() => useGame.setState({ phase: 'play', screen: 'hub', outcome: null, foldJump: null })}>
               Return to exploring
             </button>}
             <button className="btn" onClick={() => startRun(s.seed, s.settings, s.chapter)}>
@@ -323,7 +333,7 @@ function Debrief() {
                 Chapter {s.chapter + 1}: {chapterOf(s.chapter + 1).title} →
               </button>
             )}
-            <button className="btn" onClick={() => useGame.setState({ phase: 'title', outcome: null })}>
+            <button className="btn" onClick={() => useGame.setState({ phase: 'title', outcome: null, foldJump: null })}>
               Title screen
             </button>
           </div>
