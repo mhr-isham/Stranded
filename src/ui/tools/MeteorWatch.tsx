@@ -7,7 +7,7 @@ import { currentWorld, fastForward } from '../../game/sim';
 import { useGame } from '../../game/store';
 import { lifeSupportEnd } from '../../game/survival';
 import { dayNumber } from '../../game/time';
-import { paintSky } from '../../render/paint';
+import { SkyPhotograph } from './SkyPhotograph';
 import type { Camera } from '../../render/projection';
 import type { Landscape } from '../../render/terrain';
 import { Modal, useClockState, useGameTime } from '../common/widgets';
@@ -89,25 +89,12 @@ export function MeteorWatch({ camera, land, pan, zoom, close }: {
       <p>Particles from a stream enter the atmosphere on nearly parallel paths. Perspective makes their trails appear to spread from a common point called the radiant. The showers recur as this planet crosses the streams on its orbit.</p>
     </details>
     {preview && <Modal onClose={closePhoto}>
-      <section className="stack meteor-photo" aria-label="Meteor photograph">
+      <section className="stack sky-photograph" aria-label="Meteor photograph">
         <h2 tabIndex={-1} ref={photoHeading}>Meteor photograph</h2>
-        <MeteorPrint photo={preview} land={land} system={system} catalog={catalog} />
+        <SkyPhotograph at={preview.at} camera={preview.camera} land={land} system={system} catalog={catalog} meteors={preview.trails}
+          label={`Night sky photograph with ${preview.trails.length} meteor ${preview.trails.length === 1 ? 'streak' : 'streaks'}`} />
         <div className="muted">Day {dayNumber(preview.at)} · 90 s exposure · {preview.trails.length} {preview.trails.length === 1 ? 'streak' : 'streaks'}</div>
       </section>
     </Modal>}
   </section>;
-}
-
-function MeteorPrint({ photo, land, system, catalog }: { photo: MeteorPhoto; land: Landscape } & Pick<ReturnType<typeof currentWorld>, 'system' | 'catalog'>) {
-  const surface = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = surface.current, ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const { camera } = photo, factor = 960 / Math.max(camera.w, camera.h);
-    const w = Math.max(1, Math.round(camera.w * factor)), h = Math.max(1, Math.round(camera.h * factor));
-    canvas.width = w; canvas.height = h;
-    paintSky(ctx, { ...camera, w, h }, system, catalog, land, photo.at, 0, Math.max(w, h) / 680,
-      { meteors: photo.trails, reduceFlicker: true });
-  }, [photo, land, system, catalog]);
-  return <canvas ref={surface} role="img" aria-label={`Night sky photograph with ${photo.trails.length} meteor ${photo.trails.length === 1 ? 'streak' : 'streaks'}`} />;
 }

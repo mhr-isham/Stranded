@@ -1,3 +1,4 @@
+import type { AuroraPhoto } from './auroraWatch';
 import type { MeteorPhoto } from './meteorWatch';
 import type { OccultationRecord } from './occultationWatch';
 import type { MicrometerObservation } from './micrometer';
@@ -162,6 +163,7 @@ export interface GameState {
   starObs: TimedValue[]; // star longitude against background stars (rad)
   skySightings: SkySighting[];
   meteorPhotos: MeteorPhoto[];
+  auroraPhotos: AuroraPhoto[];
   constellationSketches: ConstellationSketch[];
   pendulumMilestones: string[];
   sharpEyeAwards?: SharpEyeAwards;
@@ -310,6 +312,7 @@ const initial = {
   starObs: [],
   skySightings: [] as SkySighting[],
   meteorPhotos: [] as MeteorPhoto[],
+  auroraPhotos: [] as AuroraPhoto[],
   constellationSketches: [] as ConstellationSketch[],
   pendulumMilestones: [] as string[],
   sharpEyeAwards: {} as SharpEyeAwards,

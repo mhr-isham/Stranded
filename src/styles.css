@@ -855,11 +855,15 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .meteor-conditions { border-left: 2px solid #78869a; }
 .meteor-active, .meteor-sky-cue { color: #b2d9f3; }
 .meteor-active { border-left-color: #8bc4e6; }
-.meteor-photo { padding-top: 8px; }
-.meteor-photo h2:focus { outline: none; }
-.meteor-photo canvas { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; border-radius: 9px; background: #050a13; }
+.sky-photograph { padding-top: 8px; }
+.sky-photograph h2:focus { outline: none; }
+.sky-photograph canvas { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; border-radius: 9px; background: #050a13; }
 
 @media (max-width: 860px) {
-  .tool.meteor-watch-active { grid-template-rows: 52% minmax(0, 1fr); }
-  .meteor-watch-active > .tool-side { max-height: none; }
+  .tool.wide-sky-watch-active { grid-template-rows: 52% minmax(0, 1fr); }
+  .wide-sky-watch-active > .tool-side { max-height: none; }
 }
+
+.aurora-conditions { border-left: 2px solid #78869a; }
+.aurora-active, .aurora-sky-cue { color: #a5dbc3; }
+.aurora-active { border-left-color: #7ec8a7; }

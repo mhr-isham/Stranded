@@ -1,6 +1,8 @@
 import { useMemo, useRef } from 'react';
 import { shadowAvailable } from '../game/shadowObservation';
 import { DEG } from '../engine/constants';
+import { auroraStorm } from '../engine/aurora';
+import { auroraView } from '../game/auroraWatch';
 import { clock } from '../game/clock';
 import { activeMission } from '../game/missions';
 import { useMode } from '../game/modes';
@@ -29,6 +31,7 @@ export function Hub() {
   const cadetQuiet = useGame((s) => isCadetExpedition(s) && s.settings.cadetGuidance === false);
   const guidance = useMode().missions !== 'off' && !cadetQuiet;
   const land = useMemo(() => makeLandscape(sys.seed, sys.hillHeight), [sys]);
+  const reduceMotion = useGame((s) => !!s.settings.skyReducedFlicker) || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const stations = useMemo<HubStation[]>(() => {
     const list: HubStation[] = [
       { kind: 'observatory', az: 118 * DEG, alt: -2.6 * DEG, size: 7 * DEG, label: 'Observatory', icon: '🔭', screen: 'observatory' },
@@ -61,7 +64,9 @@ export function Hub() {
         draw={({ ctx, w, h, dpr, now }) => {
           const portrait = h > w;
           const camera = { az: cam.current.az, alt: (portrait ? 14 : 9) * DEG, fov: (portrait ? 75 : 100) * DEG, w, h };
-          const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr);
+          const state = useGame.getState();
+          const aurora = state.tutorial.active || !auroraStorm(sys, clock.t) ? [] : auroraView(sys, state, land, clock.t, reduceMotion ? 0 : now / 1000).ribbons;
+          const { scene, P } = paintSky(ctx, camera, sys, catalog, land, clock.t, now, dpr, { aurora });
           cam.current.scale = P.scale;
           const ground = skyColors(scene.sunAltDeg, !!sys.features.real).ground;
           drawRocks(ctx, P, sys.seed, ground, scene.sunAltDeg);

@@ -1,6 +1,8 @@
 // Draws the wide-angle sky: atmosphere, stars, the star, the blue planet and
 // the landscape. Designed to stay cheap enough for phones at 60 fps.
 
+import type { AuroraRibbon } from '../engine/aurora';
+import { drawAurora } from './aurora';
 import type { MeteorTrail } from '../engine/meteors';
 import { drawMeteorTrails } from './meteorTrails';
 import { DEG } from '../engine/constants';
@@ -23,6 +25,7 @@ export interface SkyOptions {
   dpr: number;
   reduceFlicker?: boolean;
   meteors?: readonly MeteorTrail[];
+  aurora?: readonly AuroraRibbon[];
 }
 
 export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene, catalog: CatalogStar[], land: Landscape | null, o: SkyOptions): Projector {
@@ -54,6 +57,8 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
   }
+
+  if (o.aurora?.length) drawAurora(ctx, P, cam, o.aurora, o.dpr);
 
   // Milky Way: faint, only under a properly dark sky.
   const lim = limitingMag(sunAlt);
