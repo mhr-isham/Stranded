@@ -13,7 +13,8 @@ fixture = """async () => {
   const { angleBetween } = await import('/src/engine/vec.ts');
   const { topocentric } = await import('/src/engine/sky.ts');
   const { ECHO } = await import('/src/game/echo.ts');
-  const { DEG, DAY } = await import('/src/engine/constants.ts');
+  const { planetPhase, phaseReadable } = await import('/src/engine/planetPhase.ts');
+  const { ARCSEC, DEG, DAY } = await import('/src/engine/constants.ts');
   __game.getState().newGame(316,{difficulty:'navigator',survival:false,sound:false,formulas:true},5);
   const s = __game.getState(), {system} = currentWorld();
   const instants = {};
@@ -24,8 +25,12 @@ fixture = """async () => {
       const star = topocentric(system,'star',t,system.site), planet = topocentric(system,'target',t,system.site);
       if (angleBetween(planet,star) - Math.asin(system.star.radius / Math.hypot(...star)) > .15 * DEG) instants.strong = t;
     }
-    if (obs.ok && obs.solarGlare > .29 && obs.solarGlare < .55) instants.soft ??= t;
-    if (obs.ok && obs.solarGlare < .008) instants.clear ??= t;
+    if (!obs.ok) continue;
+    const star = topocentric(system,'star',t,system.site), planet = topocentric(system,'target',t,system.site);
+    const r = Math.asin(system.target.radius / Math.hypot(...planet)), phase = planetPhase(planet, star);
+    if (!phaseReadable(phase, 2*r, 1.2 * ARCSEC * obs.seeing, 100)) continue;
+    if (obs.solarGlare > .29 && obs.solarGlare < .55) instants.soft ??= t;
+    if (obs.solarGlare < .008) instants.clear ??= t;
   }
   if (Object.keys(instants).length !== 3) throw Error('Missing generated conjunction fixtures');
   __clock.t = instants.clear; __clock.paused = true; __clock.emit();
@@ -61,6 +66,7 @@ with sync_playwright() as p:
         expect(log).to_be_enabled()
         clear = center_sample(canvas)
         at(page, instants['soft'])
+        page.get_by_role('button', name=re.compile('^Point at the blue planet')).click()
         expect(availability).to_contain_text('Solar glare lowers contrast')
         expect(log).to_be_enabled()
         soft = center_sample(canvas)

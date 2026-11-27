@@ -928,6 +928,15 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .eclipse-image-status[data-image="shadow"], .eclipse-image-status[data-image="dark"] { border-left-color: #bd8b73; }
 .eclipse-image-status[data-image="blocked"] { border-left-color: #7e8794; }
 
+.phase-watch { outline: none; }
+.phase-status { border-left: 2px solid var(--blue); background: #102134; }
+.phase-watch p { margin: 0; }
+.phase-gallery p { margin: 8px 0; }
+.phase-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 6px; margin-top: 8px; }
+.phase-photo { margin: 0; min-width: 0; padding: 6px; }
+.phase-thumbnail { position: relative; height: 92px; background: #060c17; border-radius: 6px; overflow: hidden; }
+.phase-photo figcaption { display: grid; gap: 2px; padding-top: 4px; font-size: 11px; overflow-wrap: anywhere; }
+
 .meteor-conditions { border-left: 2px solid #78869a; }
 .meteor-active, .meteor-sky-cue { color: #b2d9f3; }
 .meteor-active { border-left-color: #8bc4e6; }

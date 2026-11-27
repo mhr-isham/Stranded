@@ -5,7 +5,9 @@ import type { SolarDisc } from '../engine/solarEclipse';
 import { ARCSEC, DEG, TAU } from '../engine/constants';
 import { lunarExposure, type LunarLight } from '../engine/eclipse';
 import { drawLunarDisk } from './lunarDisk';
-import { solarGlare, type SolarGlareSource } from '../engine/solarGlare';
+import { phaseResolved, type PlanetPhase } from '../engine/planetPhase';
+import { drawPhasePoint, drawPlanetPhase } from './planetDisk';
+import { GLARE_LIMIT, solarGlare, type SolarGlareSource } from '../engine/solarGlare';
 import { hash32, mulberry32 } from '../engine/rng';
 import { cross, dot, unit, type Vec3 } from '../engine/vec';
 import { css, mix, type RGB } from './color';
@@ -100,6 +102,8 @@ export interface ScopeScene {
   starColor: RGB;
   targetDir: Vec3 | null;
   targetRadius: number; // angular radius (rad)
+  targetPhase?: PlanetPhase;
+  phasePaused?: boolean;
   moonDir: Vec3 | null;
   moonRadius: number;
   moonLight?: number;
@@ -210,7 +214,20 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
   // Blue planet.
   if (sc.targetDir && !sc.filter) {
     const p = P.project(sc.targetDir);
-    if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day, sc.targetStyle === 'giant');
+    if (p && sc.targetPhase) {
+      const phase = sc.targetPhase;
+      const radius = sc.targetRadius * P.k;
+      if (p.x + radius >= 0 && p.x - radius <= w && p.y + radius >= 0 && p.y - radius <= h &&
+        phase.elongation > sc.sunRadius + sc.targetRadius &&
+        (!sc.glareSource || solarGlare(sc.glareSource, sc.targetDir) < GLARE_LIMIT)) {
+        if (phaseResolved(2 * sc.targetRadius, sc.seeing, 2 * radius / dpr)) {
+          // Diffuse sky stays visible in front of the dark hemisphere, which blocks background stars.
+          ctx.fillStyle = css(bg);
+          ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, TAU); ctx.fill();
+          drawPlanetPhase(ctx, phase, p.x, p.y, radius, seeingPx * 0.27, sc.realTime, !!sc.phasePaused);
+        } else drawPhasePoint(ctx, phase, p.x, p.y, Math.max(1.3 * dpr, seeingPx * 0.6));
+      }
+    } else if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day, sc.targetStyle === 'giant');
   }
   const unoccluded = sc.moonLight ?? 1;
   if (sc.moonDir && !sc.filter && unoccluded > 0) {

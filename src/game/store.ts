@@ -31,6 +31,7 @@ import { earnedSharpEyeAwards, type SharpEyeAwards, type SharpEyeCondition } fro
 import { acknowledgeObservation } from './measurementFeedback';
 import type { VerificationRecord } from './verification';
 import { earnsTwentySwings, type PendulumTechnique } from './pendulumTechnique';
+import type { PhaseSighting } from './phaseObservation';
 import type { RelayTag } from './relayObservation';
 import type { SkySighting } from './skyObservation';
 import type { ConstellationSketch } from './constellationSketch';
@@ -178,6 +179,7 @@ export interface GameState {
   moonTrackOn: boolean;
   occultations: OccultationRecord[];
   eclipseSightings: EclipseSighting[];
+  phaseSightings: PhaseSighting[];
   moonTrack: TimedValue[]; // moon offset from planet (rad)
   /** Chapter 7: the giant's nightly longitude, its moon's offset, and its marked oppositions. */
   trackGOn: boolean;
@@ -331,6 +333,7 @@ const initial = {
   moonTrack: [],
   occultations: [] as OccultationRecord[],
   eclipseSightings: [] as EclipseSighting[],
+  phaseSightings: [] as PhaseSighting[],
   trackGOn: false,
   trackG: [] as TimedValue[],
   moonTrackG: [] as TimedValue[],

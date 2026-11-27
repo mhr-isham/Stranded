@@ -7,7 +7,7 @@ import { observedMotion, savedSkyDirection } from '../../game/observedMotion';
 import { ObservationReplay } from './ObservationReplay';
 import { RetroInvestigation } from '../tutorial/RetroInvestigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ARCSEC, DAY, DEG } from '../../engine/constants';
+import { ARCSEC, DAY, DEG, TAU } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
 import { starLongitude } from '../../engine/measure';
@@ -19,6 +19,9 @@ import { MoonAnalysisPanel } from './MoonAnalysis';
 import { EclipseWatch, type EclipseView } from './EclipseWatch';
 import { lunarExposure, lunarLight } from '../../engine/eclipse';
 import { OccultationWatch, type WatchView } from './OccultationWatch';
+import { phaseReadable, planetPhase } from '../../engine/planetPhase';
+import { phaseElongation, type PhaseView } from '../../game/phaseObservation';
+import { PhaseWatch } from './PhaseWatch';
 import { GLARE_NOTICE, solarGlareSource } from '../../engine/solarGlare';
 import { apparentMoonDisks } from '../../engine/occultation';
 import { fmt } from '../../game/format';
@@ -90,7 +93,9 @@ export function Observatory() {
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
-  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | 'aurora' | null>(null);
+  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | 'meteors' | 'aurora' | 'phase' | null>(null);
+  const phaseButton = useRef<HTMLButtonElement>(null);
+  const phaseWatching = tab === 'sky' && watchOpen === 'phase';
   const watchButton = useRef<HTMLButtonElement>(null);
   const eclipseButton = useRef<HTMLButtonElement>(null);
   const meteorButton = useRef<HTMLButtonElement>(null);
@@ -104,6 +109,7 @@ export function Observatory() {
   const meteorActive = !s.tutorial.active && mode === 'sky' && tab === 'sky' && meteorWatchStatus(sys, s, t).active;
   const auroraActive = !s.tutorial.active && mode === 'sky' && tab === 'sky' && auroraView(sys, s, land, t, auroraPhase.current).direction;
   const eclipseWatching = watching === 'eclipse';
+  const minScopeFov = phaseWatching || (tab === 'micro' && sys.features.inner) ? .001 : eclipseWatching ? .002 : .015;
   const [sel, setSel] = useState<Sel | null>(null);
   const relayWait = useRef<(() => void) | null>(null);
   useEffect(() => () => { relayWait.current?.(); relayWait.current = null; }, [mode, tab, sel]);
@@ -119,6 +125,7 @@ export function Observatory() {
   const scopeSample = useRef<{ at: number; realTime: number; seeing: number; field: number; target: boolean; observable: boolean } | null>(null);
   const chooseWire = (value: WireChoice) => { wireRef.current = value; setWire(value); };
   const scopeK = useRef(1);
+  const microAxis = useRef({ x: 1, y: 0, field: 0 });
   const fov = Math.pow(10, fovLog) * DEG;
   const [labels, setLabels] = useState(false);
   const [, refreshCamera] = useState(0);
@@ -218,6 +225,42 @@ export function Observatory() {
     const p = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }).project(dir);
     return !!p && p.x >= 0 && p.y >= 0 && p.x <= viewSize.current.w && p.y <= viewSize.current.h;
   };
+  function centrePhase(micrometer = false) {
+    const r = Math.asin(sys.target.radius / Math.hypot(...topocentric(sys, 'target', clock.t, sys.site)));
+    const { w, h } = viewSize.current;
+    const aspect = micrometer ? Math.max(1, w / Math.max(h, 1)) : 1;
+    const fitInField = 3.3 * r / ARCSEC * aspect;
+    const stops = [7.2, 14.4, 28.8, 57.6, 115.2, 230.4, 460.8];
+    const fieldArcsec = stops.find((value) => value >= fitInField) ?? stops.at(-1)!;
+    pointAt('target', fieldArcsec / 3600);
+    aim.current = { a: 0, b: 0 };
+    if (micrometer) {
+      const start = Math.tan(fieldArcsec * ARCSEC * 0.22 / aspect);
+      calip.current = { ...calip.current, x1: -start, x2: start };
+    }
+  }
+  function readPhase(at: number): PhaseView {
+    const center = pointing(at);
+    if (!center || mode !== 'scope' || sel?.kind !== 'target') return { sighting: null, reason: 'Centre the telescope on the planet.' };
+    const target = topocentric(sys, 'target', at, sys.site), star = topocentric(sys, 'star', at, sys.site);
+    const phase = planetPhase(target, star);
+    const position = toHorizontal(target, localFrame(sys, at, sys.site));
+    const status = opticalStatus(sys, useGame.getState(), at, 'view', { direction: target, horizon: skyline(land, position.az) });
+    if (!status.ok) return { sighting: null, reason: status.reason };
+    const r = Math.asin(sys.target.radius / Math.hypot(...target));
+    if (phase.elongation <= r + Math.asin(sys.star.radius / Math.hypot(...star))) return { sighting: null, reason: 'The planet overlaps the star’s disk in this field.' };
+    const { w, h, dpr } = viewSize.current;
+    const projection = scopeProjector({ center, fov: phaseWatching ? watchField(fov, w, h) : fov, w, h });
+    const p = projection.project(target), radius = r * projection.k;
+    if (!p || p.x < radius || p.x > w - radius || p.y < radius || p.y > h - radius) {
+      return { sighting: null, reason: 'Centre and frame the full planetary disk.' };
+    }
+    const seeing = SEEING * status.seeing;
+    if (!phaseReadable(phase, 2 * r, seeing, 2 * radius / dpr)) {
+      return { sighting: null, reason: 2 * radius / dpr < 8 ? 'Increase magnification to see the phase.' : 'The phase blends into the seeing blur. Try a steadier view or a different date.' };
+    }
+    return { sighting: { at, phase, separation: phaseElongation(angleBetween(center, star)), seeing: seeing / (2 * r) }, reason: '' };
+  }
   function centreWatch(kind: 'occultation' | 'eclipse') {
     pointAt('target', kind === 'eclipse' ? .006 : .025);
     aim.current = { a: 0, b: 0 };
@@ -281,6 +324,7 @@ export function Observatory() {
     horizon: skyline(land, toHorizontal(topocentric(sys, 'target', t, sys.site), frameNow).az),
     inField: mode === 'scope' && sel?.kind === 'target' && available,
   });
+  const innerDiameter = tab === 'micro' && sys.features.inner && sel?.kind === 'target' ? readPhase(t) : null;
   const notebookStatus = opticalStatus(sys, s, t, 'night-view', {
     direction: sel ? objDir(sel, t) : undefined,
     horizon: sel ? skyline(land, toHorizontal(objDir(sel, t), frameNow).az) : 0,
@@ -362,7 +406,7 @@ export function Observatory() {
     const selected = wireRef.current;
     if (selected === 'pan') return;
     const key = selected === 'A' ? 'x1' : 'x2';
-    calip.current[key] = nudgeWire(calip.current[key], direction * wireStep * (fine ? .1 : 1), fov);
+    calip.current[key] = nudgeWire(calip.current[key], direction * wireStep * (fine ? .1 : 1), microAxis.current.field || fov);
     lastMotion.current = performance.now(); refreshCamera((n) => n + 1);
   };
   useEffect(() => {
@@ -424,7 +468,7 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}`}>
+    <div className={`tool ${wideWatch ? 'moon-watch-active wide-sky-watch-active' : watching || phaseWatching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : tab === 'orbit' ? 'orbit-analysis-focus' : ''}`}>
       {tab !== 'orbit' && <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -550,7 +594,7 @@ export function Observatory() {
               else if (e.key === 'ArrowRight') nudgeImage(-1, 0);
               else if (e.key === 'ArrowUp') nudgeImage(0, -1);
               else if (e.key === 'ArrowDown') nudgeImage(0, 1);
-              else setFovLog((v) => Math.max(Math.log10(eclipseWatching ? .002 : .015), Math.min(Math.log10(4), v + (e.key === '+' || e.key === '=' ? -.1 : .1))));
+              else setFovLog((v) => Math.max(Math.log10(minScopeFov), Math.min(Math.log10(4), v + (e.key === '+' || e.key === '=' ? -.1 : .1))));
             }}
             onPointerDown={(e) => {
               if (e.button !== 0 || scopePointer.current !== null) return;
@@ -562,10 +606,12 @@ export function Observatory() {
               C.start = { x: p.x, a: aim.current.a, b: aim.current.b };
               C.dragging = 3;
               if (tab === 'micro') {
-                const x1 = c.width / 2 + C.x1 * scopeK.current;
-                const x2 = c.width / 2 + C.x2 * scopeK.current;
-                const selected = wireRef.current === 'pan' ? 'pan' : pickWire(p.x, x1, x2, Math.min(window.devicePixelRatio || 1, 2), wireRef.current);
-                chooseWire(selected); wireGrab.current = selected === 'A' ? p.x - x1 : selected === 'B' ? p.x - x2 : 0; C.dragging = selected === 'A' ? 1 : selected === 'B' ? 2 : 3;
+                const axis = microAxis.current;
+                const along = (p.x - c.width / 2) * axis.x + (p.y - c.height / 2) * axis.y;
+                const x1 = C.x1 * scopeK.current, x2 = C.x2 * scopeK.current;
+                const selected = wireRef.current === 'pan' ? 'pan' : pickWire(along, x1, x2, Math.min(window.devicePixelRatio || 1, 2), wireRef.current);
+                chooseWire(selected); wireGrab.current = selected === 'A' ? along - x1 : selected === 'B' ? along - x2 : 0;
+                C.dragging = selected === 'A' ? 1 : selected === 'B' ? 2 : 3;
               }
               (C.start as { y?: number }).y = p.y;
             }}
@@ -576,9 +622,12 @@ export function Observatory() {
               const p = canvasPoint(e);
               const c = e.currentTarget;
               const k = scopeK.current;
-              if (C.dragging === 1) C.x1 = (Math.max(0, Math.min(c.width, p.x - wireGrab.current)) - c.width / 2) / k;
-              else if (C.dragging === 2) C.x2 = (Math.max(0, Math.min(c.width, p.x - wireGrab.current)) - c.width / 2) / k;
-              else {
+              if (C.dragging === 1 || C.dragging === 2) {
+                const axis = microAxis.current;
+                const raw = ((p.x - c.width / 2) * axis.x + (p.y - c.height / 2) * axis.y - wireGrab.current) / k;
+                const limit = Math.tan((axis.field || fov) / 2);
+                C[C.dragging === 1 ? 'x1' : 'x2'] = Math.max(-limit, Math.min(limit, raw));
+              } else {
                 // Fine pointing: drag moves the telescope by a quarter of the screen motion.
                 const sy = (C.start as { y?: number }).y ?? p.y;
                 aim.current = { a: C.start.a - ((p.x - C.start.x) / k) * 0.25, b: C.start.b + ((p.y - sy) / k) * 0.25 };
@@ -586,7 +635,7 @@ export function Observatory() {
             }}
             onPointerUp={(e) => { if (scopePointer.current === e.pointerId) { scopePointer.current = null; calip.current.dragging = 0; } }}
             onPointerCancel={(e) => { if (scopePointer.current === e.pointerId) { scopePointer.current = null; calip.current.dragging = 0; } }}
-            onWheel={(e) => setFovLog((v) => Math.max(Math.log10(eclipseWatching ? .002 : .015), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
+            onWheel={(e) => setFovLog((v) => Math.max(Math.log10(minScopeFov), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
             draw={({ ctx, w, h, dpr, now }) => {
               viewSize.current = { w, h, dpr };
               setInstrument('scope', now - lastMotion.current < 120 ? 0.5 : 0);
@@ -598,9 +647,10 @@ export function Observatory() {
               const sunAltitude = toHorizontal(sunV, f).alt;
               const sunRadius = Math.asin(sys.star.radius / Math.hypot(...sunV));
               const ts = now / 1000;
+              const targetPhase = sys.features.inner && !filter ? planetPhase(tgtV, sunV) : undefined;
               const P = drawScope(
                 ctx,
-                { center, fov: watching ? watchField(fov, w, h) : fov, w, h },
+                { center, fov: watching || phaseWatching ? watchField(fov, w, h) : fov, w, h },
                 {
                   seed: sys.seed,
                   sunDir: unit(sunV),
@@ -608,7 +658,7 @@ export function Observatory() {
                   glareSource: filter ? undefined : solarGlareSource(sunV, sunRadius, sys.star.luminosity, sunAltitude),
                   starColor: starRGB(sys),
                   targetDir: unit(tgtV),
-                  targetRadius,
+                  targetRadius, targetPhase, phasePaused: clock.paused,
                   moonDir: sys.features.moon ? unit(moonV) : null,
                   moonRadius,
                   moonLight: light,
@@ -629,7 +679,13 @@ export function Observatory() {
                 dpr,
               );
               scopeK.current = P.k;
-              scopeSample.current = { at: tt, realTime: now, seeing: seeingFactor(useGame.getState(), tt), field: fov, target: sel?.kind === 'target', observable: inspectable(sel, tt) };
+              const crossPhase = tab === 'micro' && sel?.kind === 'target' && targetPhase;
+              const sign = crossPhase && crossPhase.limbX < 0 ? -1 : 1;
+              const ax = crossPhase ? -crossPhase.limbY * sign : 1, ay = crossPhase ? crossPhase.limbX * sign : 0;
+              const half = Math.min(w / (2 * Math.max(Math.abs(ax), 1e-6)), h / (2 * Math.max(Math.abs(ay), 1e-6)));
+              const wireField = crossPhase ? 2 * Math.atan(half / P.k) : fov;
+              microAxis.current = { x: ax, y: ay, field: wireField };
+              scopeSample.current = { at: tt, realTime: now, seeing: seeingFactor(useGame.getState(), tt), field: wireField, target: sel?.kind === 'target', observable: inspectable(sel, tt) };
               if (obscured(tt)) {
                 ctx.fillStyle = 'rgba(10,8,6,0.94)';
                 ctx.fillRect(0, 0, w, h);
@@ -652,7 +708,7 @@ export function Observatory() {
                 }
                 if (ridge.some((p) => p.y < h)) { ctx.fillStyle = '#100e0e'; ctx.beginPath(); ctx.moveTo(0, h); for (const p of ridge) ctx.lineTo(p.x, p.y); ctx.lineTo(w, h); ctx.closePath(); ctx.fill(); }
               }
-              if (!eclipseWatching) {
+              if (!eclipseWatching && !phaseWatching) {
                 // Reticle.
                 ctx.strokeStyle = 'rgba(255,90,90,0.85)';
                 ctx.lineWidth = dpr;
@@ -671,12 +727,14 @@ export function Observatory() {
               // Calipers (filar micrometer).
               if (tab === 'micro') {
                 for (const [key, x, color] of [['A', calip.current.x1, '#6cf0ff'], ['B', calip.current.x2, '#78ffaa']] as const) {
-                  const X = w / 2 + x * P.k, active = wire === key;
+                  const X = w / 2 + x * P.k * ax, Y = h / 2 + x * P.k * ay, active = wire === key;
+                  const span = (crossPhase ? Math.min(w, h) : h) * .34;
                   ctx.strokeStyle = active ? '#ffc46b' : color; ctx.lineWidth = (active ? 1.8 : 1) * dpr;
-                  ctx.beginPath(); ctx.moveTo(X, h * .15); ctx.lineTo(X, h * .83); ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(X - ay * span, Y + ax * span); ctx.lineTo(X + ay * span, Y - ax * span); ctx.stroke();
+                  const tagX = X - ay * span * .55, tagY = Y + ax * span * .55;
                   ctx.fillStyle = active ? '#ffc46b' : color;
-                  ctx.beginPath(); ctx.arc(X, h * .66, 9 * dpr, 0, Math.PI * 2); ctx.fill();
-                  ctx.fillStyle = '#07101d'; ctx.font = `700 ${11 * dpr}px Inter`; ctx.textAlign = 'center'; ctx.fillText(key, X, h * .66 + 4 * dpr);
+                  ctx.beginPath(); ctx.arc(tagX, tagY, 9 * dpr, 0, TAU); ctx.fill();
+                  ctx.fillStyle = '#07101d'; ctx.font = `700 ${11 * dpr}px Inter`; ctx.textAlign = 'center'; ctx.fillText(key, tagX, tagY + 4 * dpr);
                 }
               }
               // Scale bar.
@@ -689,7 +747,7 @@ export function Observatory() {
             }}
           />
         )}
-        {tab !== 'micro' && !watching && !wideWatch && (
+        {tab !== 'micro' && !watching && !wideWatch && !phaseWatching && (
         <div style={{ position: 'absolute', right: 10, top: 'calc(var(--hud-h) + var(--safe-top))', zIndex: 6 }} className="row">
           <button className={`btn ${mode === 'sky' ? 'primary' : ''}`} onClick={() => setMode('sky')}>
             Wide sky
@@ -703,7 +761,7 @@ export function Observatory() {
           </button>
         </div>
         )}
-        {mode === 'scope' && tab !== 'micro' && !watching && (
+        {mode === 'scope' && tab !== 'micro' && !watching && !phaseWatching && (
           <div className="panel panel-pad stage-bottom" data-tut="obs-fov" style={{ width: 'min(440px, calc(100% - 16px))', padding: '8px 12px' }}>
             <div className="row between">
               <span className="muted" style={{ fontSize: 13 }}>Field of view</span>
@@ -716,8 +774,8 @@ export function Observatory() {
         )}
         {mode === 'scope' && tab === 'micro' && <div className="panel micrometer-controls" role="group" aria-label="Micrometer wire controls">
           <div className="row">{(['A', 'B', 'pan'] as const).map((value) => <button key={value} className="btn small" aria-pressed={wire === value} onClick={() => { chooseWire(value); sfx('detent'); }}>{value === 'pan' ? 'Pan image' : `Wire ${value}`}</button>)}</div>
-          <div className="row"><button className="btn small" aria-label="Move selected wire left" disabled={wire === 'pan'} onClick={() => { adjustWire(-1); sfx('detent'); }}>← Wire</button><button className="btn small" aria-label="Move selected wire right" disabled={wire === 'pan'} onClick={() => { adjustWire(1); sfx('detent'); }}>Wire →</button><select className="input" aria-label="Wire step in arcseconds" value={wireStep} onChange={(e) => setWireStep(Number(e.target.value))}><option value={1}>1″</option><option value={.1}>0.1″</option><option value={.01}>0.01″</option></select></div>
-          <div className="row"><button className="btn small" aria-label="Magnify micrometer image" onClick={() => setFovLog((v) => Math.max(Math.log10(.015), v - .1))}>Zoom +</button><button className="btn small" aria-label="Widen micrometer image" onClick={() => setFovLog((v) => Math.min(Math.log10(4), v + .1))}>Zoom −</button><span className="faint">{wire === 'pan' ? 'Image pan selected' : `Wire ${wire} selected`}</span></div>
+          <div className="row"><button className="btn small" aria-label={sys.features.inner ? 'Decrease selected wire position' : 'Move selected wire left'} disabled={wire === 'pan'} onClick={() => { adjustWire(-1); sfx('detent'); }}>{sys.features.inner ? '− Wire' : '← Wire'}</button><button className="btn small" aria-label={sys.features.inner ? 'Increase selected wire position' : 'Move selected wire right'} disabled={wire === 'pan'} onClick={() => { adjustWire(1); sfx('detent'); }}>{sys.features.inner ? '+ Wire' : 'Wire →'}</button><select className="input" aria-label="Wire step in arcseconds" value={wireStep} onChange={(e) => setWireStep(Number(e.target.value))}><option value={1}>1″</option><option value={.1}>0.1″</option><option value={.01}>0.01″</option></select></div>
+          <div className="row"><button className="btn small" aria-label="Magnify micrometer image" onClick={() => setFovLog((v) => Math.max(Math.log10(minScopeFov), v - .1))}>Zoom +</button><button className="btn small" aria-label="Widen micrometer image" onClick={() => setFovLog((v) => Math.min(Math.log10(4), v + .1))}>Zoom −</button><span className="faint">{wire === 'pan' ? 'Image pan selected' : `Wire ${wire} selected`}</span></div>
         </div>}
       </div>}
 
@@ -729,6 +787,8 @@ export function Observatory() {
           meteorWatching ? <MeteorWatch land={land} pan={panSky} zoom={zoomSky}
           camera={() => ({ az: cam.current.az, alt: cam.current.alt, fov: cam.current.fov, w: viewSize.current.w, h: viewSize.current.h })}
           close={() => { setWatchOpen(null); requestAnimationFrame(() => meteorButton.current?.focus()); }} /> :
+          phaseWatching ? <PhaseWatch read={readPhase} onFrame={() => centrePhase()}
+            onClose={() => { setWatchOpen(null); setMode('sky'); setFovLog(Math.log10(2)); requestAnimationFrame(() => phaseButton.current?.focus()); }} /> :
           watching === 'eclipse' ? <EclipseWatch read={readEclipse} centre={() => centreWatch('eclipse')}
           widen={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} close={closeWatch} /> :
           watching === 'occultation' ? <OccultationWatch read={readWatch} onCentre={() => centreWatch('occultation')}
@@ -758,6 +818,9 @@ export function Observatory() {
         {tab === 'sky' && (
           <>
           {!s.tutorial.active && <div className="row moon-watch-controls">
+            {sys.features.inner && s.identified && <button className="btn small" ref={phaseButton} onClick={() => {
+              centrePhase(); setWatchOpen('phase');
+            }}>Open planet phase watch</button>}
             <button className="btn small" ref={meteorButton} onClick={() => { setMode('sky'); setWatchOpen('meteors'); }}>Open meteor watch</button>
             {!sys.features.real && <button className="btn small" ref={auroraButton} onClick={() => { setMode('sky'); setWatchOpen('aurora'); }}>Open aurora watch</button>}
             {auroraActive && <span className="aurora-sky-cue">Aurora visible</span>}
@@ -854,20 +917,20 @@ export function Observatory() {
             <b>Filar micrometer</b>
             <div className="row"><button className={`btn small ${mode === 'sky' ? 'primary' : ''}`} onClick={() => setMode('sky')}>Wide sky</button><button data-tut="obs-scope-btn" className={`btn small ${mode === 'scope' ? 'primary' : ''}`} onClick={() => sel ? setMode('scope') : toast('Point at a light first')}>Telescope</button></div>
             <div className="muted" style={{ fontSize: 13 }}>
-              Frame the whole disk first; widen the field if a limb is off-screen. Then place A and B on opposite edges. Drag either wire or select it and use the fine controls. Keyboard 1/2 selects a wire; 0 pans the image; Shift makes left/right adjustments finer.
+              {sys.features.inner ? 'Frame the disk, then place the wires across the two tips of the lit limb. The wires follow the phase axis so you can measure the full diameter.' : 'Frame the whole disk first; widen the field if a limb is off-screen. Then place A and B on opposite edges.'} Drag either wire or use the fine controls. Keyboard 1/2 selects a wire, 0 pans the image, and Shift makes smaller adjustments.
             </div>
-            <button className="btn" data-tut="micro-point" onClick={() => (pointAt('target', 1 / 60), flag('micro-ready'))} disabled={!s.identified}>
-              Point at the blue planet (1′ field)
+            <button className="btn" data-tut="micro-point" onClick={() => { if (sys.features.inner) centrePhase(true); else pointAt('target', 1 / 60); flag('micro-ready'); }} disabled={!s.identified}>
+              {sys.features.inner ? 'Point at the blue planet' : 'Point at the blue planet (1′ field)'}
             </button>
             <div className="stack" data-tut="obs-fov">
-              <label className="field">Field of view · {fmt(fov / ARCSEC, 1)}″<input type="range" aria-label="Telescope field of view" aria-valuetext={`${Math.pow(10, fovLog).toFixed(3)} degrees`} min={Math.log10(.015)} max={Math.log10(4)} step={.01} value={fovLog} onChange={(e) => setFovLog(Number(e.target.value))} /></label>
+              <label className="field">Field of view · {fmt(fov / ARCSEC, 1)}″<input type="range" aria-label="Telescope field of view" aria-valuetext={`${Math.pow(10, fovLog).toFixed(3)} degrees`} min={Math.log10(sys.features.inner ? .001 : .015)} max={Math.log10(4)} step={.01} value={fovLog} onChange={(e) => setFovLog(Number(e.target.value))} /></label>
               <div className="row sky-pan"><button className="btn small" aria-label="Move telescope image left" onClick={() => nudgeImage(1, 0)}>◀</button><button className="btn small" aria-label="Move telescope image up" onClick={() => nudgeImage(0, -1)}>▲</button><button className="btn small" aria-label="Move telescope image down" onClick={() => nudgeImage(0, 1)}>▼</button><button className="btn small" aria-label="Move telescope image right" onClick={() => nudgeImage(-1, 0)}>▶</button></div>
             </div>
             <MicroReadout calip={calip} />
             <button
               data-tut="micro-log"
               className="btn primary"
-              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified && diameterStatus.ok)}
+              disabled={!(mode === 'scope' && sel?.kind === 'target' && s.identified && diameterStatus.ok && (!innerDiameter || !!innerDiameter.sighting))}
               onClick={() => {
                 const a = wireDiameter(calip.current.x1, calip.current.x2), sample = scopeSample.current;
                 if (!sample || !sample.target || !sample.observable || sel?.kind !== 'target' || !useGame.getState().identified) return toast('Bring an observable target into the current field first.');
@@ -875,6 +938,10 @@ export function Observatory() {
                 const position = toHorizontal(topocentric(sysNow, 'target', clock.t, sysNow.site), localFrame(sysNow, clock.t, sysNow.site));
                 const live = opticalStatus(sysNow, useGame.getState(), clock.t, 'diameter', { horizon: skyline(land, position.az), inField: mode === 'scope' && inspectable(sel, clock.t) });
                 if (!live.ok) return toast(live.reason);
+                if (sysNow.features.inner) {
+                  const view = readPhase(clock.t);
+                  if (!view.sighting) return toast(view.reason);
+                }
                 if (a === null || a < 0.3 * ARCSEC) return toast('The wires are on top of each other. Set them on opposite edges of the disk.');
                 const limit = Math.tan(sample.field / 2);
                 if (Math.abs(calip.current.x1) > limit || Math.abs(calip.current.x2) > limit) return toast('Both wires must be visible in the field.');
@@ -895,6 +962,7 @@ export function Observatory() {
               Log diameter
             </button>
             {mode === 'scope' && sel?.kind === 'target' && s.identified ? <ObservingStatus status={diameterStatus} /> : <div className="faint">Point the telescope at the identified blue planet to measure its diameter.</div>}
+            {innerDiameter?.reason && mode === 'scope' && <div className="faint">{innerDiameter.reason}</div>}
             <div className="faint">At a paused observation time, logging again updates that sighting. New dates alone do not guarantee independent errors.</div>
             <details className="measurement-help"><summary>Optional: diameter, distance and repeat observations</summary><p>Separate sights after the image changes can test repeatability. Re-marking the same observation time updates one reading. Shared blur, limb judgement and alignment offsets remain even with many dates. Fine wire steps improve control; they do not certify that precision.</p><p>Use the distance at the diameter’s date to infer radius. Distance uncertainty and angular uncertainty both matter; Flight School offers optional practice with their contributions.</p></details>
             <Formula>R₂ = d(t) · tan(α₂/2)</Formula>

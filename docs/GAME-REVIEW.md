@@ -224,9 +224,9 @@ Eccentric ephemerides and nonuniform launch searches are present. The old star m
 
 ### CH-05 — Inward
 
-**Partial:** inner geometry, greatest elongation, transit timing and solve chain exist. The telescope planet remains a full disk rather than showing the promised changing illuminated phases. Measuring a planet's transit does not by itself determine a separate beacon's orbit.
+**Inner-planet phases implemented — 27 November 2026.** The unfiltered telescope lights the inner planet from the modeled star–planet–observer geometry. The bright limb faces the star, and unresolved views use phase-dependent point brightness. The optional phase watch frames the disk and keeps up to eight dated views with their measured pointing separation from the star, rounded to half a degree. The watch keeps cloudy, glared, clipped and insufficiently resolved frames out of the gallery. The filter still shows geometric transit silhouettes. The inner-planet micrometer orients its wires across the tips of the illuminated limb so the user can measure the full diameter manually. Surface textures and atmospheric seeing are illustrative.
 
-**Improve:** render the illuminated fraction from Sun–planet–observer geometry; compare successive phases with elongation. Model beacon sightings or its own transit timing if its orbit is the clue. Keep historic Venus-transit differential parallax as a distinct advanced experiment, not a misleading label for ordinary background-star parallax.
+Elongation and transit remain distinct from any separate beacon orbit. A beacon investigation and historical transit parallax remain open.
 
 ### CH-06 — Red Dwarf
 
