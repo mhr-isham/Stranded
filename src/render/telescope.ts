@@ -97,6 +97,7 @@ export interface ScopeScene {
   targetRadius: number; // angular radius (rad)
   moonDir: Vec3 | null;
   moonRadius: number;
+  moonLight?: number;
   skyBrightness: number; // 0 = dark night, 1 = full day
   seeing: number; // rad (FWHM)
   realTime: number; // ms
@@ -206,12 +207,13 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
     if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day, sc.targetStyle === 'giant');
   }
   // Its moon: grey, too small to resolve.
-  if (sc.moonDir && !sc.filter) {
+  const moonLight = sc.moonLight ?? 1;
+  if (sc.moonDir && !sc.filter && moonLight > 0) {
     const p = P.project(sc.moonDir);
     if (p) {
       const r = Math.max(0.9 * dpr, sc.moonRadius * P.k, seeingPx * 0.45);
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2);
-      g.addColorStop(0, `rgba(220,215,205,${0.85 - day * 0.6})`);
+      g.addColorStop(0, `rgba(220,215,205,${moonLight * (0.85 - day * 0.6)})`);
       g.addColorStop(1, 'rgba(220,215,205,0)');
       ctx.fillStyle = g;
       ctx.fillRect(p.x - r * 2, p.y - r * 2, r * 4, r * 4);

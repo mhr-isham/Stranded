@@ -839,3 +839,10 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .sketch-star::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: #dcecff; box-shadow: 0 0 5px #a7cfff90; }
 .sketch-star:is(:focus-visible, :hover, [aria-pressed="true"]) { border-color: var(--blue); z-index: 1; }
 .sketch-star[aria-pressed="true"]::before { background: var(--amber); }
+
+.moon-watch { outline: none; }
+.moon-watch-controls { flex-wrap: wrap; }
+@media (max-width: 860px) {
+  .tool.moon-watch-active { grid-template-rows: minmax(42%, 1fr) auto; }
+  .moon-watch-active > .tool-side { max-height: 56vh; }
+}

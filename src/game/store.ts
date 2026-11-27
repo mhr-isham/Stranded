@@ -1,3 +1,4 @@
+import type { OccultationRecord } from './occultationWatch';
 import type { MicrometerObservation } from './micrometer';
 import { freshSchoolRewards, type SchoolRewards } from './schoolRewards';
 import type { ParallaxPair, ParallaxReading, ParallaxInvestigationRecord } from './parallaxObservation';
@@ -163,6 +164,7 @@ export interface GameState {
   trackOn: boolean;
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
+  occultations: OccultationRecord[];
   moonTrack: TimedValue[]; // moon offset from planet (rad)
   /** Chapter 7: the giant's nightly longitude, its moon's offset, and its marked oppositions. */
   trackGOn: boolean;
@@ -309,6 +311,7 @@ const initial = {
   track: [],
   moonTrackOn: false,
   moonTrack: [],
+  occultations: [] as OccultationRecord[],
   trackGOn: false,
   trackG: [] as TimedValue[],
   moonTrackG: [] as TimedValue[],

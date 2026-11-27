@@ -4,6 +4,7 @@
 
 import { nearestOpposition as nearestOpp } from '../engine/ephemeris';
 import { flareAt } from '../engine/flares';
+import { apparentMoonDisks } from '../engine/occultation';
 import { ARCSEC, DAY, DEG } from '../engine/constants';
 import { giantLongitude, giantMoonOffset, moonOffset, targetLongitude, targetSkyLimits } from '../engine/measure';
 import { eclLon, topocentric } from '../engine/sky';
@@ -134,7 +135,7 @@ function stepTo(t1Wanted: number, dtReal: number, hopping = false) {
         const v = Math.round(targetLongitude(sys, t, sys.site) / TRACK_RES) * TRACK_RES;
         track.push({ at: t, v, skyLatitude: Math.round(Math.asin(ray[2] / norm(ray)) / TRACK_RES) * TRACK_RES, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: obs.seeing, frozen: false } } });
       }
-      if (s.moonTrackOn && sys.features.moon) {
+      if (s.moonTrackOn && sys.features.moon && apparentMoonDisks(sys, t).light === 1) {
         const v = Math.round(moonOffset(sys, t, sys.site) / MOON_RES) * MOON_RES;
         moon.push({ at: t, v, source: 'tracker', environment: { instrument: 'telescope', at: t, rawValue: v, seeing: { factor: obs.seeing, frozen: false } } });
       }

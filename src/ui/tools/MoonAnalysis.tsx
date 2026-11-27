@@ -46,7 +46,7 @@ export function MoonAnalysisPanel({ renderPrediction }: { renderPrediction: (poi
     <b>The moon of the blue planet</b>
     {!s.identified ? <div className="amber">Identify the blue planet first.</div> :
       <button data-tut="moon-toggle" className={`btn ${s.moonTrackOn ? '' : 'primary'}`} onClick={() => { s.set({ moonTrackOn: !s.moonTrackOn }); s.say(ECHO.moon); }}>{s.moonTrackOn ? 'Moon auto-log: ON' : 'Log the moon’s offset every few hours'}</button>}
-    <p className="muted" style={{ margin: 0 }}>The dots record the moon east (+) or west (−) of the planet. Start with a few weeks of observations.</p>
+    <p className="muted" style={{ margin: 0 }}>The dots record the moon east (+) or west (−) of the planet. Start with a few weeks of observations. The tracker skips frames where the planet obscures the moon.</p>
     <div className="stack" data-tut="moon-chart">
       {a.points.length > 1 && <Chart ariaLabel="Recorded moon offsets and selected orbit fit" series={[
         { pts: a.points, color: '#d9d2c3', kind: 'dots', faded: (p) => !!band && (p.x < band[0] || p.x > band[1]) },

@@ -9,7 +9,7 @@ import { seeingFactor } from './challenges';
 import { isCloudy } from './survival';
 import type { GameState } from './store';
 
-export type OpticalMethod = 'target-track' | 'giant-track' | 'parallax' | 'diameter' | 'nearby-star' | 'solar-year' | 'locked-year' | 'solar-camera' | 'view' | 'night-view';
+export type OpticalMethod = 'target-track' | 'giant-track' | 'parallax' | 'diameter' | 'nearby-star' | 'solar-year' | 'locked-year' | 'solar-camera' | 'moon-watch' | 'view' | 'night-view';
 type ObserverState = Pick<GameState, 'seed' | 'settings'>;
 export interface OpticalConditions {
   at: number; sunAlt: number; alt?: number; cloudy: boolean; flare: boolean;
@@ -36,6 +36,7 @@ export function opticalLimits(sys: StarSystem, method: OpticalMethod, horizon = 
     // A calibrated micrometer can measure a bright disk in twilight, without
     // demanding the tracker's faint reference-star field.
     case 'diameter': return { ...base, minAlt: horizon };
+    case 'moon-watch': return { ...base, minAlt: horizon, maxSun: -3 * DEG };
     case 'nearby-star': return { ...base, minAlt: Math.max(horizon, 15 * DEG), maxSun: -12 * DEG, references: true };
     // Keep the existing filtered twilight-year model; it is not a night scan.
     case 'solar-year': return { ...base, minAlt: horizon, minSun: -1 * DEG, maxSun: 8 * DEG, filtered: true };

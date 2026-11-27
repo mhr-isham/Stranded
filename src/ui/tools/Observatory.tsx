@@ -15,6 +15,8 @@ import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
 import { MoonAnalysisPanel } from './MoonAnalysis';
+import { OccultationWatch, type WatchView } from './OccultationWatch';
+import { apparentMoonDisks } from '../../engine/occultation';
 import { fmt } from '../../game/format';
 import { MeasurementSources } from '../common/MeasurementSources';
 import { opticalStatus, opticalWeather } from '../../game/observing';
@@ -74,6 +76,9 @@ export function Observatory() {
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
+  const [watchOpen, setWatchOpen] = useState(false);
+  const watchButton = useRef<HTMLButtonElement>(null);
+  const watching = tab === 'moon' && watchOpen;
   const [sel, setSel] = useState<Sel | null>(null);
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
   const [showEcl, setShowEcl] = useState(false);
@@ -182,6 +187,30 @@ export function Observatory() {
     const p = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }).project(dir);
     return !!p && p.x >= 0 && p.y >= 0 && p.x <= viewSize.current.w && p.y <= viewSize.current.h;
   };
+  function centreWatch() {
+    pointAt('target', .025);
+    aim.current = { a: 0, b: 0 };
+  }
+  function readWatch(at: number): WatchView {
+    const center = pointing(at);
+    if (mode !== 'scope' || sel?.kind !== 'target' || !center) return { image: null, reason: 'Centre the telescope on the blue planet.' };
+    const { planet, moon, planetRadius, moonRadius, light } = apparentMoonDisks(sys, at);
+    const frame = localFrame(sys, at, sys.site);
+    const targetPosition = toHorizontal(planet, frame), moonPosition = toHorizontal(moon, frame);
+    const status = opticalStatus(sys, useGame.getState(), at, 'moon-watch', { direction: planet, horizon: skyline(land, targetPosition.az) });
+    if (!status.ok) return { image: null, reason: status.reason };
+    if (moonPosition.alt <= skyline(land, moonPosition.az)) return { image: null, reason: 'The ridge obscures the moon’s field.' };
+    const { w, h, dpr } = viewSize.current;
+    const projection = scopeProjector({ center, fov: watchField(fov, w, h), w, h });
+    const fullDisk = (dir: Vec3, margin: number) => {
+      const p = projection.project(dir);
+      return !!p && p.x >= margin && p.x <= w - margin && p.y >= margin && p.y <= h - margin;
+    };
+    if (!fullDisk(planet, planetRadius * projection.k) || !fullDisk(moon, Math.max(2 * dpr, moonRadius * projection.k))) {
+      return { image: null, reason: 'Keep the planet and the moon’s field inside the eyepiece. Try widening the field.' };
+    }
+    return { image: light === 0 ? 'dark' : light === 1 ? 'visible' : 'fading', reason: '' };
+  }
   const available = inspectable(sel, t);
   const yearReady = mode === 'scope' && sel?.kind === 'star';
   const yearStatus = opticalStatus(sys, s, t, sys.features.locked ? 'locked-year' : 'solar-year', {
@@ -281,7 +310,7 @@ export function Observatory() {
   };
 
   return (
-    <div className={`tool ${tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
+    <div className={`tool ${watching ? 'moon-watch-active' : tab === 'moon' && moonChartFocus ? 'moon-analysis-focus' : ''}`}>
       <div className="tool-stage" data-tut="obs-stage">
         {mode === 'sky' ? (
           <CanvasView
@@ -444,24 +473,24 @@ export function Observatory() {
               setInstrument('scope', now - lastMotion.current < 120 ? 0.5 : 0);
               const tt = clock.t;
               const center = pointing(tt) ?? [1, 0, 0];
-              const tgtV = topocentric(sys, 'target', tt, sys.site);
+              const { planet: tgtV, moon: moonV, planetRadius: targetRadius, moonRadius, light } = apparentMoonDisks(sys, tt);
               const sunV = topocentric(sys, 'star', tt, sys.site);
-              const moonV = topocentric(sys, 'moon', tt, sys.site);
               const f = localFrame(sys, tt, sys.site);
               const sunAlt = toHorizontal(sunV, f).alt / DEG;
               const ts = now / 1000;
               const P = drawScope(
                 ctx,
-                { center, fov, w, h },
+                { center, fov: watching ? watchField(fov, w, h) : fov, w, h },
                 {
                   seed: sys.seed,
                   sunDir: unit(sunV),
                   sunRadius: Math.asin(sys.star.radius / Math.hypot(...sunV)),
                   starColor: starRGB(sys),
                   targetDir: unit(tgtV),
-                  targetRadius: Math.asin(sys.target.radius / Math.hypot(...tgtV)),
+                  targetRadius,
                   moonDir: sys.features.moon ? unit(moonV) : null,
-                  moonRadius: Math.asin(sys.moon.radius / Math.hypot(...moonV)),
+                  moonRadius,
+                  moonLight: light,
                   skyBrightness: Math.max(0, Math.min(1, (sunAlt + 10) / 14)),
                   seeing: SEEING * seeingFactor(useGame.getState(), tt),
                   realTime: now,
@@ -536,7 +565,7 @@ export function Observatory() {
             }}
           />
         )}
-        {tab !== 'micro' && (
+        {tab !== 'micro' && !watching && (
         <div style={{ position: 'absolute', right: 10, top: 'calc(var(--hud-h) + var(--safe-top))', zIndex: 6 }} className="row">
           <button className={`btn ${mode === 'sky' ? 'primary' : ''}`} onClick={() => setMode('sky')}>
             Wide sky
@@ -550,7 +579,7 @@ export function Observatory() {
           </button>
         </div>
         )}
-        {mode === 'scope' && tab !== 'micro' && (
+        {mode === 'scope' && tab !== 'micro' && !watching && (
           <div className="panel panel-pad stage-bottom" data-tut="obs-fov" style={{ width: 'min(440px, calc(100% - 16px))', padding: '8px 12px' }}>
             <div className="row between">
               <span className="muted" style={{ fontSize: 13 }}>Field of view</span>
@@ -569,6 +598,9 @@ export function Observatory() {
       </div>
 
       <div className="tool-side">
+        {watching ? <OccultationWatch read={readWatch} onCentre={centreWatch}
+          onWiden={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))}
+          onClose={() => { setWatchOpen(false); requestAnimationFrame(() => watchButton.current?.focus()); }} /> : <>
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         {tab === 'moon' && <button className="btn small" onClick={() => setMoonChartFocus(!moonChartFocus)}>{moonChartFocus ? 'Show sky beside the chart' : 'Focus on the moon chart'}</button>}
         {mode === 'scope' && <SeeingConditions />}
@@ -731,11 +763,19 @@ export function Observatory() {
         {tab === 'orbit' && <OrbitPanel />}
         {tab === 'giant' && <GiantPanel />}
         {tab === 'stars' && <StarsPanel />}
-        {tab === 'moon' && <MoonPanel />}
+        {tab === 'moon' && <>
+          {s.identified && sys.features.moon && !s.tutorial.active && <button ref={watchButton} className="btn" onClick={() => { centreWatch(); setWatchOpen(true); }}>Open occultation watch</button>}
+          <MoonPanel />
+        </>}
+        </>}
       </div>
     </div>
   );
 }
+
+// In a watch, preserve the close-up field along the shorter side so a
+// shallow landscape viewport can still show the whole limb.
+const watchField = (fov: number, w: number, h: number) => fov * Math.max(1, w / Math.max(1, h));
 
 function pickBar(maxRad: number) {
   const opts = [0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600, 1800, 3600].map((a) => a * ARCSEC);
