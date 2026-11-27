@@ -25,6 +25,8 @@ function okToReplace() {
   return !inProgress || confirm('Start something new? The expedition in progress will be lost.');
 }
 
+import { ArchiveButton } from './tools/ArchiveButton';
+
 export function Title() {
   const s = useGame();
   const [setup, setSetup] = useState(false);
@@ -92,6 +94,7 @@ export function Title() {
             <button className="btn" onClick={() => setHow(true)}>
               How to play
             </button>
+            <ArchiveButton className="btn" />
             <PacingReportButton top />
             {s.atlas.length > 0 && (
               <button className="btn" onClick={() => setAtlas(true)}>

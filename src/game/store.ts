@@ -25,6 +25,7 @@ import type { AtlasCard, SystemNames } from './atlas';
 import type { FlightLeg, PilotingRecord } from './piloting';
 import { RULESET_VERSION } from './world';
 import type { ExerciseId, TrainingHistory } from './training';
+import type { ArchiveProgress } from './transitArchive';
 import type { ReadingPredictions } from './readingPredictions';
 import type { MeasurementEnvironment } from './measurementEnvironment';
 import { earnedSharpEyeAwards, type SharpEyeAwards, type SharpEyeCondition } from './sharpEye';
@@ -214,6 +215,7 @@ export interface GameState {
   lastNightLog: number;
   tutorial: TutorialState;
   training: TrainingHistory;
+  transitArchive: ArchiveProgress | null;
   schoolRewards: SchoolRewards;
   radiusFieldNote: RadiusFieldNote | null;
   radiusDiscoveries: RadiusDiscoveries | null;
@@ -365,6 +367,7 @@ const initial = {
   lastNightLog: -1,
   tutorial: { active: false, step: 0, flags: [], lessons: [] } as TutorialState,
   training: {} as TrainingHistory,
+  transitArchive: null as GameState['transitArchive'],
   schoolRewards: freshSchoolRewards(),
   radiusFieldNote: null as RadiusFieldNote | null,
   radiusDiscoveries: null as RadiusDiscoveries | null,
@@ -438,6 +441,7 @@ export const useGame = create<GameState>()(
           logs: get().logs ?? [],
           tutorial: { ...initial.tutorial, lessons: get().tutorial?.lessons ?? [] },
           training: get().training ?? {},
+          transitArchive: get().transitArchive ?? null,
           schoolRewards: get().schoolRewards ?? freshSchoolRewards(),
           radiusDiscoveries: get().radiusDiscoveries ?? null,
         });

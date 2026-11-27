@@ -55,6 +55,7 @@ import { unlockLog } from '../../game/story';
 import { OrbitPanel } from './OrbitPanel';
 import { GiantPanel } from './GiantPanel';
 import { nearStarsOf } from '../../engine/nearstars';
+import { ArchiveButton } from './ArchiveButton';
 import { StarsPanel } from './StarsPanel';
 import { flareAt } from '../../engine/flares';
 import { meridianAngle } from '../../engine/sky';
@@ -851,6 +852,7 @@ export function Observatory({ startOnStars = false }: { startOnStars?: boolean }
             {!sys.features.real && <button className="btn small" ref={auroraButton} onClick={() => { setMode('sky'); setWatchOpen('aurora'); }}>Open aurora watch</button>}
             {auroraActive && <span className="aurora-sky-cue">Aurora visible</span>}
             {meteorActive && <span className="meteor-sky-cue">Meteor shower active</span>}
+            <ArchiveButton />
           </div>}
           <SkyExplorer lights={skyLights} selected={sel} known={s.identified} wide={mode === 'sky'} az={cam.current.az} alt={cam.current.alt} field={cam.current.fov} labels={labels} onLabels={() => setLabels(!labels)} pan={panSky} zoom={zoomSky} select={selectLight} focus={focusWide} coaching={rules.coaching} />
           <div className="panel panel-pad stack" aria-label="Selected light observations">

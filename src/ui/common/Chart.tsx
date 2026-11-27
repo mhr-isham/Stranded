@@ -36,13 +36,14 @@ interface Props {
   band?: [number, number] | null;
   onBand?: (b: [number, number] | null) => void;
   brushMode?: 'zoom' | 'band';
+  doubleTapReset?: boolean;
 }
 
 /**
  * Interactive scatter/line chart. Tap to place the cursor; drag to zoom into
  * a range (or select a band). Double-tap resets zoom.
  */
-export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, symmetricY = false, band, onBand, brushMode = 'zoom' }: Props) {
+export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor, xLabel, yLabel, xFmt = (x) => x.toFixed(1), yFmt = (y) => y.toFixed(2), height = 220, symmetricY = false, band, onBand, brushMode = 'zoom', doubleTapReset = true }: Props) {
   const [zoom, setZoom] = useState<[number, number] | null>(null);
   const drag = useRef<null | { x0: number; x1: number; moved: boolean }>(null);
   const lastTap = useRef(0);
@@ -99,7 +100,7 @@ export function Chart({ series, ariaLabel, markers = [], cursor = null, onCursor
             else setZoom(r);
           } else {
             const now = performance.now();
-            if (now - lastTap.current < 300) {
+            if (doubleTapReset && now - lastTap.current < 300) {
               setZoom(null);
               onBand?.(null);
             } else onCursor?.(d.x0);

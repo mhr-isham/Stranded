@@ -1,4 +1,5 @@
 import { PacingReportButton } from '../common/PacingReport';
+import { ArchiveButton } from '../tools/ArchiveButton';
 import { SolarSystemReference } from './SolarSystemReference';
 import { BeaconEclipseWatch } from './BeaconEclipseWatch';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -381,6 +382,12 @@ function Debrief() {
           </div>
         )}
 
+        {sys.features.real && kind === 'success' && !s.tutorial.active && (
+          <section className="panel panel-pad row between" aria-label="Beyond the campaign">
+            <div><b>Kepler observing archive</b><div className="muted">Search a real light curve for an exoplanet.</div></div>
+            <ArchiveButton />
+          </section>
+        )}
         {sys.features.real && <SolarSystemReference rows={rows} />}
         <div className="panel panel-pad" data-tut="results-table">
           <h2 style={{ fontSize: 18, marginBottom: 8 }}>{sys.features.real ? 'Your numbers vs the simulated system' : 'Your numbers vs the truth'}</h2>
