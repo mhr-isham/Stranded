@@ -1,3 +1,4 @@
+import { PacingReportButton } from '../common/PacingReport';
 import { BeaconEclipseWatch } from './BeaconEclipseWatch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUANTITY_INFO, deriveAll, derivedFor, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
@@ -401,6 +402,8 @@ function Debrief() {
             Points reward precise and honest error bars. A tight error bar that misses the truth scores below zero.
           </div>}
         </div>
+
+        {s.pacingRecord && <div className="row"><PacingReportButton top /></div>}
 
         {kind === 'success' && s.arrival && outcome && sys.features.moon && !s.tutorial.active && (
           <section className="panel panel-pad stack" aria-label="Beacon sky">

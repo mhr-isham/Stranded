@@ -1,3 +1,4 @@
+import { flushPacing } from '../../game/pacingRecorder';
 import type { Difficulty } from '../../engine/types';
 import { clock } from '../../game/clock';
 import { useGame, type GameState } from '../../game/store';
@@ -6,6 +7,7 @@ import { startRun } from './widgets';
 import { recordTraining } from '../../game/training';
 
 export function practiceSnapshot() {
+  flushPacing();
   const s = useGame.getState();
   const state = Object.fromEntries(Object.entries(s).filter(([key, value]) => typeof value !== 'function' && key !== 'practiceReturn')) as Partial<GameState>;
   return s.practiceReturn ?? { state: JSON.parse(JSON.stringify(state)), t: clock.t, warpIndex: clock.warpIndex };

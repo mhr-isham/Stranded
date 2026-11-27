@@ -1,3 +1,5 @@
+import { canRecordPacing } from '../game/pacing';
+import { PacingReportButton } from './common/PacingReport';
 import { useMemo, useRef, useState } from 'react';
 import { DAY, DEG } from '../engine/constants';
 import { generateSystem } from '../engine/system';
@@ -30,7 +32,7 @@ export function Title() {
   const [atlas, setAtlas] = useState(false);
   const [campaign, setCampaign] = useState(false);
   const [roam, setRoam] = useState(false);
-  const [settings, setSettings] = useState<Settings>({ ...s.settings });
+  const [settings, setSettings] = useState<Settings>({ ...s.settings, pacingStudy: false });
   const [seedText, setSeedText] = useState('');
   const [expeditionChapter, setExpeditionChapter] = useState(1);
   const demo = useMemo(() => {
@@ -90,6 +92,7 @@ export function Title() {
             <button className="btn" onClick={() => setHow(true)}>
               How to play
             </button>
+            <PacingReportButton top />
             {s.atlas.length > 0 && (
               <button className="btn" onClick={() => setAtlas(true)}>
                 🗺 Atlas
@@ -121,7 +124,7 @@ export function Title() {
           <p className="faint" style={{ fontSize: 12 }}>
             Complete Campaign chapters to unlock their variations here. Free Roam offers all system types for practice.
           </p>
-          <ModeSettings settings={settings} setSettings={setSettings} />
+          <ModeSettings settings={settings} setSettings={setSettings} chapter={expeditionChapter} />
           <div className="field" style={{ marginTop: 12 }}>
             <label>System seed (optional — share it so friends play the same system)</label>
             <input
@@ -187,7 +190,7 @@ export function Title() {
 }
 
 /** Mode picker plus the survival, formula and sound toggles (shared by New expedition and Campaign). */
-function ModeSettings({ settings, setSettings }: { settings: Settings; setSettings: (s: Settings) => void }) {
+function ModeSettings({ settings, setSettings, chapter }: { settings: Settings; setSettings: (s: Settings) => void; chapter: number }) {
   const atlas = useGame((g) => g.atlas);
   const hard = settings.difficulty === 'astronomer' || settings.difficulty === 'legend';
   const chosen = settings.challenges ?? [];
@@ -302,6 +305,11 @@ function ModeSettings({ settings, setSettings }: { settings: Settings; setSettin
             : 'Show the formula behind every step. Each mode picks a default; you can change it here or during play.'
         }
       />
+      {canRecordPacing({ ...settings, freeRoam: false }, chapter) && <details className="measurement-help">
+        <summary>Optional pacing playtest</summary>
+        <Toggle on={!!settings.pacingStudy} onChange={(pacingStudy) => setSettings({ ...settings, pacingStudy })}
+          label="Record local pacing" sub="Keep a local record of time and milestones. You can download it from the expedition menu or debrief. The game sends nothing automatically." />
+      </details>}
       <AudioSettings
         settings={settings}
         onChange={(value) => {
@@ -408,7 +416,7 @@ function CampaignModal({
               </div>
             </div>
           )}
-          <ModeSettings settings={settings} setSettings={setSettings} />
+          <ModeSettings settings={settings} setSettings={setSettings} chapter={ch.n} />
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
             <button
               className="btn primary big"

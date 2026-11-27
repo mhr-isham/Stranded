@@ -1,3 +1,4 @@
+import { createPacingRecord, type PacingRecord } from './pacing';
 import type { AuroraPhoto } from './auroraWatch';
 import type { MeteorPhoto } from './meteorWatch';
 import type { OccultationRecord } from './occultationWatch';
@@ -84,6 +85,7 @@ export interface Settings {
   freeRoam?: boolean;
   /** Absent in legacy saves, which used expedition wins as campaign progress. */
   campaignRun?: boolean;
+  pacingStudy?: boolean;
   freeRoamGuidance?: boolean;
   /** Optional Cadet objectives and unsolicited coaching; warnings remain available. */
   cadetGuidance?: boolean;
@@ -158,6 +160,7 @@ export interface GameState {
   settings: Settings;
   seed: number;
   savedT: number;
+  pacingRecord: PacingRecord | null;
   readings: Reading[];
   sheet: Partial<Record<PrimaryKey, Estimate>>;
   starObs: TimedValue[]; // star longitude against background stars (rad)
@@ -307,6 +310,7 @@ const initial = {
   settings: { difficulty: 'navigator' as Difficulty, survival: false, formulas: true, sound: true },
   seed: 1,
   savedT: 0,
+  pacingRecord: null as PacingRecord | null,
   readings: [] as Reading[],
   sheet: {},
   starObs: [],
@@ -414,6 +418,7 @@ export const useGame = create<GameState>()(
           campaign: get().campaign ?? {},
           seed,
           settings: { ...settings, rulesetVersion: RULESET_VERSION },
+          pacingRecord: createPacingRecord(settings, chapter, seed),
           codex: get().codex,
           achievements: get().achievements,
           atlas: get().atlas ?? [],

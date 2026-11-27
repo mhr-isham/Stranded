@@ -1,5 +1,6 @@
 import { SchoolRewardFeedback } from './SchoolRewards';
 import { useEffect } from 'react';
+import { flushPacing, pacingInput, tickPacing } from '../game/pacingRecorder';
 import { clock } from '../game/clock';
 import { advance, currentWorld, fastForward } from '../game/sim';
 import { botMeasure, COMPETENT } from '../engine/solver';
@@ -49,17 +50,26 @@ export default function App() {
       raf = requestAnimationFrame(loop);
       const dt = Math.max(0, (now - last) / 1000);
       last = now;
+      tickPacing(now, dt, document.visibilityState === 'visible' && document.hasFocus());
       advance(dt);
       saveTimer += dt;
       if (saveTimer > 3) {
         saveTimer = 0;
-        useGame.setState({ savedT: clock.t });
+        if (!flushPacing()) useGame.setState({ savedT: clock.t });
       }
     };
     raf = requestAnimationFrame(loop);
-    const save = () => useGame.setState({ savedT: clock.t });
+    const save = () => { if (!flushPacing()) useGame.setState({ savedT: clock.t }); };
+    const rebase = () => { flushPacing(); last = performance.now(); };
+    const pacingGesture = () => pacingInput(performance.now());
+    window.addEventListener('focus', rebase);
+    window.addEventListener('blur', rebase);
+    document.addEventListener('visibilitychange', rebase);
+    window.addEventListener('pointermove', pacingGesture, { passive: true });
+    window.addEventListener('wheel', pacingGesture, { passive: true });
     window.addEventListener('pagehide', save);
     const firstGesture = () => {
+      pacingGesture();
       startAmbient();
     };
     window.addEventListener('pointerdown', firstGesture);
@@ -67,6 +77,11 @@ export default function App() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('pagehide', save);
+      window.removeEventListener('focus', rebase);
+      window.removeEventListener('blur', rebase);
+      document.removeEventListener('visibilitychange', rebase);
+      window.removeEventListener('pointermove', pacingGesture);
+      window.removeEventListener('wheel', pacingGesture);
       window.removeEventListener('pointerdown', firstGesture);
       window.removeEventListener('keydown', firstGesture);
       disposeAudio();

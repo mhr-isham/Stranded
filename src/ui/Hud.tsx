@@ -1,3 +1,4 @@
+import { PacingReportButton } from './common/PacingReport';
 import { useMemo, useState } from 'react';
 import { DAY } from '../engine/constants';
 import { variantOf } from '../engine/chapters';
@@ -228,6 +229,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
             </div>
           )}
           {!s.tutorial.active && <CheckpointPanel onDone={() => setMenu(false)} />}
+          <PacingReportButton top />
           <AudioSettings settings={s.settings} onChange={(settings) => s.set({ settings })} />
           <div className="row" style={{ justifyContent: 'space-between', marginTop: 16 }}>
             <button
