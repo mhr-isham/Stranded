@@ -846,3 +846,8 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
   .tool.moon-watch-active { grid-template-rows: minmax(42%, 1fr) auto; }
   .moon-watch-active > .tool-side { max-height: 56vh; }
 }
+
+.eclipse-image-status { border-left: 2px solid #8da6c9; }
+.eclipse-image-status[data-image="dim"] { border-left-color: #c6a978; }
+.eclipse-image-status[data-image="shadow"], .eclipse-image-status[data-image="dark"] { border-left-color: #bd8b73; }
+.eclipse-image-status[data-image="blocked"] { border-left-color: #7e8794; }

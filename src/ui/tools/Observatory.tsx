@@ -10,11 +10,13 @@ import { ARCSEC, DAY, DEG } from '../../engine/constants';
 import { linearFit } from '../../engine/solver';
 import { eclLon, localFrame, toHorizontal, topocentric } from '../../engine/sky';
 import { starLongitude } from '../../engine/measure';
-import { angleBetween, unit, type Vec3 } from '../../engine/vec';
+import { angleBetween, dot, unit, type Vec3 } from '../../engine/vec';
 import { sfx, setInstrument, stopInstrument } from '../../game/audio';
 import { clock } from '../../game/clock';
 import { ECHO } from '../../game/echo';
 import { MoonAnalysisPanel } from './MoonAnalysis';
+import { EclipseWatch, type EclipseView } from './EclipseWatch';
+import { lunarExposure, lunarLight } from '../../engine/eclipse';
 import { OccultationWatch, type WatchView } from './OccultationWatch';
 import { GLARE_NOTICE, solarGlareSource } from '../../engine/solarGlare';
 import { apparentMoonDisks } from '../../engine/occultation';
@@ -77,9 +79,11 @@ export function Observatory() {
   const [mode, setMode] = useState<'sky' | 'scope'>('sky');
   const [tab, setTab] = useState<Tab>('sky');
   const [moonChartFocus, setMoonChartFocus] = useState(true);
-  const [watchOpen, setWatchOpen] = useState(false);
+  const [watchOpen, setWatchOpen] = useState<'occultation' | 'eclipse' | null>(null);
   const watchButton = useRef<HTMLButtonElement>(null);
+  const eclipseButton = useRef<HTMLButtonElement>(null);
   const watching = tab === 'moon' && watchOpen;
+  const eclipseWatching = watching === 'eclipse';
   const [sel, setSel] = useState<Sel | null>(null);
   const [fovLog, setFovLog] = useState(Math.log10(2)); // degrees, log scale
   const [showEcl, setShowEcl] = useState(false);
@@ -154,7 +158,7 @@ export function Observatory() {
   };
   const pointing = (tt: number): Vec3 | null => {
     if (!sel) return null;
-    const d = objDir(sel, tt);
+    const d = eclipseWatching ? unit(topocentric(sys, 'moon', tt, sys.site)) : objDir(sel, tt);
     let e1: Vec3 = [-d[1], d[0], 0];
     const n = Math.hypot(e1[0], e1[1]) || 1;
     e1 = [e1[0] / n, e1[1] / n, 0];
@@ -191,8 +195,8 @@ export function Observatory() {
     const p = scopeProjector({ center, fov, w: viewSize.current.w, h: viewSize.current.h }).project(dir);
     return !!p && p.x >= 0 && p.y >= 0 && p.x <= viewSize.current.w && p.y <= viewSize.current.h;
   };
-  function centreWatch() {
-    pointAt('target', .025);
+  function centreWatch(kind: 'occultation' | 'eclipse') {
+    pointAt('target', kind === 'eclipse' ? .006 : .025);
     aim.current = { a: 0, b: 0 };
   }
   function readWatch(at: number): WatchView {
@@ -213,7 +217,36 @@ export function Observatory() {
     if (!fullDisk(planet, planetRadius * projection.k) || !fullDisk(moon, Math.max(2 * dpr, moonRadius * projection.k))) {
       return { image: null, reason: 'Keep the planet and the moon’s field inside the eyepiece. Try widening the field.' };
     }
+    if (light > 0 && lunarExposure(lunarLight(sys, at), unit(moon)).fraction < .45) {
+      return { image: null, reason: 'Eclipse dimming makes this frame unsuitable for timing an occultation.' };
+    }
     return { image: light === 0 ? 'dark' : light === 1 ? 'visible' : 'fading', reason: '' };
+  }
+  function readEclipse(at: number): EclipseView {
+    const center = pointing(at);
+    if (!center || mode !== 'scope') return { image: null, reason: 'Centre the telescope on the moon.' };
+    const { moon, moonRadius, light: unoccluded } = apparentMoonDisks(sys, at);
+    const position = toHorizontal(moon, localFrame(sys, at, sys.site));
+    const status = opticalStatus(sys, useGame.getState(), at, 'moon-watch', { direction: moon, horizon: skyline(land, position.az) });
+    if (!status.ok) return { image: null, reason: status.reason };
+    const { w, h } = viewSize.current;
+    const field = scopeProjector({ center, fov: watchField(fov, w, h), w, h });
+    const point = field.project(moon), r = moonRadius * field.k;
+    if (!point || point.x < r || point.x > w - r || point.y < r || point.y > h - r) {
+      return { image: null, reason: 'Keep the whole moon in the eyepiece. Try centring or widening the field.' };
+    }
+    if (unoccluded < 1) return { image: null, reason: 'The planet blocks part or all of our view of the moon.' };
+    const lighting = lunarLight(sys, at), direction = unit(moon);
+    if (dot(unit(lighting.toStar), direction) > .97) return { image: null, reason: 'The moon presents too little sunlit surface to time a shadow here.' };
+    const { fraction, darkEdge } = lunarExposure(lighting, direction);
+    const image = lighting.shadow === 'total' ? 'dark' : fraction > .94 ? 'steady' : darkEdge ? 'shadow' : 'dim';
+    return { image, reason: '' };
+  }
+  function closeWatch() {
+    const button = eclipseWatching ? eclipseButton : watchButton;
+    setWatchOpen(null);
+    setFovLog(Math.log10(.025));
+    requestAnimationFrame(() => button.current?.focus());
   }
   const available = inspectable(sel, t);
   const yearReady = mode === 'scope' && sel?.kind === 'star';
@@ -439,7 +472,7 @@ export function Observatory() {
               else if (e.key === 'ArrowRight') nudgeImage(-1, 0);
               else if (e.key === 'ArrowUp') nudgeImage(0, -1);
               else if (e.key === 'ArrowDown') nudgeImage(0, 1);
-              else setFovLog((v) => Math.max(Math.log10(.015), Math.min(Math.log10(4), v + (e.key === '+' || e.key === '=' ? -.1 : .1))));
+              else setFovLog((v) => Math.max(Math.log10(eclipseWatching ? .002 : .015), Math.min(Math.log10(4), v + (e.key === '+' || e.key === '=' ? -.1 : .1))));
             }}
             onPointerDown={(e) => {
               if (e.button !== 0 || scopePointer.current !== null) return;
@@ -475,7 +508,7 @@ export function Observatory() {
             }}
             onPointerUp={(e) => { if (scopePointer.current === e.pointerId) { scopePointer.current = null; calip.current.dragging = 0; } }}
             onPointerCancel={(e) => { if (scopePointer.current === e.pointerId) { scopePointer.current = null; calip.current.dragging = 0; } }}
-            onWheel={(e) => setFovLog((v) => Math.max(Math.log10(0.015), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
+            onWheel={(e) => setFovLog((v) => Math.max(Math.log10(eclipseWatching ? .002 : .015), Math.min(Math.log10(4), v + (e.deltaY > 0 ? 0.05 : -0.05))))}
             draw={({ ctx, w, h, dpr, now }) => {
               viewSize.current = { w, h, dpr };
               setInstrument('scope', now - lastMotion.current < 120 ? 0.5 : 0);
@@ -501,6 +534,7 @@ export function Observatory() {
                   moonDir: sys.features.moon ? unit(moonV) : null,
                   moonRadius,
                   moonLight: light,
+                  lunarLighting: sys.features.moon && !filter ? { light: lunarLight(sys, tt), at: tt, closeUp: eclipseWatching, paused: clock.paused } : undefined,
                   skyBrightness: Math.max(0, Math.min(1, (sunAltitude / DEG + 10) / 14)),
                   seeing: SEEING * seeingFactor(useGame.getState(), tt),
                   realTime: now,
@@ -540,20 +574,22 @@ export function Observatory() {
                 }
                 if (ridge.some((p) => p.y < h)) { ctx.fillStyle = '#100e0e'; ctx.beginPath(); ctx.moveTo(0, h); for (const p of ridge) ctx.lineTo(p.x, p.y); ctx.lineTo(w, h); ctx.closePath(); ctx.fill(); }
               }
-              // Reticle.
-              ctx.strokeStyle = 'rgba(255,90,90,0.85)';
-              ctx.lineWidth = dpr;
-              const g = 10 * dpr;
-              ctx.beginPath();
-              ctx.moveTo(w / 2 - 60 * dpr, h / 2);
-              ctx.lineTo(w / 2 - g, h / 2);
-              ctx.moveTo(w / 2 + g, h / 2);
-              ctx.lineTo(w / 2 + 60 * dpr, h / 2);
-              ctx.moveTo(w / 2, h / 2 - 60 * dpr);
-              ctx.lineTo(w / 2, h / 2 - g);
-              ctx.moveTo(w / 2, h / 2 + g);
-              ctx.lineTo(w / 2, h / 2 + 60 * dpr);
-              ctx.stroke();
+              if (!eclipseWatching) {
+                // Reticle.
+                ctx.strokeStyle = 'rgba(255,90,90,0.85)';
+                ctx.lineWidth = dpr;
+                const g = 10 * dpr;
+                ctx.beginPath();
+                ctx.moveTo(w / 2 - 60 * dpr, h / 2);
+                ctx.lineTo(w / 2 - g, h / 2);
+                ctx.moveTo(w / 2 + g, h / 2);
+                ctx.lineTo(w / 2 + 60 * dpr, h / 2);
+                ctx.moveTo(w / 2, h / 2 - 60 * dpr);
+                ctx.lineTo(w / 2, h / 2 - g);
+                ctx.moveTo(w / 2, h / 2 + g);
+                ctx.lineTo(w / 2, h / 2 + 60 * dpr);
+                ctx.stroke();
+              }
               // Calipers (filar micrometer).
               if (tab === 'micro') {
                 for (const [key, x, color] of [['A', calip.current.x1, '#6cf0ff'], ['B', calip.current.x2, '#78ffaa']] as const) {
@@ -608,9 +644,10 @@ export function Observatory() {
       </div>
 
       <div className="tool-side">
-        {watching ? <OccultationWatch read={readWatch} onCentre={centreWatch}
-          onWiden={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))}
-          onClose={() => { setWatchOpen(false); requestAnimationFrame(() => watchButton.current?.focus()); }} /> : <>
+        {watching === 'eclipse' ? <EclipseWatch read={readEclipse} centre={() => centreWatch('eclipse')}
+          widen={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} close={closeWatch} /> :
+          watching === 'occultation' ? <OccultationWatch read={readWatch} onCentre={() => centreWatch('occultation')}
+            onWiden={() => setFovLog((v) => Math.min(Math.log10(4), v + .28))} onClose={closeWatch} /> : <>
         <ToolHeader title="Observatory" sub="Tracker + telescope. Positions are measured against the background stars." />
         {tab === 'moon' && <button className="btn small" onClick={() => setMoonChartFocus(!moonChartFocus)}>{moonChartFocus ? 'Show sky beside the chart' : 'Focus on the moon chart'}</button>}
         {mode === 'scope' && <SeeingConditions />}
@@ -774,7 +811,10 @@ export function Observatory() {
         {tab === 'giant' && <GiantPanel />}
         {tab === 'stars' && <StarsPanel />}
         {tab === 'moon' && <>
-          {s.identified && sys.features.moon && !s.tutorial.active && <button ref={watchButton} className="btn" onClick={() => { centreWatch(); setWatchOpen(true); }}>Open occultation watch</button>}
+          {s.identified && sys.features.moon && !s.tutorial.active && <div className="row moon-watch-controls">
+            <button ref={watchButton} className="btn" onClick={() => { centreWatch('occultation'); setWatchOpen('occultation'); }}>Open occultation watch</button>
+            <button ref={eclipseButton} className="btn" onClick={() => { centreWatch('eclipse'); setWatchOpen('eclipse'); }}>Open eclipse watch</button>
+          </div>}
           <MoonPanel />
         </>}
         </>}

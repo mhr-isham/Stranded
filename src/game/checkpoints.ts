@@ -69,7 +69,7 @@ function restore(snap: Snapshot) {
   clock.t = snap.t;
   clock.stopAt = Infinity;
   clock.paused = true;
-  useGame.setState({ ...snap.state, sharpEyeAwards: current.sharpEyeAwards ?? {}, sharpEyeNotified: current.sharpEyeNotified ?? [], moonStudies: snap.state.moonStudies ?? [], occultations: snap.state.occultations ?? [], parallaxPair: snap.state.parallaxPair ?? null, roverOuting: snap.state.roverOuting ?? null, constellationSketches: snap.state.constellationSketches ?? [], parallaxInvestigations: snap.state.parallaxInvestigations ?? [], hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
+  useGame.setState({ ...snap.state, sharpEyeAwards: current.sharpEyeAwards ?? {}, sharpEyeNotified: current.sharpEyeNotified ?? [], moonStudies: snap.state.moonStudies ?? [], occultations: snap.state.occultations ?? [], eclipseSightings: snap.state.eclipseSightings ?? [], parallaxPair: snap.state.parallaxPair ?? null, roverOuting: snap.state.roverOuting ?? null, constellationSketches: snap.state.constellationSketches ?? [], parallaxInvestigations: snap.state.parallaxInvestigations ?? [], hintsSeen, hintsUsed, checksUsed, verificationHistory: current.verificationHistory ?? [], penaltyDv: (snap.state.penaltyDv ?? 0) + spentSinceSave, phase: 'play', outcome: null, savedT: snap.t });
 }
 
 export const listSlots = () => read().slots;

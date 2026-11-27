@@ -147,6 +147,9 @@ export interface TutorialState {
   note?: string[];
 }
 
+export type EclipseImage = 'steady' | 'dim' | 'shadow' | 'dark';
+export interface EclipseSighting { at: number; image: EclipseImage; note: string }
+
 export interface GameState {
   phase: Phase;
   screen: Screen;
@@ -165,6 +168,7 @@ export interface GameState {
   track: TimedValue[]; // blue planet longitude (rad), nightly
   moonTrackOn: boolean;
   occultations: OccultationRecord[];
+  eclipseSightings: EclipseSighting[];
   moonTrack: TimedValue[]; // moon offset from planet (rad)
   /** Chapter 7: the giant's nightly longitude, its moon's offset, and its marked oppositions. */
   trackGOn: boolean;
@@ -312,6 +316,7 @@ const initial = {
   moonTrackOn: false,
   moonTrack: [],
   occultations: [] as OccultationRecord[],
+  eclipseSightings: [] as EclipseSighting[],
   trackGOn: false,
   trackG: [] as TimedValue[],
   moonTrackG: [] as TimedValue[],

@@ -2,6 +2,8 @@
 // (ecliptic east to the left, ecliptic north up).
 
 import { ARCSEC, DEG, TAU } from '../engine/constants';
+import { lunarExposure, type LunarLight } from '../engine/eclipse';
+import { drawLunarDisk } from './lunarDisk';
 import { solarGlare, type SolarGlareSource } from '../engine/solarGlare';
 import { hash32, mulberry32 } from '../engine/rng';
 import { cross, dot, unit, type Vec3 } from '../engine/vec';
@@ -100,6 +102,7 @@ export interface ScopeScene {
   moonDir: Vec3 | null;
   moonRadius: number;
   moonLight?: number;
+  lunarLighting?: { light: LunarLight; at: number; closeUp: boolean; paused: boolean };
   skyBrightness: number; // 0 = dark night, 1 = full day
   seeing: number; // rad (FWHM)
   realTime: number; // ms
@@ -204,17 +207,33 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
     const p = P.project(sc.targetDir);
     if (p) drawPlanet(ctx, p.x, p.y, sc.targetRadius * P.k, seeingPx, sc.realTime, dpr, day, sc.targetStyle === 'giant');
   }
-  // Its moon: grey, too small to resolve.
-  const moonLight = sc.moonLight ?? 1;
-  if (sc.moonDir && !sc.filter && moonLight > 0) {
+  const unoccluded = sc.moonLight ?? 1;
+  if (sc.moonDir && !sc.filter && unoccluded > 0) {
     const p = P.project(sc.moonDir);
-    if (p) {
-      const r = Math.max(0.9 * dpr, sc.moonRadius * P.k, seeingPx * 0.45);
-      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2);
-      g.addColorStop(0, `rgba(220,215,205,${moonLight * (0.85 - day * 0.6)})`);
-      g.addColorStop(1, 'rgba(220,215,205,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(p.x - r * 2, p.y - r * 2, r * 4, r * 4);
+    if (p && p.x >= -w && p.x <= 2 * w && p.y >= -h && p.y <= 2 * h) {
+      const radius = sc.moonRadius * P.k;
+      const lighting = sc.lunarLighting;
+      if (lighting?.closeUp && radius >= 2 * dpr) {
+        ctx.save();
+        const planet = unoccluded < 1 && sc.targetDir && P.project(sc.targetDir);
+        if (planet) {
+          ctx.beginPath();
+          ctx.rect(-w, -h, 3 * w, 3 * h);
+          ctx.moveTo(planet.x + sc.targetRadius * P.k, planet.y);
+          ctx.arc(planet.x, planet.y, sc.targetRadius * P.k, 0, TAU);
+          ctx.clip('evenodd');
+        }
+        drawLunarDisk(ctx, lighting.light, sc.moonDir, p.x, p.y, radius, sc.seed, lighting.at, sc.realTime, lighting.paused);
+        ctx.restore();
+      } else {
+        const exposure = lighting ? lunarExposure(lighting.light, sc.moonDir).fraction : 1;
+        const r = Math.max(.9 * dpr, radius, seeingPx * .45);
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 2 * r);
+        glow.addColorStop(0, `rgba(220,215,205,${unoccluded * exposure * (.85 - day * .6)})`);
+        glow.addColorStop(1, 'rgba(220,215,205,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(p.x - 2 * r, p.y - 2 * r, 4 * r, 4 * r);
+      }
     }
   }
   if (!sc.filter && sc.glareSource && sc.glareSource.exposure > 0) {
