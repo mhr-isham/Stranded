@@ -6,7 +6,7 @@ import { clock, subscribeClock } from '../../game/clock';
 import { campDistances, terrainFor } from '../../game/surface';
 
 /** A dialog. Closes on the backdrop, Esc or its ✕ when it has `onClose`; `top` puts it above the tutorial card. */
-export function Modal({ children, onClose, top }: { children: ReactNode; onClose?: () => void; top?: boolean }) {
+export function Modal({ children, onClose, top, className }: { children: ReactNode; onClose?: () => void; top?: boolean; className?: string }) {
   useEffect(() => {
     if (!onClose) return;
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -16,7 +16,7 @@ export function Modal({ children, onClose, top }: { children: ReactNode; onClose
   // Rendered at the top of the page, so no parent's stacking (the HUD's) can bury it.
   return createPortal(
     <div className={`modal-back ${top ? 'top' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className="modal panel">
+      <div className={`modal panel${className ? ` ${className}` : ''}`}>
         {onClose && (
           <button type="button" className="modal-x btn ghost small" aria-label="Close" onClick={onClose}>
             ✕

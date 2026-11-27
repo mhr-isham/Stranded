@@ -867,3 +867,11 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .aurora-conditions { border-left: 2px solid #78869a; }
 .aurora-active, .aurora-sky-cue { color: #a5dbc3; }
 .aurora-active { border-left-color: #7ec8a7; }
+
+.modal.beacon-eclipse-dialog { background: #0a111d; }
+.beacon-eclipse { padding-top: 8px; }
+.beacon-eclipse h2:focus { outline: none; }
+.beacon-eclipse-frame { position: relative; min-height: 150px; height: min(41vh, 330px); overflow: hidden; background: #060b13; border-radius: 10px; }
+.beacon-eclipse-controls { flex-wrap: wrap; }
+.beacon-eclipse-status { min-height: 24px; }
+.beacon-eclipse-slider { width: 100%; }

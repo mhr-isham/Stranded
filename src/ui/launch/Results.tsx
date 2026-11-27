@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { BeaconEclipseWatch } from './BeaconEclipseWatch';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUANTITY_INFO, deriveAll, derivedFor, keysFor, labelFor, truthValues, type Primaries, type QuantityKey } from '../../engine/chain';
 import { variantOf } from '../../engine/chapters';
 import { DAY } from '../../engine/constants';
@@ -147,6 +148,8 @@ function Debrief() {
   const daysLeftFraction = outcome ? (outcome.cruise?.departureMargin ?? (end - outcome.plan.departTime) / end) : 0;
   const grade = gradeRun({ measurementPoints, fuelLeftFraction, daysLeftFraction, hintsUsed: s.hintsUsed, success: kind === 'success', penalty: s.rewindsUsed * mode.rewindPenalty - landingBonus(s.arrival) - (scored ? sharpEyePoints(s) : 0), predictionPoints: predictionPoints(s), multiplier: challengeBonus(s) });
   const [copied, setCopied] = useState(false);
+  const [eclipseOpen, setEclipseOpen] = useState(false);
+  const eclipseButton = useRef<HTMLButtonElement>(null);
   const affected = affectedReadings(s);
 
   // Error budget: how much correction fuel each measurement cost, found by
@@ -398,6 +401,16 @@ function Debrief() {
             Points reward precise and honest error bars. A tight error bar that misses the truth scores below zero.
           </div>}
         </div>
+
+        {kind === 'success' && s.arrival && outcome && sys.features.moon && !s.tutorial.active && (
+          <section className="panel panel-pad stack" aria-label="Beacon sky">
+            <b>Beacon sky</b>
+            <div className="muted">Look through the destination beacon’s camera for the moon’s next daytime passage.</div>
+            <button ref={eclipseButton} className="btn small" onClick={() => setEclipseOpen(true)}>Open beacon eclipse watch</button>
+            {eclipseOpen && <BeaconEclipseWatch system={sys}
+              arrivalAt={outcome.plan.departTime + (outcome.cruise?.elapsed ?? outcome.plan.tof)} close={() => { setEclipseOpen(false); requestAnimationFrame(() => eclipseButton.current?.focus()); }} />}
+          </section>
+        )}
 
         {scored && earned.length > 0 && (
           <div className="panel panel-pad">

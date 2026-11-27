@@ -1,3 +1,4 @@
+import { campSolarDiscs } from '../../engine/solarEclipse';
 import { nudgeWire, pickWire, wireDiameter, type WireChoice } from '../../game/micrometer';
 import { OutingPlanner } from './RoverOuting';
 import { acknowledgeObservation } from '../../game/measurementFeedback';
@@ -564,7 +565,7 @@ export function Observatory() {
                     ...(relayVisible(tt) ? [{ dir: unit(relayTopocentric(sys, tt, sys.site)), radius: 0, color: [235, 240, 255] as [number, number, number] }] : []),
                   ],
                   filter,
-                  targetInFront: sys.features.inner && Math.hypot(...tgtV) < Math.hypot(...sunV),
+                  solarDiscs: filter ? campSolarDiscs(sys, tt, sunV, tgtV, moonV) : undefined,
                   shimmer: { x: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 2.1) * Math.sin(ts * 0.7), y: 0.35 * ARCSEC * seeingFactor(useGame.getState(), tt) * Math.sin(ts * 1.7 + 1) },
                 },
                 dpr,

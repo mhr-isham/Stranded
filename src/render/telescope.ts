@@ -1,3 +1,4 @@
+import type { SolarDisc } from '../engine/solarEclipse';
 // Narrow-field telescope rendering in an ecliptic-aligned tangent plane
 // (ecliptic east to the left, ecliptic north up).
 
@@ -107,8 +108,9 @@ export interface ScopeScene {
   seeing: number; // rad (FWHM)
   realTime: number; // ms
   filter: boolean; // solar filter fitted
-  /** The planet is nearer than the star (an inner planet): through the filter it shows as a black dot in transit. */
-  targetInFront?: boolean;
+  solarDiscs?: readonly SolarDisc[];
+  /** An independent low-light camera channel, used only during totality. */
+  solarCorona?: boolean;
   shimmer?: { x: number; y: number }; // tip-tilt offset in rad
   brightStars?: CatalogStar[];
   reduceFlicker?: boolean;
@@ -163,21 +165,24 @@ export function drawScope(ctx: CanvasRenderingContext2D, view: ScopeView, sc: Sc
   const sp = P.project(sc.sunDir);
   if (sc.filter && sp) {
     const r = sc.sunRadius * P.k;
+    if (sc.solarCorona) drawSolarCorona(ctx, sp.x, sp.y, r, sc.seed);
     drawFilteredStar(ctx, sp.x, sp.y, r, sc.seed);
-    // Clip the foreground silhouette at the stellar limb. The far-side
-    // conjunction has no silhouette.
-    const planet = sc.targetInFront && sc.targetDir && P.project(sc.targetDir);
-    if (planet) {
-      ctx.save();
+    // The ordinary filter shows silhouettes only against the stellar disk.
+    ctx.save();
+    if (!sc.solarCorona) {
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, r, 0, TAU);
       ctx.clip();
-      ctx.fillStyle = '#050403';
-      ctx.beginPath();
-      ctx.arc(planet.x, planet.y, sc.targetRadius * P.k, 0, TAU);
-      ctx.fill();
-      ctx.restore();
     }
+    ctx.fillStyle = '#050403';
+    for (const disc of sc.solarDiscs ?? []) {
+      const p = P.project(disc.direction);
+      if (!p) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, disc.radius * P.k, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // Preserve the bright stars selected in the wide view at narrow fields too.
@@ -348,6 +353,33 @@ function drawPlanet(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.stroke();
   void day;
   void dpr;
+}
+
+function drawSolarCorona(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seed: number) {
+  const glow = ctx.createRadialGradient(x, y, r * .94, x, y, r * 2.5);
+  glow.addColorStop(0, 'rgba(228,242,250,.72)');
+  glow.addColorStop(.2, 'rgba(177,211,232,.27)');
+  glow.addColorStop(.53, 'rgba(126,164,197,.10)');
+  glow.addColorStop(1, 'rgba(126,164,197,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - 2.5 * r, y - 2.5 * r, 5 * r, 5 * r);
+
+  const random = mulberry32(seed ^ 0x57ea);
+  for (let i = 0; i < 78; i++) {
+    const a = TAU * i / 78 + random() * .045;
+    const span = (1.28 + .52 * Math.abs(Math.cos(a * 2.0 - .7)) + .38 * random()) * r;
+    const endX = x + Math.cos(a) * span, endY = y + Math.sin(a) * span;
+    const startX = x + Math.cos(a) * r, startY = y + Math.sin(a) * r;
+    const streamer = ctx.createLinearGradient(startX, startY, endX, endY);
+    streamer.addColorStop(0, 'rgba(226,235,247,.23)');
+    streamer.addColorStop(1, 'rgba(167,188,227,0)');
+    ctx.strokeStyle = streamer;
+    ctx.lineWidth = Math.max(.8, r * (.012 + .022 * random()));
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(x + Math.cos(a + .09) * (span + r) / 2, y + Math.sin(a + .09) * (span + r) / 2, endX, endY);
+    ctx.stroke();
+  }
 }
 
 function drawFilteredStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seed: number) {
