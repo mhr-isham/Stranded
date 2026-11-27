@@ -236,9 +236,9 @@ Broader flare policy across tools and the narrative roles of Mira and Vale remai
 
 ### CH-07 — Slingshot
 
-**Substantial mechanics:** giant planet, moon-based giant mass, orbit fitting and two-leg patched-conic assist. **Partial premise:** easier modes deliberately allow fuel margins that can make a direct transfer affordable; the dialogue's universal “impossible” claim is too strong. Spent-stage reconstruction is not an interactive clue.
+**Agreed and implemented.** Compare Direct and Giant flyby at one departure using the same measured orbit model. The cards show time, fuel margin or deficit, and projected supplies. The launch planner highlights which route fits those estimates and initially chooses a viable route where possible. The flyby map highlights the encounter and both legs. Expand the encounter details to see when the ship reaches the giant, the closest approach, and any maneuver costs. Either route can be flown. Fuel costs come from the transfer and encounter model. Tomas introduces the choice in the briefing.
 
-**Improve:** either make the assist a mandatory routing requirement for the chapter or say it is the safer/cheaper route in forgiving modes. Let Tomas assess engine/structure limits while the Navigator measures the giant and chooses the geometry. Reconstruct a spent-stage position from an archived route and observe it where predicted. Avoid a fake assist bonus detached from actual energy/momentum exchange.
+Spent-stage reconstruction and Tomas's broader engineering role remain open for the story discussion.
 
 ### CH-08 — Lost Among Stars
 

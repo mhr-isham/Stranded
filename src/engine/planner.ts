@@ -287,6 +287,11 @@ export function predictedWindows(m: PlayerModel, t0: number, t1: number, limit =
 /** Best flight time for a given departure, by golden-section search on total cost. */
 export function bestTransfer(m: PlayerModel, departTime: number): PlannedTransfer | null {
   if (m.giant) return bestSlingshot(m, departTime);
+  return bestDirectTransfer(m, departTime);
+}
+
+/** Lowest modeled fuel cost over the direct route's flight-time search. */
+export function bestDirectTransfer(m: PlayerModel, departTime: number): PlannedTransfer | null {
   const tH = hohmannFor(m).tof;
   let a = 0.45 * tH;
   let b = 1.6 * tH;
@@ -310,6 +315,14 @@ export function bestTransfer(m: PlayerModel, departTime: number): PlannedTransfe
     else a = c;
   }
   return planTransfer(m, departTime, 0.5 * (a + b));
+}
+
+/** Departure candidates for the route families available to the player. */
+export function routeWindows(m: PlayerModel, t0: number, t1: number, limit = Infinity) {
+  const primary = predictedWindows(m, t0, t1, limit);
+  if (!m.giant) return primary;
+  const direct = predictedWindows({ ...m, giant: undefined }, t0, t1, limit);
+  return [...new Set([...primary, ...direct])].sort((a, b) => a - b).slice(0, limit);
 }
 
 /**

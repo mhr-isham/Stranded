@@ -4,7 +4,7 @@
 
 import { useGame } from './store';
 
-export type Speaker = 'echo' | 'vale' | 'mira' | 'navigator' | 'note';
+export type Speaker = 'echo' | 'vale' | 'mira' | 'tomas' | 'navigator' | 'note';
 
 export interface StoryLine {
   who: Speaker;
@@ -22,6 +22,7 @@ export const SPEAKER: Record<Speaker, { name: string; cls: string }> = {
   echo: { name: 'ECHO', cls: 'blue' },
   vale: { name: 'Commander Vale', cls: 'amber' },
   mira: { name: 'Mira Sato · Halcyon journal', cls: 'violet' },
+  tomas: { name: 'Tomas Rhee', cls: 'amber' },
   navigator: { name: 'You', cls: '' },
   note: { name: '', cls: 'faint' },
 };
@@ -213,11 +214,10 @@ export const LOGS: Record<string, StoryLog> = {
     chapter: 7,
     kind: 'scene',
     lines: [
-      { who: 'echo', text: 'The next Halcyon cache is on a planet far out — five times our distance from the star. The drive can’t get us there. I ran the numbers four times.' },
-      { who: 'echo', text: 'So I have woken Tomas Rhee.' },
+      { who: 'echo', text: 'The next Halcyon cache is on a planet far out. A direct flight could eat through our fuel. There’s a giant between us and the cache, so I’ve woken Tomas Rhee to help.' },
       { who: 'note', text: 'The engineer climbs out of his pod, reads the fuel display, and laughs once without humour.' },
-      { who: 'echo', text: 'Tomas, there is a giant planet between us and the target. Pass close behind it and it drags us forwards — we leave faster than we came, and it never notices.' },
-      { who: 'echo', text: 'Navigator: the giant must be exactly where we expect it, two years from now, and exactly as heavy as we think. Measure it like you measured everything else.' },
+      { who: 'tomas', text: 'Meet that giant at the right angle and it can swing us onto a faster path. Give me a straight shot and a flyby on the same date. I want to see what each one leaves in the tank.' },
+      { who: 'echo', text: 'Navigator, track the giant and weigh it using its moon. Where we meet it sets up the turn. How much it bends our course depends on its mass.' },
       { who: 'note', text: 'Optional: the Flight School module “Gravity assists” is in the Codex.' },
     ],
   },
@@ -227,7 +227,7 @@ export const LOGS: Record<string, StoryLog> = {
     kind: 'scene',
     lines: [
       { who: 'echo', text: 'Orbit confirmed. And something else on the scope: an empty rocket stage, in an orbit around the star that crosses the giant’s. The Halcyon’s.' },
-      { who: 'echo', text: 'They used the same slingshot forty years ago. Their stage is still on the path the giant bent it onto. I ran their trajectory forward: it lands exactly where we see it.' },
+      { who: 'echo', text: 'They used the giant for a slingshot forty years ago. Their stage is still on the path the giant bent it onto. I ran their trajectory forward: it lands exactly where we see it.' },
       { who: 'note', text: 'Tomas spends the descent rebuilding the fold coils from the cache. “Mira’s crew did this with worse tools,” he says. “I’m not going to be outdone by a ghost.”' },
     ],
   },

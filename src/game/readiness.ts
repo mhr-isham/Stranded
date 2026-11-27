@@ -1,6 +1,6 @@
 import { QUANTITY_INFO, deriveAll, keysFor, type ChainVariant, type DerivedKey, type Estimate, type Primaries, type PrimaryKey } from '../engine/chain';
 import { simulateLaunch } from '../engine/launch';
-import { bestTransfer, modelFromPrimaries, predictedWindows, sampleModel, systemFromModel } from '../engine/planner';
+import { bestDirectTransfer, bestSlingshot, modelFromPrimaries, routeWindows, sampleModel, systemFromModel } from '../engine/planner';
 import { makeRng } from '../engine/rng';
 import type { StarSystem } from '../engine/types';
 import { variantOf } from '../engine/chapters';
@@ -67,12 +67,14 @@ export function flightReadiness(sheet: Primaries, system: StarSystem, budget: nu
   if (progress.invalid.length) return { status: 'invalid-model' };
   const model = navigationModel(sheet, variant);
   if (!model) return { status: 'invalid-model' };
-  const window = predictedWindows(model, now, end, 1)[0];
+  const window = routeWindows(model, now, end, 1)[0];
   if (window === undefined) return { status: 'no-window' };
   const previous = estimateCache.get(sheet);
   if (previous?.system === system && previous.budget === budget && previous.window === window) return previous.estimate;
 
-  const plan = bestTransfer(model, window);
+  const direct = bestDirectTransfer(model, window);
+  const flyby = model.giant ? bestSlingshot(model, window) : null;
+  const plan = flyby && flyby.total < (direct?.total ?? Infinity) ? flyby : direct;
   let estimate: FlightReadiness = { status: 'no-transfer' };
   if (plan && Number.isFinite(plan.total) && Number.isFinite(budget)) {
     const rng = makeRng(7);

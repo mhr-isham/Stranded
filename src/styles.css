@@ -827,6 +827,7 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .orrery-overlay-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; padding: 6px 9px; font-size: 12px; }
 .orrery-route-key { display: inline-flex; align-items: center; gap: 6px; }
 .orrery-route-key i { width: 17px; border-top: 2px dashed var(--amber); }
+.flyby-route-key i { width: 24px; border: 0; height: 2px; background: linear-gradient(90deg, var(--amber) 50%, #76dccc 50%); }
 .orrery-path-count { flex-basis: 100%; color: var(--muted); text-align: center; }
 
 .route-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -838,6 +839,11 @@ hr.sep { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); margin: 10p
 .route-option dt:not(:first-child) { margin-top: 4px; }
 .route-option dd { margin: 0; font: 500 13px var(--mono); overflow-wrap: anywhere; }
 .route-option .amber { color: var(--amber); }
+.slingshot-comparison .route-option[data-selected="true"] { background: linear-gradient(145deg, #18334b, #0d1828); }
+.flyby-details { padding: 8px 10px; border: 1px solid #ffc46b32; border-radius: 8px; background: #ffc46b09; }
+.flyby-details summary { color: var(--amber); cursor: pointer; }
+.flyby-details .kv { margin-top: 10px; }
+.flyby-details p { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
 
 @media (min-width: 680px) and (max-width: 860px) and (max-height: 500px) {
   .tool.launch-tool { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); grid-template-rows: minmax(0, 1fr); }

@@ -13,7 +13,7 @@ export interface SystemFeatures {
   ellipse?: [number, number];
   /** A red dwarf with a tidally locked home planet: no day and night (chapter 6). */
   locked?: boolean;
-  /** A giant planet for a gravity assist; the target is too far to reach directly (chapter 7). */
+  /** A giant planet can provide a gravity assist to the distant target (chapter 7). */
   slingshot?: boolean;
   /** Three nearby stars to triangulate by their annual parallax (chapter 8). */
   stars?: boolean;

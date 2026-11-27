@@ -8,18 +8,20 @@ import { DAY, DEG, G } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
 import { lambert, propagate } from '../../engine/orbits';
 import {
-  bestTransfer,
+  bestDirectTransfer,
+  bestSlingshot,
   hohmannFor,
   modelFromPrimaries,
   planTransfer,
   posAt,
   targetState,
   giantState,
-  predictedWindows,
+  routeWindows,
   sampleModel,
   systemFromModel,
   velAt,
   type PlannedTransfer,
+  type PlayerModel,
 } from '../../engine/planner';
 import { makeRng } from '../../engine/rng';
 import { add, scale, unit, type Vec3 } from '../../engine/vec';
@@ -52,6 +54,18 @@ interface TransferForecasts {
 }
 
 type RouteMode = 'fuel-saver' | 'fast' | 'custom';
+type GiantRoute = 'flyby' | 'direct';
+
+function replanDeparture(model: PlayerModel, route: PlannedTransfer, mode: RouteMode, at: number) {
+  if (route.plan.departTime === at) return route;
+  if (route.plan.flyby) return bestSlingshot(model, at);
+  if (model.giant || mode === 'fuel-saver') return bestDirectTransfer(model, at);
+  return planTransfer(model, at, route.plan.tof);
+}
+
+function canReachArrival(route: PlannedTransfer | null, supplies: CruiseSupplies | null, budget: number) {
+  return !!route && route.total <= budget && (!supplies || supplies.canDepart && cruiseLimit(supplies) > supplies.needs);
+}
 
 export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: number | null; clearLaunchWindow: (value: null) => void }) {
   const s = useGame();
@@ -65,6 +79,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
   const budget = sys.fuelDv - s.penaltyDv;
   const [dep, setDep] = useState<number | 'now' | null>(null); // days
   const [routeMode, setRouteMode] = useState<RouteMode>('fuel-saver');
+  const [giantChoice, setGiantChoice] = useState<GiantRoute | null>(null);
   const [customDays, setCustomDays] = useState<number | null>(null);
   const [forecast, setForecast] = useState<TransferForecasts | null>(null);
   const [showPaths, setShowPaths] = useState(false);
@@ -87,17 +102,27 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
 
   const hoh = useMemo(() => (model ? hohmannFor(model) : null), [model]);
   // A window stays listed for a day after it opens, so warping onto it doesn't make it vanish.
-  const windows = useMemo(() => (model ? predictedWindows(model, Math.max(0, t - DAY), end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const windows = useMemo(() => (model ? routeWindows(model, Math.max(0, t - DAY), end) : []), [model, end, Math.floor(t / DAY)]); // eslint-disable-line react-hooks/exhaustive-deps
   // Which windows can our fuel pay for (by the player's own model)? Default to the first of those.
   const affordable = useMemo(
-    () => (model ? windows.filter((w) => (bestTransfer(model, w)?.total ?? Infinity) <= budget) : []),
+    () => (model ? windows.filter((w) => (bestDirectTransfer(model, w)?.total ?? Infinity) <= budget
+      || (model.giant && (bestSlingshot(model, w)?.total ?? Infinity) <= budget)) : []),
     [model, windows, budget],
   );
   const firstWindow = affordable[0] ?? windows[0];
-  const depDay = launchWindow !== null ? launchWindow / DAY : dep === 'now' ? Math.ceil((t / DAY) * 4) / 4 : (dep ?? (firstWindow ?? t) / DAY);
-  const departure = depDay * DAY;
+  const nowDeparture = model?.giant ? t : Math.ceil(t / DAY * 4) / 4 * DAY;
+  const departure = launchWindow ?? (dep === 'now' ? nowDeparture : dep === null ? firstWindow ?? t : dep * DAY);
+  const depDay = departure / DAY;
   const departureDate = fmt(depDay + 1, 1);
-  const fuelSaver = useMemo(() => model ? bestTransfer(model, departure) : null, [model, departure]);
+  const fuelSaver = useMemo(() => model && !model.giant ? bestDirectTransfer(model, departure) : null, [model, departure]);
+  const direct = useMemo(() => model?.giant ? bestDirectTransfer(model, departure) : null, [model, departure]);
+  const flyby = useMemo(() => model?.giant ? bestSlingshot(model, departure) : null, [model, departure]);
+  const directSupplies = direct ? cruiseSupplies(s, sys, t, direct.plan) : null;
+  const flybySupplies = flyby ? cruiseSupplies(s, sys, t, flyby.plan) : null;
+  const directFits = canReachArrival(direct, directSupplies, budget);
+  const flybyFits = canReachArrival(flyby, flybySupplies, budget);
+  const preferDirect = directFits !== flybyFits ? directFits : (direct?.total ?? Infinity) < (flyby?.total ?? Infinity);
+  const giantRoute = giantChoice ?? (preferDirect ? 'direct' : 'flyby');
   const fast = useMemo(() => model && !model.giant && fuelSaver
     ? planTransfer(model, departure, .75 * fuelSaver.plan.tof) : null, [model, departure, fuelSaver]);
   const minDays = Math.max(1, Math.round((hoh?.tof ?? DAY) / DAY * .5));
@@ -105,12 +130,13 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
   const tofDays = Math.min(maxDays, Math.max(minDays, customDays ?? Math.round((fuelSaver?.plan.tof ?? DAY) / DAY)));
   const custom = useMemo(() => model && !model.giant && routeMode === 'custom'
     ? planTransfer(model, departure, tofDays * DAY) : null, [model, departure, tofDays, routeMode]);
-  const plan = model?.giant || routeMode === 'fuel-saver' ? fuelSaver : routeMode === 'fast' ? fast : custom;
+  const plan = model?.giant ? (giantRoute === 'flyby' ? flyby : direct)
+    : routeMode === 'fuel-saver' ? fuelSaver : routeMode === 'fast' ? fast : custom;
   const launchNowPlan = useMemo(() => confirm && plan && model
-    ? routeMode === 'fuel-saver' || model.giant ? bestTransfer(model, t) : planTransfer(model, t, plan.plan.tof)
+    ? replanDeparture(model, plan, routeMode, t)
     : null, [confirm, plan, model, routeMode, t]);
   const selectedSupplies = plan ? cruiseSupplies(s, sys, t, plan.plan) : null;
-  const forecastRoutes = useMemo(() => [fuelSaver, fast, custom].filter((route): route is PlannedTransfer => !!route), [fuelSaver, fast, custom]);
+  const forecastRoutes = useMemo(() => [fuelSaver, fast, custom, direct, flyby].filter((route): route is PlannedTransfer => !!route), [fuelSaver, fast, custom, direct, flyby]);
 
   // Porkchop: estimated total delta-v over departure date x flight time.
   const pork = useMemo(() => {
@@ -209,7 +235,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
 
   const launch = (manual = false) => {
     if (!plan) return;
-    const p = routeMode === 'fuel-saver' || model.giant ? bestTransfer(model, clock.t) : planTransfer(model, clock.t, plan.plan.tof);
+    const p = replanDeparture(model, plan, routeMode, clock.t);
     if (!p) return toast('No transfer found for this date.');
     const current = useGame.getState();
     if (cruiseSupplies(current, sys, clock.t, p.plan)?.canDepart === false) return toast('The camp is out of supplies for takeoff.');
@@ -245,7 +271,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
       <div className="tool-stage" data-tut="launch-stage">
         <Orrery model={model} plan={plan} paths={paths} t={t} depDay={depDay} />
         {plan && <div className="panel stage-bottom orrery-overlay-controls" role="group" aria-label="Trajectory display">
-          <span className="orrery-route-key"><i aria-hidden="true" />Planned route</span>
+          <span className={`orrery-route-key${plan.plan.flyby ? ' flyby-route-key' : ''}`}><i aria-hidden="true" />{model.giant ? (giantRoute === 'flyby' ? 'Giant flyby' : 'Direct') : 'Planned route'}</span>
           <button type="button" className="btn small" aria-pressed={showPaths} onClick={() => setShowPaths(!showPaths)}>
             {showPaths ? 'Hide possible paths' : 'Show possible paths'}
           </button>
@@ -256,8 +282,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
       </div>
       <div className="tool-side">
         <ToolHeader title="Launch planner" sub="Everything here is computed from your measurements — ECHO flies it through the real system." />
-        <PlanningModelNotes model={model} />
-        <DistanceContext sheet={s.sheet} variant={variant} />
+        {!model.giant && <><PlanningModelNotes model={model} /><DistanceContext sheet={s.sheet} variant={variant} /></>}
         <div className="panel panel-pad stack" data-tut="launch-departure">
           <div className="row between">
             <b>Departure</b>
@@ -280,24 +305,22 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
               Now
             </button>
           </div>
-          {model.giant && plan?.plan.flyby && (
-            <div className="callout key" style={{ margin: 0 }}>
-              <b>Slingshot route</b>
-              <dl className="kv" style={{ marginTop: 4 }}>
-                <dt>To the giant</dt>
-                <dd>{fmt(plan.plan.flyby.tof1 / DAY, 0)} days</dd>
-                <dt>Closest approach</dt>
-                <dd>{fmt(plan.plan.flyby.rp / 1e6, 0)} thousand km</dd>
-                <dt>Burn at closest approach</dt>
-                <dd>{fmt(Math.abs(plan.plan.flyby.dv) + plan.plan.flyby.extraDv, 0)} m/s</dd>
-                <dt>Giant to the blue planet</dt>
-                <dd>{fmt((plan.plan.tof - plan.plan.flyby.tof1) / DAY, 0)} days</dd>
-              </dl>
-              <div className="faint" style={{ fontSize: 12 }}>
-                ECHO aims the flyby with YOUR giant mass. If it is heavier than you think, it bends us further — and the correction after it costs fuel.
-              </div>
+          {model.giant && <section className="stack" aria-label="Compare routes">
+            <b>Choose your route</b>
+            <span className="muted route-comparison-note">Same departure · Day {departureDate} · From your measurements</span>
+            <div className="route-comparison slingshot-comparison">
+              <RouteOption label="Giant flyby" route={flyby} budget={budget} supplies={flybySupplies} showForecast={false}
+                selected={giantRoute === 'flyby'} onSelect={() => { setGiantChoice('flyby'); setConfirm(false); }} />
+              <RouteOption label="Direct" route={direct} budget={budget} supplies={directSupplies} showForecast={false}
+                selected={giantRoute === 'direct'} onSelect={() => { setGiantChoice('direct'); setConfirm(false); }} />
             </div>
-          )}
+            <p className="route-comparison-note" aria-live="polite">{directFits && flybyFits
+              ? 'Both routes fit your fuel and supplies estimates. Compare time in flight and fuel left for corrections.'
+              : directFits || flybyFits
+                ? `Only ${flybyFits ? 'the giant flyby' : 'the direct route'} fits your fuel and supplies estimates at this departure.`
+                : 'Neither route fits your fuel and supplies estimates here. Try another departure.'}</p>
+            {flyby?.plan.flyby && model.giant && <EncounterDetails flyby={flyby.plan.flyby} departure={departure} flightTime={flyby.plan.tof} />}
+          </section>}
           {!model.giant && <section className="stack" aria-label="Compare routes">
             <b>Compare routes</b>
             <span className="muted route-comparison-note">Same departure · Day {departureDate}</span>
@@ -328,8 +351,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
           }} /></div>}
           {model.giant ? (
             <div className="muted" style={{ fontSize: 13 }}>
-              No single lead angle here: the route needs the giant AND the blue planet in the right places, so windows are rare. ECHO searches your own
-              numbers date by date for routes past the giant.
+              A flyby needs the giant and the blue planet in position. Try a different window to see how the encounter and fuel costs change.
             </div>
           ) : model.ecc ? (
             <div className="muted" style={{ fontSize: 13 }}>
@@ -356,7 +378,8 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
             <b>Fuel (your estimate)</b>
             <dl className="kv">
               <dt>Escape from surface</dt>
-              <dd>{fmt(plan.departCost / 1000, 3)} km/s</dd>
+              <dd>{fmt((plan.departCost - encounterFuel(plan.plan.flyby)) / 1000, 3)} km/s</dd>
+              {plan.plan.flyby && <><dt>Flyby maneuvers</dt><dd>{fmt(encounterFuel(plan.plan.flyby) / 1000, 3)} km/s</dd></>}
               <dt>Capture into orbit</dt>
               <dd>{fmt(plan.captureCost / 1000, 3)} km/s</dd>
               <dt>Total planned</dt>
@@ -394,11 +417,15 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
               confirm ? (
                 <div className="stack" style={{ gap: 6 }}>
                   {launchNowPlan && <div className="panel-inset" aria-label="Supplies if you launch now">
-                    <b>Launching now · {fmt(launchNowPlan.plan.tof / DAY, 1)} days in flight</b>
+                    <b>{model.giant ? `${giantRoute === 'flyby' ? 'Giant flyby' : 'Direct'} · ` : 'Launching now · '}{fmt(launchNowPlan.plan.tof / DAY, 1)} days in flight</b>
+                    {model.giant && <div className="route-comparison-note">
+                      {fmt(Math.abs(budget - launchNowPlan.total) / 1000, 2)} km/s {launchNowPlan.total > budget ? 'over budget if launched now' : 'for corrections if launched now'}
+                    </div>}
                     <ArrivalSupplies supplies={cruiseSupplies(s, sys, t, launchNowPlan.plan)} />
                   </div>}
+                  {!launchNowPlan && <div className="amber">There is no usable transfer at the current time.</div>}
                   <div className="row">
-                    <button className="btn danger big" onClick={() => launch(manualRequired)} style={{ flex: 1 }}>
+                    <button className="btn danger big" disabled={!launchNowPlan} onClick={() => launch(manualRequired)} style={{ flex: 1 }}>
                       {manualRequired ? '🕹 Begin manual ascent' : '🚀 Confirm launch'}
                     </button>
                     <button className="btn" onClick={() => setConfirm(false)}>
@@ -406,14 +433,17 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
                     </button>
                   </div>
                   {!s.tutorial.active && !manualRequired && (
-                    <button className="btn" onClick={() => launch(true)}>
+                    <button className="btn" disabled={!launchNowPlan} onClick={() => launch(true)}>
                       🕹 Fly the ascent yourself
                     </button>
                   )}
                   {!s.tutorial.active && <div className="faint" style={{ fontSize: 12 }}>{manualRequired ? 'Manual ascent and destination entry/landing are required. A rescue preserves your expedition as assisted, without a hard-mode score. Flight begins paused so you can check the controls.' : 'ECHO flies the ascent unless you take it. Fuel you waste beyond ECHO’s profile comes out of the margin.'}</div>}
                 </div>
               ) : (
-                <button className="btn amber big" onClick={() => setConfirm(true)}>
+                <button className="btn amber big" onClick={() => {
+                  if (model.giant) setGiantChoice(giantRoute);
+                  setConfirm(true);
+                }}>
                   Launch now
                 </button>
               )
@@ -427,6 +457,7 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
             </div>
           </div>
         )}
+        {model.giant && <><PlanningModelNotes model={model} /><DistanceContext sheet={s.sheet} variant={variant} /></>}
       </div>
     </div>
   );
@@ -434,12 +465,33 @@ export function Launch({ launchWindow, clearLaunchWindow }: { launchWindow: numb
 
 const TAU_DEG = 360;
 
-function RouteOption({ label, route, budget, supplies, forecast, selected, onSelect }: {
+type Flyby = NonNullable<PlannedTransfer['plan']['flyby']>;
+
+function encounterFuel(flyby?: Flyby) {
+  return flyby ? Math.abs(flyby.dv) + flyby.extraDv : 0;
+}
+
+function EncounterDetails({ flyby, departure, flightTime }: { flyby: Flyby; departure: number; flightTime: number }) {
+  return <details className="flyby-details">
+    <summary>Inside the giant encounter</summary>
+    <dl className="kv">
+      <dt>Reach the giant</dt><dd>Day {fmt((departure + flyby.tof1) / DAY + 1, 1)}</dd>
+      <dt>Closest to the giant's centre</dt><dd>{fmt(flyby.rp / 1e6, 0)} thousand km</dd>
+      <dt>Burn at closest approach</dt><dd>{fmt(Math.abs(flyby.dv), 0)} m/s</dd>
+      {flyby.extraDv > 0 && <><dt>Extra turn burn</dt><dd>{fmt(flyby.extraDv, 0)} m/s</dd></>}
+      <dt>Coast from giant to blue planet</dt><dd>{fmt((flightTime - flyby.tof1) / DAY, 1)} days</dd>
+    </dl>
+    <p>The giant's gravity turns the ship. Because the giant is itself orbiting the star, that turn can give the ship a boost or slow it down. A poor approach can need more fuel. Your estimate of the giant's mass helps ECHO aim the pass.</p>
+  </details>;
+}
+
+function RouteOption({ label, route, budget, supplies, forecast, selected, onSelect, showForecast = true }: {
   label: string;
   route: PlannedTransfer | null;
   budget: number;
   supplies: CruiseSupplies | null;
   forecast?: ForecastSummary;
+  showForecast?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -451,8 +503,8 @@ function RouteOption({ label, route, budget, supplies, forecast, selected, onSel
         <dt>Flight time</dt><dd>{fmt(route.plan.tof / DAY, 1)} days</dd>
         <dt>{margin < 0 ? 'Over budget by' : 'Fuel for corrections'}</dt>
         <dd className={margin < 0 ? 'red' : 'blue'}>{fmt(Math.abs(margin) / 1000, 2)} km/s</dd>
-        <dt>Captures within budget</dt>
-        <dd>{forecast ? `${forecast.succeeded} of ${forecast.attempted}` : 'Simulating…'}</dd>
+        {showForecast && <><dt>Captures within budget</dt>
+          <dd>{forecast ? `${forecast.succeeded} of ${forecast.attempted}` : 'Simulating…'}</dd></>}
       </dl>
       {forecast && forecast.unassessable > 0 && <div className="muted route-comparison-note">{forecast.unassessable} unassessable</div>}
       <ArrivalSupplies supplies={supplies} />
@@ -473,7 +525,8 @@ function ArrivalSupplies({ supplies }: { supplies: CruiseSupplies | null }) {
 
 function FuelBar({ plan, budget }: { plan: PlannedTransfer; budget: number }) {
   const parts = [
-    { v: plan.departCost, c: '#6cc4ff', l: 'escape' },
+    { v: plan.departCost - encounterFuel(plan.plan.flyby), c: '#6cc4ff', l: 'escape' },
+    ...(plan.plan.flyby ? [{ v: encounterFuel(plan.plan.flyby), c: '#ffc46b', l: 'flyby' }] : []),
     { v: plan.captureCost, c: '#b59cff', l: 'capture' },
   ];
   const total = Math.max(budget, plan.total);
@@ -545,8 +598,8 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
   const anim = useRef(0);
   // The planned transfer arc in the player's model, computed once per plan.
   const arc = useMemo(() => {
-    if (!plan) return [];
-    const td = depDay * DAY;
+    if (!plan) return { points: [], encounterIndex: -1 };
+    const td = plan.plan.departTime;
     const r1 = posAt(model.a1, model.P1, model, td);
     const v1 = velAt(model.a1, model.P1, model, td);
     const vInf = add(scale(unit(r1), plan.plan.vInfRadial), scale(unit(v1), plan.plan.vInfPrograde));
@@ -560,22 +613,33 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
       const rg = giantState(model, td + fb.tof1)[0];
       const sol = lambert(rg, targetState(model, td + plan.plan.tof)[0], tof2, mu);
       const leg2 = sol ? Array.from({ length: 61 }, (_, i) => propagate(rg, sol[0], (tof2 * i) / 60, mu)[0]) : [];
-      return [...leg1, ...leg2];
+      return { points: [...leg1, ...leg2.slice(1)], encounterIndex: leg1.length - 1 };
     }
-    return Array.from({ length: 121 }, (_, i) => propagate(r1, v0, (plan.plan.tof * i) / 120, mu)[0]);
-  }, [plan, model, depDay]);
+    return { points: Array.from({ length: 121 }, (_, i) => propagate(r1, v0, (plan.plan.tof * i) / 120, mu)[0]), encounterIndex: -1 };
+  }, [plan, model]);
+  const reducedMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), []);
+  const orbitDescription = model.giant
+    ? plan?.plan.flyby ? 'Giant flyby route, showing the leg to the giant and the leg to the blue planet'
+      : plan ? 'Direct route from home to the blue planet' : 'Planetary orbits'
+    : 'Planned route and planetary orbits';
   return (
     <CanvasView
-      role="img" aria-label={paths.length ? 'Planned route with sampled trajectories' : 'Planned route and planetary orbits'}
+      role="img" aria-label={paths.length ? `${orbitDescription} with sampled trajectories` : orbitDescription}
       draw={({ ctx, w, h, dpr, dt }) => {
-        anim.current = (anim.current + dt * 0.15) % 1;
+        if (!reducedMotion.matches) anim.current = (anim.current + dt * 0.15) % 1;
         ctx.fillStyle = '#04060c';
         ctx.fillRect(0, 0, w, h);
         const cx = w / 2;
-        const cy = h * 0.47;
+        const cy = h * (model.giant && w < 600 * dpr && h >= w ? 0.52 : 0.47);
         const S = (Math.min(w, h) * 0.42) / (model.a2 * (1 + (model.ecc ?? 0)) * 1.12);
         const X = (v: Vec3) => cx + v[0] * S;
         const Y = (v: Vec3) => cy - v[1] * S;
+        const labelAt = (text: string, x: number, y: number, offset: number) => {
+          const width = ctx.measureText(text).width;
+          const pad = 6 * dpr;
+          const left = x + offset + width <= w - pad ? x + offset : x - offset - width;
+          ctx.fillText(text, Math.max(pad, left), y);
+        };
         // Orbits.
         for (const [a, c] of [
           [model.a1, 'rgba(255,190,120,0.35)'],
@@ -615,16 +679,27 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
         const td = depDay * DAY;
         if (plan) {
           // Planned transfer in the player's model.
-          ctx.strokeStyle = '#ffc46b';
-          ctx.lineWidth = 2 * dpr;
+          const drawLeg = (start: number, end: number, color: string) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2 * dpr;
+            ctx.beginPath();
+            for (let i = start; i < end; i++) {
+              const r = arc.points[i];
+              if (i === start) ctx.moveTo(X(r), Y(r));
+              else ctx.lineTo(X(r), Y(r));
+            }
+            ctx.stroke();
+          };
           ctx.setLineDash([6 * dpr, 5 * dpr]);
-          ctx.beginPath();
-          arc.forEach((r, i) => (i ? ctx.lineTo(X(r), Y(r)) : ctx.moveTo(X(r), Y(r))));
-          ctx.stroke();
+          if (arc.encounterIndex < 0) drawLeg(0, arc.points.length, '#ffc46b');
+          else {
+            drawLeg(0, arc.encounterIndex + 1, '#ffc46b');
+            drawLeg(arc.encounterIndex, arc.points.length, '#76dccc');
+          }
           ctx.setLineDash([]);
           // Ship marker animating along the plan.
-          const rs = arc[Math.min(arc.length - 1, Math.floor(anim.current * arc.length))];
-          if (rs) {
+          const rs = arc.points[Math.floor(anim.current * arc.points.length)];
+          if (rs && !reducedMotion.matches) {
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(X(rs), Y(rs), 3 * dpr, 0, Math.PI * 2);
@@ -633,13 +708,21 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
           // The giant at the flyby (ghost).
           if (plan.plan.flyby && model.giant) {
             const rg = giantState(model, td + plan.plan.flyby.tof1)[0];
-            ctx.strokeStyle = 'rgba(255,230,184,0.85)';
+            const x = X(rg), y = Y(rg);
+            const glow = ctx.createRadialGradient(x, y, 2 * dpr, x, y, 23 * dpr);
+            glow.addColorStop(0, '#ffe6b8');
+            glow.addColorStop(.35, 'rgba(255,196,107,0.25)');
+            glow.addColorStop(1, 'rgba(255,196,107,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(x - 23 * dpr, y - 23 * dpr, 46 * dpr, 46 * dpr);
+            ctx.strokeStyle = 'rgba(255,230,184,0.8)';
+            ctx.lineWidth = dpr;
             ctx.beginPath();
-            ctx.arc(X(rg), Y(rg), 9 * dpr, 0, Math.PI * 2);
+            ctx.arc(x, y, 9 * dpr, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.fillStyle = 'rgba(255,230,184,0.85)';
-            ctx.font = `${11 * dpr}px Inter`;
-            ctx.fillText('flyby', X(rg) + 11 * dpr, Y(rg));
+            ctx.fillStyle = '#ffe6b8';
+            ctx.font = `600 ${11 * dpr}px Inter, sans-serif`;
+            labelAt('Giant encounter', x, y - 9 * dpr, 12 * dpr);
           }
           // Planet 2 at arrival (ghost).
           const r2a = targetState(model, td + plan.plan.tof)[0];
@@ -648,8 +731,8 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
           ctx.arc(X(r2a), Y(r2a), 8 * dpr, 0, Math.PI * 2);
           ctx.stroke();
           ctx.fillStyle = 'rgba(108,196,255,0.8)';
-          ctx.font = `${11 * dpr}px Inter`;
-          ctx.fillText('arrival', X(r2a) + 10 * dpr, Y(r2a));
+          ctx.font = `${11 * dpr}px Inter, sans-serif`;
+          labelAt('Arrival', X(r2a), Y(r2a), 10 * dpr);
         }
         // Planets at departure and now.
         const planet = (v: Vec3, c: string, r: number, label: string) => {
@@ -658,11 +741,11 @@ function Orrery({ model, plan, paths, t, depDay }: { model: NonNullable<ReturnTy
           ctx.arc(X(v), Y(v), r * dpr, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = 'rgba(230,238,252,0.85)';
-          ctx.font = `600 ${11 * dpr}px Inter`;
-          ctx.fillText(label, X(v) + 9 * dpr, Y(v) - 6 * dpr);
+          ctx.font = `600 ${11 * dpr}px Inter, sans-serif`;
+          if (label) labelAt(label, X(v), Y(v) - 6 * dpr, 9 * dpr);
         };
-        planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, 'home @ departure');
-        planet(targetState(model, td)[0], '#6cc4ff', 6, 'blue @ departure');
+        planet(posAt(model.a1, model.P1, model, td), '#ffb26b', 6, model.giant ? 'Home at departure' : 'home @ departure');
+        planet(targetState(model, td)[0], '#6cc4ff', 6, model.giant ? 'Blue planet at departure' : 'blue @ departure');
         ctx.globalAlpha = 0.45;
         planet(posAt(model.a1, model.P1, model, t), '#ffb26b', 4, 'now');
         planet(targetState(model, t)[0], '#6cc4ff', 4, '');

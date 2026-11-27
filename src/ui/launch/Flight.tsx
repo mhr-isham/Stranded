@@ -62,10 +62,10 @@ export function Flight() {
     : noEscape
     ? ['Ignition…', 'The engines strain — we cannot reach escape speed.', 'Abort. We fall back to the surface.']
     : [
-        `Ignition. Burning ${fmt(result.departCost / 1000, 2)} km/s to escape.`,
+        plan.flyby ? 'Ignition. Escape burn underway. Next stop: the giant.' : `Ignition. Burning ${fmt(result.departCost / 1000, 2)} km/s to escape.`,
         'Coasting. Cryo-pods engaged.',
         outcome.plan.flyby
-          ? `Slingshot: we swing past the giant ${fmt(outcome.plan.flyby.rp / 1e6, 0)} thousand km from its centre. ECHO’s corrections before and after: ${fmt(result.correctionCost, 0)} m/s.`
+          ? `Slingshot plan: pass ${fmt(outcome.plan.flyby.rp / 1e6, 0)} thousand km from the giant’s centre. Course corrections used ${fmt(result.correctionCost, 0)} m/s.`
           : `Mid-course: ECHO sights the blue planet and corrects course — ${fmt(result.correctionCost, 0)} m/s.`,
         result.outcome === 'lost' ? 'Not enough fuel to correct. We drift past the blue planet’s orbit…' : `Arrival. Braking ${fmt(result.captureCost / 1000, 2)} km/s into orbit…`,
         result.outcome === 'success' ? 'Orbit achieved. Heat shield armed for landing.' : result.outcome === 'flyby' ? 'The tanks run dry mid-burn. We fly past.' : 'Lost in space.',

@@ -2,7 +2,7 @@ import { PacingReportButton } from './common/PacingReport';
 import { useMemo, useState } from 'react';
 import { DAY } from '../engine/constants';
 import { variantOf } from '../engine/chapters';
-import { predictedWindows } from '../engine/planner';
+import { routeWindows } from '../engine/planner';
 import { WARPS, clock, setWarp, togglePause } from '../game/clock';
 import { checkMissions, currentWorld } from '../game/sim';
 import { useGame } from '../game/store';
@@ -37,7 +37,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
   const flare = flareAt(sys, t);
   const variant = variantOf(sys.features);
   const model = useMemo(() => navigationModel(s.sheet, variant), [s.sheet, variant]);
-  const launchWindow = !s.tutorial.active && model ? predictedWindows(model, t, end, 1)[0] : undefined;
+  const launchWindow = !s.tutorial.active && model ? routeWindows(model, t, end, 1)[0] : undefined;
   const windowDays = launchWindow === undefined ? 0 : Math.ceil((launchWindow - t) / DAY);
   const windowCountdown = windowDays <= 1 ? 'Under 1 day' : `${fmt(windowDays, 0)} days`;
 
@@ -45,7 +45,7 @@ export function Hud({ onLaunchWindow }: { onLaunchWindow: (at: number) => void }
     const current = useGame.getState();
     const currentModel = navigationModel(current.sheet, variant);
     if (!currentModel) return;
-    const at = predictedWindows(currentModel, clock.t, lifeSupportEnd(current, sys), 1)[0];
+    const at = routeWindows(currentModel, clock.t, lifeSupportEnd(current, sys), 1)[0];
     if (at !== undefined) onLaunchWindow(at);
   }
 

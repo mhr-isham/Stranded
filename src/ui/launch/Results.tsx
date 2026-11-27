@@ -5,7 +5,7 @@ import { QUANTITY_INFO, deriveAll, derivedFor, keysFor, labelFor, truthValues, t
 import { variantOf } from '../../engine/chapters';
 import { DAY } from '../../engine/constants';
 import { simulateLaunch } from '../../engine/launch';
-import { bestTransfer, modelFromPrimaries, planTransfer } from '../../engine/planner';
+import { bestSlingshot, modelFromPrimaries, planTransfer } from '../../engine/planner';
 import { gradeRun, scoreQuantity } from '../../engine/scoring';
 import { sfx } from '../../game/audio';
 import { fmt, sig, toDisplay } from '../../game/format';
@@ -164,8 +164,8 @@ function Debrief() {
       const alt = { ...sheet, [k]: { ...sheet[k]!, value: truth[k] } };
       const m = modelFromPrimaries(alt, variant);
       if (!m) continue;
-      // A slingshot is replanned as a slingshot (a direct route would cost the same for every row).
-      const p = m.giant ? bestTransfer(m, outcome.plan.departTime) : planTransfer(m, outcome.plan.departTime, outcome.plan.tof);
+      // Preserve the route family the player actually flew.
+      const p = outcome.plan.flyby && m.giant ? bestSlingshot(m, outcome.plan.departTime) : planTransfer(m, outcome.plan.departTime, outcome.plan.tof);
       if (!p) continue;
       const r = simulateLaunch(sys, p.plan);
       out.push({ k, saved: base - r.correctionCost });
